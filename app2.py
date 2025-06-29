@@ -2,15 +2,35 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # Initialize session data
 if 'data' not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=[
-        'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'
-    ])
+    st.session_state.data = pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
 
 st.set_page_config(page_title="Submersible Rotor Tracker", layout="centered")
 st.title("🔧 Submersible Pump Rotor Tracker")
+
+# Google Sheets setup
+def get_gsheet():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open("Rotor Log").sheet1
+
+def append_to_sheet(row):
+    sheet = get_gsheet()
+    sheet.append_row(row)
+
+def read_sheet_as_df():
+    sheet = get_gsheet()
+    return pd.DataFrame(sheet.get_all_records())
+
+# Load initial data from Google Sheet
+if st.session_state.data.empty:
+    st.session_state.data = read_sheet_as_df()
 
 # --- Entry Form ---
 with st.form("entry_form"):
@@ -22,26 +42,17 @@ with st.form("entry_form"):
         entry_type = st.selectbox("🔄 Entry Type", ["Inward", "Outgoing"])
         quantity = st.number_input("🔢 Quantity (number of rotors)", min_value=1, step=1)
     remarks = st.text_input("📝 Remarks")
-
     submitted = st.form_submit_button("➕ Add Entry")
     if submitted:
-        new_entry = pd.DataFrame([{
-            'Date': date,
-            'Size (mm)': rotor_size,
-            'Type': entry_type,
-            'Quantity': quantity,
-            'Remarks': remarks
-        }])
+        new_entry = pd.DataFrame([{'Date': date, 'Size (mm)': rotor_size, 'Type': entry_type, 'Quantity': quantity, 'Remarks': remarks}])
         st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
-        st.success("✅ Entry logged!")
+        append_to_sheet([str(date), rotor_size, entry_type, quantity, remarks])  # Sync with Google Sheet
+        st.success("✅ Entry logged and saved to Google Sheet!")
 
 # --- Rotor Log Table ---
 st.subheader("📋 Rotor Movement Log")
-
 if not st.session_state.data.empty:
     df = st.session_state.data.reset_index(drop=True)
-
-    # Create a new column with delete buttons (icons)
     for i in df.index:
         delete_col = st.columns([10, 1])
         with delete_col[0]:
@@ -50,17 +61,16 @@ if not st.session_state.data.empty:
             if st.button("❌", key=f"delete_{i}"):
                 st.session_state.data.drop(index=i, inplace=True)
                 st.session_state.data.reset_index(drop=True, inplace=True)
+                append_to_sheet([])  # Optional: Clear row in Google Sheet if supported
                 st.rerun()
 else:
     st.info("No entries to display.")
+
 # --- Summary by Size ---
 st.subheader("📊 Current Stock by Size (mm)")
-
 if not st.session_state.data.empty:
     summary = st.session_state.data.copy()
-    summary['Net Quantity'] = summary.apply(
-        lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1
-    )
+    summary['Net Quantity'] = summary.apply(lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1)
     stock_summary = summary.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
     stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
     st.dataframe(stock_summary, use_container_width=True)
@@ -68,89 +78,15 @@ else:
     st.info("No data available yet.")
 
 # --- Export Section ---
-# --- Export Section ---
 st.subheader("📤 Export Data")
-
-# Export to CSV
 csv = st.session_state.data.to_csv(index=False).encode('utf-8')
-st.download_button(
-    label="📥 Download CSV",
-    data=csv,
-    file_name="submersible_rotor_log.csv",
-    mime="text/csv"
-)
+st.download_button("📥 Download CSV", csv, "submersible_rotor_log.csv", "text/csv")
+excel_bytes = to_excel(st.session_state.data)
+st.download_button("📊 Download Excel", excel_bytes, "submersible_rotor_log.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# Export to Excel
 def to_excel(df):
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
     df.to_excel(writer, index=False, sheet_name='Rotor Data')
     writer.close()
     return output.getvalue()
-
-# Even if data is empty, allow Excel export
-excel_bytes = to_excel(st.session_state.data)
-st.download_button(
-    label="📊 Download Excel",
-    data=excel_bytes,
-    file_name="submersible_rotor_log.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-import gspread
-import json
-import streamlit as st
-from oauth2client.service_account import ServiceAccountCredentials
-
-def get_gsheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds_dict = json.loads(st.secrets["gcp_service_account"])  # secrets must be valid JSON
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open("Rotor Log").sheet1  # Name must match your actual Google Sheet
-    return sheet
-
-def append_to_sheet(row):
-    sheet = get_gsheet()
-    sheet.append_row(row)
-
-# Sample Streamlit entry form
-st.title("🛠 Rotor Logger")
-
-date = st.date_input("Date", value=datetime.today())
-size = st.number_input("Size (mm)", min_value=1)
-rtype = st.selectbox("Type", ["Inward", "Outgoing"])
-qty = st.number_input("Quantity", min_value=1)
-remarks = st.text_input("Remarks")
-
-if st.button("➕ Add Entry"):
-    new_row = [str(date), size, rtype, qty, remarks]
-    append_to_sheet(new_row)
-    st.success("✅ Entry saved to Google Sheet!")
-    
-from gsheet import append_to_sheet, read_sheet_as_df
-
-# Example to save a new row
-new_row = ['2025-06-29', '100', 'Inward', 100, 'tri']
-append_to_sheet(new_row)
-
-# Example to read and show DataFrame
-df = read_sheet_as_df()
-st.dataframe(df)
-
-# === Stock Summary ===
-st.markdown("### 📊 Stock Summary")
-
-if "data" in st.session_state and not st.session_state.data.empty:
-    # Calculate net quantity by size
-    summary_df = st.session_state.data.copy()
-    summary_df["Net Quantity"] = summary_df.apply(lambda row: row["Quantity"] if row["Type"] == "Inward" else -row["Quantity"], axis=1)
-    stock_summary = summary_df.groupby("Size (mm)")["Net Quantity"].sum().reset_index()
-
-    # Display stock summary
-    st.dataframe(stock_summary)
-
-    # Optional: Download summary
-    csv = stock_summary.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Stock Summary", csv, "stock_summary.csv", "text/csv")
-else:
-    st.info("No stock data available to summarize.")
