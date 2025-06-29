@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from io import BytesIO
 
-# Initialize session data
+# Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'
@@ -52,11 +53,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet.")
 
-# --- CSV Download ---
-
-from io import BytesIO
-
-# --- Excel & CSV Export ---
+# --- Export Section ---
 st.subheader("📤 Export Data")
 
 # Export to CSV
