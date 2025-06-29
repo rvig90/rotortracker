@@ -147,6 +147,17 @@ if not st.session_state.data.empty:
 else:
     st.warning("No data available to export.")
 
+def read_sheet_as_df():
+    try:
+        sheet = get_gsheet()
+        if sheet is None:
+            return pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
+        records = sheet.get_all_records()
+        return pd.DataFrame(records) if records else pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
+    except Exception as e:
+        st.error(f"Error reading Google Sheet: {e}")
+        return pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
+
 if st.button("Test Google Sheets Connection"):
     try:
         sheet = get_gsheet()
