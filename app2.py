@@ -50,7 +50,7 @@ if not st.session_state.data.empty:
             if st.button("❌", key=f"delete_{i}"):
                 st.session_state.data.drop(index=i, inplace=True)
                 st.session_state.data.reset_index(drop=True, inplace=True)
-                st.experimental_rerun()
+                st.rerun()
 else:
     st.info("No entries to display.")
 # --- Summary by Size ---
