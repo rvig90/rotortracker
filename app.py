@@ -1,76 +1,100 @@
-
-import streamlit as st
-import pandas as pd
-from datetime import datetime
+import csv
 import os
+from datetime import datetime
+from collections import defaultdict
 
-# File path for persistent storage
-DATA_FILE = "rotor_stock_log.xlsx"
+CSV_FILE = "rotor_log.csv"
 
-# Initialize or load data
-def load_data():
-    if os.path.exists(DATA_FILE):
-        return pd.read_excel(DATA_FILE)
-    else:
-        return pd.DataFrame(columns=[
-            'Date', 'Size (mm)', 'Inward Qty', 'Outward Qty', 'Balance Qty', 'Remarks'
-        ])
+def load_log():
+    log = []
+    if os.path.exists(CSV_FILE):
+        with open(CSV_FILE, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            log = list(reader)
+    return log
 
-def save_data(df):
-    df.to_excel(DATA_FILE, index=False)
+def save_log(log):
+    with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=['date', 'sizeMM', 'quantity', 'type', 'remarks'])
+        writer.writeheader()
+        writer.writerows(log)
 
-st.title("🔧 Submersible Pump Rotor Stock Tracker with Auto Save")
+def add_entry():
+    date = input("Enter date (YYYY-MM-DD) [leave empty for today]: ") or datetime.today().strftime('%Y-%m-%d')
+    sizeMM = input("Enter rotor size in mm: ")
+    quantity = input("Enter quantity: ")
+    type_ = input("Enter type (in/out): ").lower()
+    remarks = input("Enter remarks: ")
 
-data = load_data()
+    entry = {
+        'date': date,
+        'sizeMM': sizeMM,
+        'quantity': quantity,
+        'type': type_,
+        'remarks': remarks
+    }
 
-# --- Data Entry ---
-st.header("Add New Entry")
-date = st.date_input("Date", datetime.today())
-size = st.text_input("Rotor Size (mm)")
-inward = st.number_input("Inward Quantity", min_value=0, value=0, step=1)
-outward = st.number_input("Outward Quantity", min_value=0, value=0, step=1)
-remarks = st.text_input("Remarks")
+    log = load_log()
+    log.append(entry)
+    save_log(log)
+    print("Entry added successfully.")
 
-if st.button("Add Entry"):
-    new_row = pd.DataFrame({
-        'Date': [date],
-        'Size (mm)': [size],
-        'Inward Qty': [inward],
-        'Outward Qty': [outward],
-        'Balance Qty': [0],  # Will recalculate below
-        'Remarks': [remarks]
-    })
-    data = pd.concat([data, new_row], ignore_index=True)
+def show_inventory():
+    log = load_log()
+    inventory = defaultdict(int)
+    for entry in log:
+        qty = int(entry['quantity'])
+        size = entry['sizeMM']
+        if entry['type'] == 'in':
+            inventory[size] += qty
+        else:
+            inventory[size] -= qty
 
-    # Recalculate Balance Qty per size
-    data['Balance Qty'] = data.groupby('Size (mm)')['Inward Qty'].cumsum() - data.groupby('Size (mm)')['Outward Qty'].cumsum()
+    print("\nCurrent Inventory:")
+    print("------------------------")
+    for size, qty in inventory.items():
+        print(f"{size} mm: {qty}")
+    print("------------------------")
 
-    save_data(data)
-    st.success("Entry added and saved to Excel.")
+def view_log():
+    log = load_log()
+    if not log:
+        print("No log entries yet.")
+        return
 
-# --- Display Table ---
-st.header("📊 Transaction Log")
-if len(data) > 0:
-    st.dataframe(data.sort_values(by='Date'))
-    # Download option
-    csv = data.to_csv(index=False).encode('utf-8')
-    st.download_button("Download as CSV", csv, "rotor_stock.csv", "text/csv")
-else:
-    st.info("No data yet. Add an entry to get started.")
+    print("\nLog Entries:")
+    print("{:<12} {:<8} {:<8} {:<6} {}".format("Date", "Size", "Qty", "Type", "Remarks"))
+    print("-" * 50)
+    for entry in log:
+        print("{:<12} {:<8} {:<8} {:<6} {}".format(
+            entry['date'],
+            entry['sizeMM'],
+            entry['quantity'],
+            entry['type'],
+            entry['remarks']
+        ))
+    print("-" * 50)
 
-# --- Filters (Optional) ---
-st.sidebar.header("Filter Data")
-size_filter = st.sidebar.text_input("Filter by Size (mm)")
-date_filter = st.sidebar.date_input("Filter by Date Range", [])
+def main():
+    while True:
+        print("\nRotor Tracker Menu:")
+        print("1. Add Entry")
+        print("2. Show Inventory")
+        print("3. View Log")
+        print("4. Exit")
+        choice = input("Enter your choice: ")
 
-filtered = data
+        if choice == '1':
+            add_entry()
+        elif choice == '2':
+            show_inventory()
+        elif choice == '3':
+            view_log()
+        elif choice == '4':
+            print("Exiting Rotor Tracker.")
+            break
+        else:
+            print("Invalid choice. Try again.")
 
-if size_filter:
-    filtered = filtered[filtered['Size (mm)'] == size_filter]
-
-if isinstance(date_filter, list) and len(date_filter) == 2:
-    start_date, end_date = date_filter
-    filtered = filtered[(filtered['Date'] >= pd.to_datetime(start_date)) & (filtered['Date'] <= pd.to_datetime(end_date))]
-
-st.sidebar.write(f"Filtered Entries: {len(filtered)}")
-st.sidebar.dataframe(filtered)
+if __name__ == '__main__':
+    main()
