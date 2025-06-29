@@ -146,3 +146,14 @@ if not st.session_state.data.empty:
     )
 else:
     st.warning("No data available to export.")
+
+if st.button("Test Google Sheets Connection"):
+    try:
+        sheet = get_gsheet()
+        if sheet:
+            st.success("Connection successful!")
+            st.write(f"Found sheet with {len(sheet.get_all_records())} rows")
+        else:
+            st.error("Connection failed")
+    except Exception as e:
+        st.error(f"Connection error: {e}")
