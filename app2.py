@@ -2,43 +2,38 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Initialize data
+# Initialize data on first load
 if 'data' not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=['Date', 'Type', 'Quantity (mm)', 'Remarks'])
+    st.session_state.data = pd.DataFrame(columns=['Date', 'Quantity (mm)', 'Remarks'])
 
-st.title("🔧 Rotor Inward & Outgoing Tracker")
+st.set_page_config(page_title="Rotor Tracker", layout="centered")
+st.title("🔧 Rotor Stock Tracker")
 
-# Data Entry Form
+# --- Data Entry Form ---
 with st.form("entry_form"):
     col1, col2 = st.columns(2)
     with col1:
         date = st.date_input("📅 Date", value=datetime.today())
     with col2:
-        entry_type = st.selectbox("🔁 Type", ["Inward", "Outgoing"])
-    quantity = st.number_input("📏 Quantity (in mm)", min_value=1, step=1)
+        quantity = st.number_input("📏 Quantity (in mm)", min_value=1, step=1)
     remarks = st.text_input("📝 Remarks")
-    submitted = st.form_submit_button("➕ Add Entry")
 
+    submitted = st.form_submit_button("➕ Add Entry")
     if submitted:
-        new_entry = pd.DataFrame([[date, entry_type, quantity, remarks]],
-                                 columns=['Date', 'Type', 'Quantity (mm)', 'Remarks'])
+        new_entry = pd.DataFrame([[date, quantity, remarks]],
+                                 columns=['Date', 'Quantity (mm)', 'Remarks'])
         st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
         st.success("✅ Entry added successfully!")
 
-# Show the log
-st.subheader("📋 Transaction Log")
+# --- Display Table ---
+st.subheader("📋 Rotor Log")
 st.dataframe(st.session_state.data, use_container_width=True)
 
-# Summary Metrics
+# --- Summary Section ---
 st.subheader("📊 Stock Summary")
-inward_total = st.session_state.data.query("Type == 'Inward'")['Quantity (mm)'].sum()
-outgoing_total = st.session_state.data.query("Type == 'Outgoing'")['Quantity (mm)'].sum()
-current_stock = inward_total - outgoing_total
+total_quantity = st.session_state.data['Quantity (mm)'].sum()
+st.metric("Total Stock", f"{total_quantity} mm")
 
-st.metric("Total Inward", f"{inward_total} mm")
-st.metric("Total Outgoing", f"{outgoing_total} mm")
-st.metric("Current Stock", f"{current_stock} mm")
-
-# Download data
+# --- Download Section ---
 csv = st.session_state.data.to_csv(index=False).encode('utf-8')
-st.download_button("📥 Download CSV", csv, "rotor_data.csv", "text/csv")
+st.download_button("📥 Download as CSV", csv, "rotor_data.csv", "text/csv")
