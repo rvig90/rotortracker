@@ -133,3 +133,31 @@ if st.button("➕ Add Entry"):
     new_row = [str(date), size, rtype, qty, remarks]
     append_to_sheet(new_row)
     st.success("✅ Entry saved to Google Sheet!")
+    
+from gsheet import append_to_sheet, read_sheet_as_df
+
+# Example to save a new row
+new_row = ['2025-06-29', '100', 'Inward', 100, 'tri']
+append_to_sheet(new_row)
+
+# Example to read and show DataFrame
+df = read_sheet_as_df()
+st.dataframe(df)
+
+# === Stock Summary ===
+st.markdown("### 📊 Stock Summary")
+
+if "data" in st.session_state and not st.session_state.data.empty:
+    # Calculate net quantity by size
+    summary_df = st.session_state.data.copy()
+    summary_df["Net Quantity"] = summary_df.apply(lambda row: row["Quantity"] if row["Type"] == "Inward" else -row["Quantity"], axis=1)
+    stock_summary = summary_df.groupby("Size (mm)")["Net Quantity"].sum().reset_index()
+
+    # Display stock summary
+    st.dataframe(stock_summary)
+
+    # Optional: Download summary
+    csv = stock_summary.to_csv(index=False).encode('utf-8')
+    st.download_button("Download Stock Summary", csv, "stock_summary.csv", "text/csv")
+else:
+    st.info("No stock data available to summarize.")
