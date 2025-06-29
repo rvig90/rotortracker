@@ -97,23 +97,16 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import pandas as pd
-import streamlit as st
-from datetime import datetime
-from io import BytesIO
 import json
-import os
+import streamlit as st
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Authenticate with Google Sheets
 def get_gsheet():
-    creds_dict = json.loads(st.secrets["gcp_service_account"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        creds_dict,
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(st.secrets["gcp_service_account"])  # secrets must be valid JSON
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet = client.open("Rotor Log").sheet1  # Make sure name matches
+    sheet = client.open("Rotor Log").sheet1  # Name must match your actual Google Sheet
     return sheet
 
 def append_to_sheet(row):
