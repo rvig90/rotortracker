@@ -1,3 +1,5 @@
 streamlit
 pandas
 XlsxWriter
+gsspread
+oauth2client
