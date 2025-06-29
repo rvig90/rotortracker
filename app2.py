@@ -53,5 +53,27 @@ else:
     st.info("No data available yet.")
 
 # --- CSV Download ---
+
+from io import BytesIO
+
+# --- Excel & CSV Export ---
+st.subheader("📤 Export Data")
+
+# Export to CSV
 csv = st.session_state.data.to_csv(index=False).encode('utf-8')
 st.download_button("📥 Download CSV", csv, "submersible_rotor_log.csv", "text/csv")
+
+# Export to Excel
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Rotor Data')
+    return output.getvalue()
+
+excel_data = to_excel(st.session_state.data)
+st.download_button(
+    label="📊 Download Excel",
+    data=excel_data,
+    file_name="submersible_rotor_log.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
