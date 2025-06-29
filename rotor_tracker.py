@@ -19,8 +19,10 @@ def get_gsheet():
              "https://www.googleapis.com/auth/drive"]
     
     try:
-        # Convert secrets to dictionary and fix private key formatting
-        creds_dict = dict(st.secrets["gcp_service_account"])
+        # Parse the JSON service account string from secrets
+        creds_dict = json.loads(st.secrets["gcp_service_account"])
+        
+        # Fix newline characters in private key
         if "\\n" in creds_dict["private_key"]:
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
             
