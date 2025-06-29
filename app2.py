@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from io import BytesIO
 
-# Initialize session state
+# Initialize data
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'
@@ -44,11 +44,11 @@ st.subheader("📊 Current Stock by Size (mm)")
 
 if not st.session_state.data.empty:
     summary = st.session_state.data.copy()
-    summary['Quantity'] = summary.apply(
+    summary['Net Quantity'] = summary.apply(
         lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1
     )
-    stock_summary = summary.groupby('Size (mm)')['Quantity'].sum().reset_index()
-    stock_summary = stock_summary[stock_summary['Quantity'] != 0]
+    stock_summary = summary.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
+    stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
     st.dataframe(stock_summary, use_container_width=True)
 else:
     st.info("No data available yet.")
@@ -58,19 +58,27 @@ st.subheader("📤 Export Data")
 
 # Export to CSV
 csv = st.session_state.data.to_csv(index=False).encode('utf-8')
-st.download_button("📥 Download CSV", csv, "submersible_rotor_log.csv", "text/csv")
+st.download_button(
+    label="📥 Download CSV",
+    data=csv,
+    file_name="submersible_rotor_log.csv",
+    mime="text/csv"
+)
 
 # Export to Excel
 def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Rotor Data')
-    return output.getvalue()
+        writer.save()
+    processed_data = output.getvalue()
+    return processed_data
 
-excel_data = to_excel(st.session_state.data)
+excel_bytes = to_excel(st.session_state.data)
+
 st.download_button(
     label="📊 Download Excel",
-    data=excel_data,
+    data=excel_bytes,
     file_name="submersible_rotor_log.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
