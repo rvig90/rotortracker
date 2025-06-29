@@ -54,6 +54,7 @@ else:
     st.info("No data available yet.")
 
 # --- Export Section ---
+# --- Export Section ---
 st.subheader("📤 Export Data")
 
 # Export to CSV
@@ -73,12 +74,11 @@ def to_excel(df):
     writer.close()
     return output.getvalue()
 
-# Generate Excel bytes only if there's data
-if not st.session_state.data.empty:
-    excel_bytes = to_excel(st.session_state.data)
-    st.download_button(
-        label="📊 Download Excel",
-        data=excel_bytes,
-        file_name="submersible_rotor_log.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+# Even if data is empty, allow Excel export
+excel_bytes = to_excel(st.session_state.data)
+st.download_button(
+    label="📊 Download Excel",
+    data=excel_bytes,
+    file_name="submersible_rotor_log.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
