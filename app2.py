@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from io import BytesIO
 
-# Initialize data
+# Initialize session data
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'
@@ -68,17 +68,17 @@ st.download_button(
 # Export to Excel
 def to_excel(df):
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Rotor Data')
-        writer.save()
-    processed_data = output.getvalue()
-    return processed_data
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    df.to_excel(writer, index=False, sheet_name='Rotor Data')
+    writer.close()
+    return output.getvalue()
 
-excel_bytes = to_excel(st.session_state.data)
-
-st.download_button(
-    label="📊 Download Excel",
-    data=excel_bytes,
-    file_name="submersible_rotor_log.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+# Generate Excel bytes only if there's data
+if not st.session_state.data.empty:
+    excel_bytes = to_excel(st.session_state.data)
+    st.download_button(
+        label="📊 Download Excel",
+        data=excel_bytes,
+        file_name="submersible_rotor_log.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
