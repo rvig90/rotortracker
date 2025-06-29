@@ -1,13 +1,13 @@
 
->>> import gspread
-... from google.oauth2.service_account import Credentials
-... import pandas as pd
-... import streamlit as st
-... 
-... SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-... SHEET_NAME = "Rotor Log"
-... 
-... def get_gsheet():
+ import gspread
+ from google.oauth2.service_account import Credentials
+ import pandas as pd
+ import streamlit as st
+ 
+ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+ SHEET_NAME = "Rotor Log"
+ 
+ def get_gsheet():
 ...     creds_dict = st.secrets["gcp_service_account"]
 ...     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPE)
 ...     client = gspread.authorize(creds)
