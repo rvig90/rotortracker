@@ -37,24 +37,22 @@ with st.form("entry_form"):
 
 # --- Rotor Log Table ---
 st.subheader("📋 Rotor Movement Log")
-st.subheader("📋 Rotor Movement Log")
 
-# If there's data, show with delete buttons
 if not st.session_state.data.empty:
     df = st.session_state.data.reset_index(drop=True)
 
-    # Add a delete column
+    # Create a new column with delete buttons (icons)
     for i in df.index:
-        st.write(f"*Entry #{i+1}*")
-        st.dataframe(df.iloc[[i]], use_container_width=True, hide_index=True)
-        if st.button(f"🗑 Delete Entry #{i+1}", key=f"delete_{i}"):
-            st.session_state.data.drop(index=i, inplace=True)
-            st.session_state.data.reset_index(drop=True, inplace=True)
-            st.success(f"✅ Entry #{i+1} deleted.")
-            st.experimental_rerun()
+        delete_col = st.columns([10, 1])
+        with delete_col[0]:
+            st.dataframe(df.iloc[[i]], use_container_width=True, hide_index=True)
+        with delete_col[1]:
+            if st.button("❌", key=f"delete_{i}"):
+                st.session_state.data.drop(index=i, inplace=True)
+                st.session_state.data.reset_index(drop=True, inplace=True)
+                st.experimental_rerun()
 else:
-    st.info("No data to display yet.")
-
+    st.info("No entries to display.")
 # --- Summary by Size ---
 st.subheader("📊 Current Stock by Size (mm)")
 
