@@ -96,3 +96,40 @@ st.download_button(
     file_name="submersible_rotor_log.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+import streamlit as st
+from datetime import datetime
+from io import BytesIO
+import json
+import os
+
+# Authenticate with Google Sheets
+def get_gsheet():
+    creds_dict = json.loads(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    client = gspread.authorize(creds)
+    sheet = client.open("Rotor Log").sheet1  # Make sure name matches
+    return sheet
+
+def append_to_sheet(row):
+    sheet = get_gsheet()
+    sheet.append_row(row)
+
+# Sample Streamlit entry form
+st.title("🛠 Rotor Logger")
+
+date = st.date_input("Date", value=datetime.today())
+size = st.number_input("Size (mm)", min_value=1)
+rtype = st.selectbox("Type", ["Inward", "Outgoing"])
+qty = st.number_input("Quantity", min_value=1)
+remarks = st.text_input("Remarks")
+
+if st.button("➕ Add Entry"):
+    new_row = [str(date), size, rtype, qty, remarks]
+    append_to_sheet(new_row)
+    st.success("✅ Entry saved to Google Sheet!")
