@@ -1,100 +1,132 @@
-import csv
-import os
-from datetime import datetime
-from collections import defaultdict
+import React, { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
-CSV_FILE = "rotor_log.csv"
+export default function RotorTrackerApp() {
+  const [logData, setLogData] = useState([]);
+  const [date, setDate] = useState(new Date());
+  const [sizeMM, setSizeMM] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [type, setType] = useState('in');
+  const [remarks, setRemarks] = useState('');
 
-def load_log():
-    log = []
-    if os.path.exists(CSV_FILE):
-        with open(CSV_FILE, newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            log = list(reader)
-    return log
+  const handleAddEntry = () => {
+    if (!sizeMM || !quantity) return;
+    const newEntry = {
+      date: format(date, 'yyyy-MM-dd'),
+      sizeMM,
+      quantity: parseInt(quantity),
+      type,
+      remarks,
+    };
+    setLogData([...logData, newEntry]);
+    setSizeMM('');
+    setQuantity('');
+    setType('in');
+    setRemarks('');
+  };
 
-def save_log(log):
-    with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['date', 'sizeMM', 'quantity', 'type', 'remarks'])
-        writer.writeheader()
-        writer.writerows(log)
+  const handleExport = () => {
+    const worksheet = XLSX.utils.json_to_sheet(logData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rotor Log');
+    XLSX.writeFile(workbook, 'rotor_log.xlsx');
+  };
 
-def add_entry():
-    date = input("Enter date (YYYY-MM-DD) [leave empty for today]: ") or datetime.today().strftime('%Y-%m-%d')
-    sizeMM = input("Enter rotor size in mm: ")
-    quantity = input("Enter quantity: ")
-    type_ = input("Enter type (in/out): ").lower()
-    remarks = input("Enter remarks: ")
+  const inventory = useMemo(() => {
+    const inv = {};
+    logData.forEach(entry => {
+      if (!inv[entry.sizeMM]) inv[entry.sizeMM] = 0;
+      inv[entry.sizeMM] += entry.type === 'in' ? entry.quantity : -entry.quantity;
+    });
+    return inv;
+  }, [logData]);
 
-    entry = {
-        'date': date,
-        'sizeMM': sizeMM,
-        'quantity': quantity,
-        'type': type_,
-        'remarks': remarks
-    }
+  return (
+    <div className="max-w-2xl mx-auto p-4 space-y-4">
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <h1 className="text-xl font-bold">Rotor Accounting App</h1>
+          <Input type="date" value={format(date, 'yyyy-MM-dd')} onChange={(e) => setDate(new Date(e.target.value))} />
+          <Input type="number" placeholder="Rotor Size (mm)" value={sizeMM} onChange={(e) => setSizeMM(e.target.value)} />
+          <Input type="number" placeholder="Quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <select value={type} onChange={(e) => setType(e.target.value)} className="border rounded p-2">
+            <option value="in">IN</option>
+            <option value="out">OUT</option>
+          </select>
+          <Input type="text" placeholder="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          <div className="flex gap-2">
+            <Button onClick={handleAddEntry}>Add Entry</Button>
+            <Button onClick={handleExport} variant="secondary">Export to Excel</Button>
+          </div>
+        </CardContent>
+      </Card>
 
-    log = load_log()
-    log.append(entry)
-    save_log(log)
-    print("Entry added successfully.")
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="text-lg font-semibold">Log Entries</h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Size (mm)</TableHead>
+                <TableHead>Qty</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Remarks</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">No entries yet.</TableCell>
+                </TableRow>
+              ) : (
+                logData.map((entry, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{entry.date}</TableCell>
+                    <TableCell>{entry.sizeMM}</TableCell>
+                    <TableCell>{entry.quantity}</TableCell>
+                    <TableCell className={entry.type === 'in' ? 'text-green-600' : 'text-red-600'}>{entry.type.toUpperCase()}</TableCell>
+                    <TableCell>{entry.remarks}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-def show_inventory():
-    log = load_log()
-    inventory = defaultdict(int)
-    for entry in log:
-        qty = int(entry['quantity'])
-        size = entry['sizeMM']
-        if entry['type'] == 'in':
-            inventory[size] += qty
-        else:
-            inventory[size] -= qty
-
-    print("\nCurrent Inventory:")
-    print("------------------------")
-    for size, qty in inventory.items():
-        print(f"{size} mm: {qty}")
-    print("------------------------")
-
-def view_log():
-    log = load_log()
-    if not log:
-        print("No log entries yet.")
-        return
-
-    print("\nLog Entries:")
-    print("{:<12} {:<8} {:<8} {:<6} {}".format("Date", "Size", "Qty", "Type", "Remarks"))
-    print("-" * 50)
-    for entry in log:
-        print("{:<12} {:<8} {:<8} {:<6} {}".format(
-            entry['date'],
-            entry['sizeMM'],
-            entry['quantity'],
-            entry['type'],
-            entry['remarks']
-        ))
-    print("-" * 50)
-
-def main():
-    while True:
-        print("\nRotor Tracker Menu:")
-        print("1. Add Entry")
-        print("2. Show Inventory")
-        print("3. View Log")
-        print("4. Exit")
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            add_entry()
-        elif choice == '2':
-            show_inventory()
-        elif choice == '3':
-            view_log()
-        elif choice == '4':
-            print("Exiting Rotor Tracker.")
-            break
-        else:
-            print("Invalid choice. Try again.")
-
-if __name__ == '__main__':
-    main()
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="text-lg font-semibold">Current Inventory</h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Size (mm)</TableHead>
+                <TableHead>Qty Left</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.keys(inventory).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center">No inventory data.</TableCell>
+                </TableRow>
+              ) : (
+                Object.entries(inventory).map(([size, qty], index) => (
+                  <TableRow key={index}>
+                    <TableCell>{size}</TableCell>
+                    <TableCell className={qty >= 0 ? 'text-green-600' : 'text-red-600'}>{qty}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
