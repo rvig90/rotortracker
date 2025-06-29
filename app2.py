@@ -1,132 +1,44 @@
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import streamlit as st
+import pandas as pd
+from datetime import datetime
 
-export default function RotorTrackerApp() {
-  const [logData, setLogData] = useState([]);
-  const [date, setDate] = useState(new Date());
-  const [sizeMM, setSizeMM] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [type, setType] = useState('in');
-  const [remarks, setRemarks] = useState('');
+# Initialize data
+if 'data' not in st.session_state:
+    st.session_state.data = pd.DataFrame(columns=['Date', 'Type', 'Quantity (mm)', 'Remarks'])
 
-  const handleAddEntry = () => {
-    if (!sizeMM || !quantity) return;
-    const newEntry = {
-      date: format(date, 'yyyy-MM-dd'),
-      sizeMM,
-      quantity: parseInt(quantity),
-      type,
-      remarks,
-    };
-    setLogData([...logData, newEntry]);
-    setSizeMM('');
-    setQuantity('');
-    setType('in');
-    setRemarks('');
-  };
+st.title("🔧 Rotor Inward & Outgoing Tracker")
 
-  const handleExport = () => {
-    const worksheet = XLSX.utils.json_to_sheet(logData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rotor Log');
-    XLSX.writeFile(workbook, 'rotor_log.xlsx');
-  };
+# Data Entry Form
+with st.form("entry_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        date = st.date_input("📅 Date", value=datetime.today())
+    with col2:
+        entry_type = st.selectbox("🔁 Type", ["Inward", "Outgoing"])
+    quantity = st.number_input("📏 Quantity (in mm)", min_value=1, step=1)
+    remarks = st.text_input("📝 Remarks")
+    submitted = st.form_submit_button("➕ Add Entry")
 
-  const inventory = useMemo(() => {
-    const inv = {};
-    logData.forEach(entry => {
-      if (!inv[entry.sizeMM]) inv[entry.sizeMM] = 0;
-      inv[entry.sizeMM] += entry.type === 'in' ? entry.quantity : -entry.quantity;
-    });
-    return inv;
-  }, [logData]);
+    if submitted:
+        new_entry = pd.DataFrame([[date, entry_type, quantity, remarks]],
+                                 columns=['Date', 'Type', 'Quantity (mm)', 'Remarks'])
+        st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+        st.success("✅ Entry added successfully!")
 
-  return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <h1 className="text-xl font-bold">Rotor Accounting App</h1>
-          <Input type="date" value={format(date, 'yyyy-MM-dd')} onChange={(e) => setDate(new Date(e.target.value))} />
-          <Input type="number" placeholder="Rotor Size (mm)" value={sizeMM} onChange={(e) => setSizeMM(e.target.value)} />
-          <Input type="number" placeholder="Quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-          <select value={type} onChange={(e) => setType(e.target.value)} className="border rounded p-2">
-            <option value="in">IN</option>
-            <option value="out">OUT</option>
-          </select>
-          <Input type="text" placeholder="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          <div className="flex gap-2">
-            <Button onClick={handleAddEntry}>Add Entry</Button>
-            <Button onClick={handleExport} variant="secondary">Export to Excel</Button>
-          </div>
-        </CardContent>
-      </Card>
+# Show the log
+st.subheader("📋 Transaction Log")
+st.dataframe(st.session_state.data, use_container_width=True)
 
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="text-lg font-semibold">Log Entries</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Size (mm)</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Remarks</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">No entries yet.</TableCell>
-                </TableRow>
-              ) : (
-                logData.map((entry, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{entry.date}</TableCell>
-                    <TableCell>{entry.sizeMM}</TableCell>
-                    <TableCell>{entry.quantity}</TableCell>
-                    <TableCell className={entry.type === 'in' ? 'text-green-600' : 'text-red-600'}>{entry.type.toUpperCase()}</TableCell>
-                    <TableCell>{entry.remarks}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+# Summary Metrics
+st.subheader("📊 Stock Summary")
+inward_total = st.session_state.data.query("Type == 'Inward'")['Quantity (mm)'].sum()
+outgoing_total = st.session_state.data.query("Type == 'Outgoing'")['Quantity (mm)'].sum()
+current_stock = inward_total - outgoing_total
 
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="text-lg font-semibold">Current Inventory</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Size (mm)</TableHead>
-                <TableHead>Qty Left</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.keys(inventory).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-center">No inventory data.</TableCell>
-                </TableRow>
-              ) : (
-                Object.entries(inventory).map(([size, qty], index) => (
-                  <TableRow key={index}>
-                    <TableCell>{size}</TableCell>
-                    <TableCell className={qty >= 0 ? 'text-green-600' : 'text-red-600'}>{qty}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+st.metric("Total Inward", f"{inward_total} mm")
+st.metric("Total Outgoing", f"{outgoing_total} mm")
+st.metric("Current Stock", f"{current_stock} mm")
+
+# Download data
+csv = st.session_state.data.to_csv(index=False).encode('utf-8')
+st.download_button("📥 Download CSV", csv, "rotor_data.csv", "text/csv")
