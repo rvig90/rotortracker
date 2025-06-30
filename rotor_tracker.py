@@ -2,11 +2,14 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# ====== INITIALIZE DATA ======
+# ====== INITIALIZE DATA WITH STATUS COLUMN ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
     ])
+    # Initialize with default 'Current' status if migrating old data
+    if not st.session_state.data.empty and 'Status' not in st.session_state.data.columns:
+        st.session_state.data['Status'] = 'Current'
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors"])
@@ -58,92 +61,75 @@ with form_tabs[1]:  # Coming Rotors
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
             st.rerun()
 
-# ====== STOCK SUMMARY WITH ERROR HANDLING ======
+# ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
+    # Ensure Status column exists
+    if 'Status' not in st.session_state.data.columns:
+        st.session_state.data['Status'] = 'Current'
+    
     try:
-        # Current stock calculation
-        current_mask = (st.session_state.data['Status'] == 'Current')
-        current_data = st.session_state.data[current_mask].copy()
+        # Current stock
+        current_data = st.session_state.data[st.session_state.data['Status'] == 'Current'].copy()
+        current_data['Net Quantity'] = current_data.apply(
+            lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], 
+            axis=1
+        )
+        stock_summary = current_data.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
+        stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
         
-        if not current_data.empty:
-            current_data['Net Quantity'] = current_data.apply(
-                lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], 
-                axis=1
-            )
-            stock_summary = current_data.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
-            stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
-        else:
-            stock_summary = pd.DataFrame(columns=['Size (mm)', 'Net Quantity'])
+        # Coming rotors
+        future_data = st.session_state.data[st.session_state.data['Status'] == 'Future']
+        coming_rotors = future_data.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Coming rotors calculation
-        future_mask = (st.session_state.data['Status'] == 'Future')
-        future_data = st.session_state.data[future_mask]
+        # Merge results
+        merged = pd.merge(
+            stock_summary,
+            coming_rotors,
+            on='Size (mm)',
+            how='outer'
+        ).fillna(0).rename(columns={
+            'Net Quantity': 'Current Stock',
+            'Quantity': 'Coming Rotors'
+        })
         
-        if not future_data.empty:
-            coming_rotors = future_data.groupby('Size (mm)')['Quantity'].sum().reset_index()
-        else:
-            coming_rotors = pd.DataFrame(columns=['Size (mm)', 'Quantity'])
-        
-        # Merge data with error handling
-        if not stock_summary.empty or not coming_rotors.empty:
-            merged = pd.merge(
-                stock_summary,
-                coming_rotors,
-                on='Size (mm)',
-                how='outer'
-            ).fillna(0).rename(columns={
-                'Net Quantity': 'Current Stock',
-                'Quantity': 'Coming Rotors'
-            })
-            
-            st.dataframe(
-                merged[['Size (mm)', 'Current Stock', 'Coming Rotors']],
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.info("No stock data available")
-            
-    except KeyError as e:
-        st.error(f"Data structure error: {e}. Please check your data columns.")
+        st.dataframe(
+            merged[['Size (mm)', 'Current Stock', 'Coming Rotors']],
+            use_container_width=True,
+            hide_index=True
+        )
     except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
+        st.error(f"Error generating stock summary: {e}")
 else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG ======
 st.subheader("📋 Movement Log")
 if not st.session_state.data.empty:
+    # Ensure Status column exists
+    if 'Status' not in st.session_state.data.columns:
+        st.session_state.data['Status'] = 'Current'
+    
     try:
         display_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']
         display_df = st.session_state.data[display_cols].sort_values(['Date'], ascending=[False])
         
-        # Add delete buttons
-        display_df['Action'] = [f"""
-        <button onclick="window.deleteIndex={i}" style="
-            background: none;
-            border: none;
-            color: red;
-            cursor: pointer;
-            font-size: 1.2rem;
-        ">❌</button>
-        """ for i in display_df.index]
+        # Add index for deletion
+        display_df['Delete'] = [f"<button onclick='deleteEntry({i})'>❌</button>" for i in display_df.index]
         
-        # Convert to HTML
-        st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+        # Display as HTML table
+        st.markdown(
+            display_df.to_html(escape=False, index=False),
+            unsafe_allow_html=True
+        )
         
-        # JavaScript for delete
+        # JavaScript for deletion
         st.markdown("""
         <script>
-        const buttons = document.querySelectorAll('button');
-        buttons.forEach(button => {
-            button.onclick = () => {
-                const index = button.parentElement.parentElement.rowIndex - 1;
-                fetch('/delete_entry?index=' + index, {method: 'POST'})
-                    .then(() => window.location.reload());
-            };
-        });
+        function deleteEntry(index) {
+            fetch(/delete_entry?index=${index}, {method: 'POST'})
+                .then(() => window.location.reload());
+        }
         </script>
         """, unsafe_allow_html=True)
         
