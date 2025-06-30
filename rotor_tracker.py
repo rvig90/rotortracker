@@ -48,7 +48,7 @@ def load_from_gsheet():
     except Exception as e:
         st.error(f"Error loading from Google Sheets: {e}")
 
-def save_to_gsheet():
+def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
         if sheet:
@@ -61,20 +61,12 @@ def save_to_gsheet():
                 sheet.append_row(row.tolist())
             
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.success("Data saved to Google Sheets!")
     except Exception as e:
-        st.error(f"Error saving to Google Sheets: {e}")
+        st.error(f"Auto-save failed: {e}")
 
-# ====== SYNC BUTTONS ======
-st.write("")  # Spacer
-sync_col1, sync_col2 = st.columns(2)
-with sync_col1:
-    if st.button("🔄 Load from Google Sheets"):
-        load_from_gsheet()
-with sync_col2:
-    if st.button("💾 Save to Google Sheets"):
-        save_to_gsheet()
-st.caption(f"Last sync: {st.session_state.last_sync}")
+# ====== SYNC BUTTON ======
+if st.button("🔄 Sync with Google Sheets", help="Load latest data and auto-save changes"):
+    load_from_gsheet()
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors"])
@@ -100,6 +92,7 @@ with form_tabs[0]:  # Current Movement
                 'Status': 'Current'
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            auto_save_to_gsheet()
             st.rerun()
 
 with form_tabs[1]:  # Coming Rotors
@@ -122,6 +115,7 @@ with form_tabs[1]:  # Coming Rotors
                 'Status': 'Future'
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            auto_save_to_gsheet()
             st.rerun()
 
 # ====== STOCK SUMMARY ======
@@ -169,12 +163,10 @@ with st.expander("📋 View Movement Log", expanded=False):
             st.session_state.data['Status'] = 'Current'
         
         try:
-            # Create a copy of the data for display
             display_df = st.session_state.data.copy()
             
-            # Display each entry with delete button
             for i in display_df.index:
-                cols = st.columns([10, 1])  # Original ratio from your first version
+                cols = st.columns([10, 1])
                 with cols[0]:
                     st.dataframe(
                         display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].iloc[[i]],
@@ -184,8 +176,13 @@ with st.expander("📋 View Movement Log", expanded=False):
                 with cols[1]:
                     if st.button("❌", key=f"delete_{i}"):
                         st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
+                        auto_save_to_gsheet()
                         st.rerun()
         except Exception as e:
             st.error(f"Error displaying movement log: {e}")
     else:
         st.info("No entries to display")
+
+# Display last sync time if available
+if st.session_state.last_sync != "Never":
+    st.caption(f"Last synced: {st.session_state.last_sync}")
