@@ -11,6 +11,7 @@ if 'data' not in st.session_state:
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
     ])
     st.session_state.last_sync = "Never"
+    st.session_state.editing_index = None  # Track which row is being edited
 
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
@@ -42,30 +43,26 @@ def load_from_gsheet():
                     df['Status'] = 'Current'
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.success("Data loaded from Google Sheets!")
+                st.success("Data loaded successfully!")
             else:
-                st.info("Google Sheet is empty")
+                st.info("No data found in Google Sheet")
     except Exception as e:
-        st.error(f"Error loading from Google Sheets: {e}")
+        st.error(f"Error loading data: {e}")
 
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
-        if sheet:
-            if 'Status' not in st.session_state.data.columns:
-                st.session_state.data['Status'] = 'Current'
-            
+        if sheet and not st.session_state.data.empty:
             sheet.clear()
             sheet.append_row(st.session_state.data.columns.tolist())
             for _, row in st.session_state.data.iterrows():
                 sheet.append_row(row.tolist())
-            
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 
-# ====== SYNC BUTTON ======
-if st.button("🔄 Sync with Google Sheets", help="Load latest data and auto-save changes"):
+# ====== SINGLE SYNC BUTTON ======
+if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
     load_from_gsheet()
 
 # ====== ENTRY FORMS ======
@@ -82,7 +79,7 @@ with form_tabs[0]:  # Current Movement
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
         remarks = st.text_input("📝 Remarks")
         
-        if st.form_submit_button("➕ Add Current Movement"):
+        if st.form_submit_button("➕ Add Entry"):
             new_entry = pd.DataFrame([{
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': rotor_size, 
@@ -121,68 +118,115 @@ with form_tabs[1]:  # Coming Rotors
 # ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
-    if 'Status' not in st.session_state.data.columns:
-        st.session_state.data['Status'] = 'Current'
-    
     try:
-        current_data = st.session_state.data[st.session_state.data['Status'] == 'Current'].copy()
-        current_data['Net Quantity'] = current_data.apply(
-            lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], 
-            axis=1
-        )
-        stock_summary = current_data.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
-        stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
+        # Current stock
+        current = st.session_state.data[st.session_state.data['Status'] == 'Current'].copy()
+        current['Net'] = current.apply(lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1)
+        stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
+        stock = stock[stock['Net'] != 0]
         
-        future_data = st.session_state.data[st.session_state.data['Status'] == 'Future']
-        coming_rotors = future_data.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        # Coming rotors
+        future = st.session_state.data[st.session_state.data['Status'] == 'Future']
+        coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        merged = pd.merge(
-            stock_summary,
-            coming_rotors,
-            on='Size (mm)',
-            how='outer'
-        ).fillna(0).rename(columns={
-            'Net Quantity': 'Current Stock',
-            'Quantity': 'Coming Rotors'
-        })
+        # Combined view
+        combined = pd.merge(stock, coming, on='Size (mm)', how='outer').fillna(0)
+        combined.columns = ['Size (mm)', 'Current Stock', 'Coming Rotors']
         
         st.dataframe(
-            merged[['Size (mm)', 'Current Stock', 'Coming Rotors']],
+            combined,
             use_container_width=True,
             hide_index=True
         )
     except Exception as e:
-        st.error(f"Error generating stock summary: {e}")
+        st.error(f"Error generating summary: {e}")
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG (HIDDEN IN EXPANDABLE SECTION) ======
+# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
-        if 'Status' not in st.session_state.data.columns:
-            st.session_state.data['Status'] = 'Current'
-        
         try:
-            display_df = st.session_state.data.copy()
+            # Sort data by date (newest first)
+            sorted_data = st.session_state.data.sort_values('Date', ascending=False)
             
-            for i in display_df.index:
-                cols = st.columns([10, 1])
+            for idx, row in sorted_data.iterrows():
+                st.markdown("---")
+                cols = st.columns([10, 1, 1])
+                
+                # Display the entry
                 with cols[0]:
                     st.dataframe(
-                        display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].iloc[[i]],
+                        pd.DataFrame(row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']]).T,
                         use_container_width=True,
                         hide_index=True
                     )
+                
+                # Edit button
                 with cols[1]:
-                    if st.button("❌", key=f"delete_{i}"):
-                        st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
+                    if st.button("✏", key=f"edit_{idx}"):
+                        st.session_state.editing_index = idx
+                
+                # Delete button
+                with cols[2]:
+                    if st.button("❌", key=f"del_{idx}"):
+                        st.session_state.data = st.session_state.data.drop(idx).reset_index(drop=True)
                         auto_save_to_gsheet()
                         st.rerun()
+                
+                # Edit form (appears when edit button is clicked)
+                if st.session_state.editing_index == idx:
+                    with st.form(f"edit_form_{idx}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_date = st.date_input("📅 Date", 
+                                                      value=datetime.strptime(row['Date'], '%Y-%m-%d'), 
+                                                      key=f"date_{idx}")
+                            edit_size = st.number_input("📐 Rotor Size (mm)", 
+                                                      value=row['Size (mm)'], 
+                                                      min_value=1, 
+                                                      key=f"size_{idx}")
+                        with col2:
+                            edit_type = st.selectbox("🔄 Type", 
+                                                    ["Inward", "Outgoing"], 
+                                                    index=0 if row['Type'] == 'Inward' else 1,
+                                                    key=f"type_{idx}")
+                            edit_qty = st.number_input("🔢 Quantity", 
+                                                      value=row['Quantity'], 
+                                                      min_value=1, 
+                                                      key=f"qty_{idx}")
+                        edit_remarks = st.text_input("📝 Remarks", 
+                                                    value=row['Remarks'], 
+                                                    key=f"remarks_{idx}")
+                        edit_status = st.selectbox("Status", 
+                                                 ["Current", "Future"], 
+                                                 index=0 if row['Status'] == 'Current' else 1,
+                                                 key=f"status_{idx}")
+                        
+                        # Form submission buttons
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            if st.form_submit_button("💾 Save Changes"):
+                                st.session_state.data.at[idx, 'Date'] = edit_date.strftime('%Y-%m-%d')
+                                st.session_state.data.at[idx, 'Size (mm)'] = edit_size
+                                st.session_state.data.at[idx, 'Type'] = edit_type
+                                st.session_state.data.at[idx, 'Quantity'] = edit_qty
+                                st.session_state.data.at[idx, 'Remarks'] = edit_remarks
+                                st.session_state.data.at[idx, 'Status'] = edit_status
+                                auto_save_to_gsheet()
+                                st.session_state.editing_index = None
+                                st.rerun()
+                        with cancel_col:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state.editing_index = None
+                                st.rerun()
+            
+            st.markdown("---")
         except Exception as e:
-            st.error(f"Error displaying movement log: {e}")
+            st.error(f"Error displaying log: {e}")
     else:
         st.info("No entries to display")
 
-# Display last sync time if available
+# Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
