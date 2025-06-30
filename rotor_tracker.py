@@ -80,35 +80,32 @@ if 'verified' not in st.session_state:
 # --- Entry Form ---
 with st.form("entry_form"):
     col1, col2 = st.columns(2)
-    # In your entry form section, replace these lines:
-with col1:
-    rotor_size = st.number_input("📐 Rotor Size (in mm)", min_value=1)
-with col2:
-    quantity = st.number_input("🔢 Quantity (number of rotors)", min_value=1, step=1)
-
-# With these lines to force numeric keyboard on mobile:
-with col1:
-    rotor_size = st.text_input("📐 Rotor Size (in mm)", value="", 
-                             key="rotor_size",
-                             type="number",
-                             help="Enter size in millimeters")
-    if rotor_size and not rotor_size.isdigit():
-        st.warning("Please enter numbers only")
-        rotor_size = ""
-    else:
-        rotor_size = int(rotor_size) if rotor_size else 0
-
-with col2:
-    quantity = st.text_input("🔢 Quantity (number of rotors)", value="", 
-                           key="quantity",
-                           type="number",
-                           help="Enter whole numbers only")
-    if quantity and not quantity.isdigit():
-        st.warning("Please enter numbers only")
-        quantity = ""
-    else:
-        quantity = int(quantity) if quantity else 0
+    with col1:
+        date = st.date_input("📅 Date", value=datetime.today())
+        # Use number_input with proper parameters for numeric keyboard
+        rotor_size = st.number_input(
+            "📐 Rotor Size (in mm)", 
+            min_value=1,
+            step=1,
+            format="%d",  # Ensures integer input
+            key="rotor_size"
+        )
+    with col2:
+        entry_type = st.selectbox("🔄 Entry Type", ["Inward", "Outgoing"])
+        quantity = st.number_input(
+            "🔢 Quantity (number of rotors)", 
+            min_value=1, 
+            step=1,
+            format="%d",  # Ensures integer input
+            key="quantity"
+        )
+    remarks = st.text_input("📝 Remarks")
+    
+    # The crucial submit button - must be inside the form
+    submitted = st.form_submit_button("➕ Add Entry")
+    
     if submitted:
+        # Your submission handling logic here
         new_entry = pd.DataFrame([{
             'Date': date.strftime('%Y-%m-%d'),
             'Size (mm)': rotor_size, 
@@ -116,7 +113,7 @@ with col2:
             'Quantity': quantity, 
             'Remarks': remarks
         }])
-        
+        # Rest of your submission logic...        
         try:
             # Add to session state
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
