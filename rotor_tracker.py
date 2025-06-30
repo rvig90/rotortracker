@@ -1,85 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import json
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
     ])
-    st.session_state.last_sync = "Never"
-
-# ====== GOOGLE SHEETS INTEGRATION ======
-def get_gsheet_connection():
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", 
-                "https://www.googleapis.com/auth/drive"]
-        
-        # Handle both string and dict formats for secrets
-        if isinstance(st.secrets["gcp_service_account"], str):
-            creds_dict = json.loads(st.secrets["gcp_service_account"])
-        else:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-        
-        # Fix private key formatting
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        return client.open("Rotor Log").sheet1
-    except Exception as e:
-        st.error(f"Google Sheets connection failed: {str(e)}")
-        return None
-
-def load_from_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            records = sheet.get_all_records()
-            if records:
-                df = pd.DataFrame(records)
-                if 'Status' not in df.columns:
-                    df['Status'] = 'Current'  # Set default status
-                st.session_state.data = df
-                st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.success("Data loaded from Google Sheets!")
-            else:
-                st.info("Google Sheet is empty")
-    except Exception as e:
-        st.error(f"Error loading from Google Sheets: {e}")
-
-def save_to_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            # Ensure Status column exists
-            if 'Status' not in st.session_state.data.columns:
-                st.session_state.data['Status'] = 'Current'
-            
-            # Clear existing sheet and write new data
-            sheet.clear()
-            sheet.append_row(st.session_state.data.columns.tolist())
-            for _, row in st.session_state.data.iterrows():
-                sheet.append_row(row.tolist())
-            
-            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.success("Data saved to Google Sheets!")
-    except Exception as e:
-        st.error(f"Error saving to Google Sheets: {e}")
-
-# ====== SYNC BUTTONS ======
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🔄 Load from Google Sheets", help="Fetch latest data from cloud"):
-        load_from_gsheet()
-with col2:
-    if st.button("💾 Save to Google Sheets", help="Backup data to cloud"):
-        save_to_gsheet()
-
-st.caption(f"Last sync: {st.session_state.last_sync}")
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors"])
@@ -173,7 +100,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG ======
+# ====== MOVEMENT LOG (HIDDEN TABLE FORMAT) ======
 st.subheader("📋 Movement Log")
 if not st.session_state.data.empty:
     # Ensure Status column exists
@@ -181,30 +108,29 @@ if not st.session_state.data.empty:
         st.session_state.data['Status'] = 'Current'
     
     try:
-        display_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']
-        display_df = st.session_state.data[display_cols].sort_values(['Date'], ascending=[False])
+        # Create display dataframe with all entries
+        display_df = st.session_state.data.sort_values(['Date'], ascending=[False])
         
-        # Add delete buttons
-        for i in display_df.index:
-            cols = st.columns([3, 2, 2, 2, 4, 2, 1])
-            with cols[0]:
-                st.write(display_df.loc[i, 'Date'])
-            with cols[1]:
-                st.write(f"{display_df.loc[i, 'Size (mm)']}mm")
-            with cols[2]:
-                st.write(display_df.loc[i, 'Type'])
-            with cols[3]:
-                st.write(display_df.loc[i, 'Quantity'])
-            with cols[4]:
-                st.write(display_df.loc[i, 'Remarks'])
-            with cols[5]:
-                st.write(display_df.loc[i, 'Status'])
-            with cols[6]:
-                if st.button("❌", key=f"delete_{i}"):
+        # Show in expandable section
+        with st.expander("View Full Movement Log", expanded=False):
+            # Display as table with hidden index
+            st.dataframe(
+                display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']],
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Add delete buttons for each entry
+            for i in display_df.index:
+                if st.button(f"Delete Entry {i+1}", key=f"delete_{i}"):
                     st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
                     st.rerun()
-        
     except Exception as e:
         st.error(f"Error displaying movement log: {e}")
 else:
     st.info("No entries to display")
+
+# ====== DEBUG SECTION (Can be removed after testing) ======
+with st.expander("Debug Data", expanded=False):
+    st.write("Current Data in Session State:")
+    st.write(st.session_state.data)
