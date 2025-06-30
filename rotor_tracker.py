@@ -162,33 +162,30 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG (ORIGINAL FORMAT) ======
-st.subheader("📋 Movement Log")
-if not st.session_state.data.empty:
-    if 'Status' not in st.session_state.data.columns:
-        st.session_state.data['Status'] = 'Current'
-    
-    try:
-        # Create a copy of the data for display
-        display_df = st.session_state.data.copy()
+# ====== MOVEMENT LOG (HIDDEN IN EXPANDABLE SECTION) ======
+with st.expander("📋 View Movement Log", expanded=False):
+    if not st.session_state.data.empty:
+        if 'Status' not in st.session_state.data.columns:
+            st.session_state.data['Status'] = 'Current'
         
-        # Add delete buttons as a new column
-        display_df['Delete'] = [f"delete_{i}" for i in display_df.index]
-        
-        # Display the table with delete buttons
-        for i in display_df.index:
-            cols = st.columns([10, 1])  # Original ratio from your first version
-            with cols[0]:
-                st.dataframe(
-                    display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].iloc[[i]],
-                    use_container_width=True,
-                    hide_index=True
-                )
-            with cols[1]:
-                if st.button("❌", key=f"delete_{i}"):
-                    st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
-                    st.rerun()
-    except Exception as e:
-        st.error(f"Error displaying movement log: {e}")
-else:
-    st.info("No entries to display")
+        try:
+            # Create a copy of the data for display
+            display_df = st.session_state.data.copy()
+            
+            # Display each entry with delete button
+            for i in display_df.index:
+                cols = st.columns([10, 1])  # Original ratio from your first version
+                with cols[0]:
+                    st.dataframe(
+                        display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].iloc[[i]],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                with cols[1]:
+                    if st.button("❌", key=f"delete_{i}"):
+                        st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
+                        st.rerun()
+        except Exception as e:
+            st.error(f"Error displaying movement log: {e}")
+    else:
+        st.info("No entries to display")
