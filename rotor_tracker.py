@@ -5,6 +5,71 @@ from io import BytesIO
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+
+
+# ====== LOGO IMPLEMENTATION ======
+def add_logo():
+    st.markdown(
+        f"""
+        <style>
+            /* Main header container */
+            .logo-container {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                margin-bottom: 2rem;
+            }}
+            
+            /* EST. 1993 text */
+            .established {{
+                font-family: 'Arial', sans-serif;
+                font-size: 1rem;
+                color: #555555;
+                letter-spacing: 0.1em;
+                margin-bottom: -10px;
+            }}
+            
+            /* MR Enterprises text */
+            .logo-text {{
+                font-family: 'Arial Black', sans-serif;
+                font-size: 2rem;
+                font-weight: 900;
+                color: #333333;
+                line-height: 1;
+                text-align: center;
+            }}
+            
+            /* Horizontal rule */
+            .logo-hr {{
+                width: 80%;
+                border: 0;
+                height: 2px;
+                background: linear-gradient(90deg, transparent, #333333, transparent);
+                margin: 0.5rem 0;
+            }}
+        </style>
+        
+        <div class="logo-container">
+            <div class="established">EST. 1993</div>
+            <div class="logo-text">MR<br>M.R ENTERPRISES</div>
+            <div class="logo-hr"></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ====== APP LAYOUT ======
+add_logo()  # Add this before any other components
+
+st.set_page_config(page_title="MR Enterprises - Rotor Tracker", layout="centered")
+
+# Your existing app content
+st.title("🔧 Submersible Pump Rotor Tracker")
+
+# Rest of your existing form and components...
+with st.form("entry_form"):
+    # Your form fields here
+    pass
 st.markdown("""
 <style>
 /* Remove spin buttons from number inputs */
