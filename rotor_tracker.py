@@ -110,36 +110,23 @@ with st.form("entry_form"):
             st.error(f"Failed to save entry: {e}")
 
 # --- Rotor Log Table ---
-st.subheader("📋 Rotor Movement Log")
-if not st.session_state.data.empty:
-    df = st.session_state.data.copy()
-    for i in df.index:
-        delete_col = st.columns([10, 1])
-        with delete_col[0]:
-            st.dataframe(df.iloc[[i]], use_container_width=True, hide_index=True)
-        with delete_col[1]:
-            if st.button("❌", key=f"delete_{i}"):
-                try:
-                    # Remove from session state
-                    st.session_state.data = st.session_state.data.drop(index=i).reset_index(drop=True)
-                    
-                    # Update Google Sheet (clear and rewrite)
-                    sheet = get_gsheet()
-                    if sheet:
-                        sheet.clear()
-                        # Add headers
-                        sheet.append_row(['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
-                        # Add remaining data
-                        for _, row in st.session_state.data.iterrows():
-                            sheet.append_row(row.tolist())
-                    
-                    st.success("Entry deleted successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to delete entry: {e}")
-else:
-    st.info("No entries to display.")
-
+# Replace your movement log section with:
+with st.expander("📋 Rotor Movement Log", expanded=False):
+    if not st.session_state.data.empty:
+        df = st.session_state.data.copy()
+        for i in df.index:
+            delete_col = st.columns([10, 1])
+            with delete_col[0]:
+                st.dataframe(df.iloc[[i]], use_container_width=True, hide_index=True)
+            with delete_col[1]:
+                if st.button("❌", key=f"delete_{i}"):
+                    try:
+                        st.session_state.data = st.session_state.data.drop(index=i).reset_index(drop=True)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete entry: {e}")
+    else:
+        st.info("No entries to display.")
 # --- Summary by Size ---
 st.subheader("📊 Current Stock by Size (mm)")
 if not st.session_state.data.empty:
