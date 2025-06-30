@@ -1,15 +1,85 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
 
-# ====== INITIALIZE DATA WITH STATUS COLUMN ======
+# ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
     ])
-    # Initialize with default 'Current' status if migrating old data
-    if not st.session_state.data.empty and 'Status' not in st.session_state.data.columns:
-        st.session_state.data['Status'] = 'Current'
+    st.session_state.last_sync = "Never"
+
+# ====== GOOGLE SHEETS INTEGRATION ======
+def get_gsheet_connection():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", 
+                "https://www.googleapis.com/auth/drive"]
+        
+        # Handle both string and dict formats for secrets
+        if isinstance(st.secrets["gcp_service_account"], str):
+            creds_dict = json.loads(st.secrets["gcp_service_account"])
+        else:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+        
+        # Fix private key formatting
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        return client.open("Rotor Log").sheet1
+    except Exception as e:
+        st.error(f"Google Sheets connection failed: {str(e)}")
+        return None
+
+def load_from_gsheet():
+    try:
+        sheet = get_gsheet_connection()
+        if sheet:
+            records = sheet.get_all_records()
+            if records:
+                df = pd.DataFrame(records)
+                if 'Status' not in df.columns:
+                    df['Status'] = 'Current'  # Set default status
+                st.session_state.data = df
+                st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                st.success("Data loaded from Google Sheets!")
+            else:
+                st.info("Google Sheet is empty")
+    except Exception as e:
+        st.error(f"Error loading from Google Sheets: {e}")
+
+def save_to_gsheet():
+    try:
+        sheet = get_gsheet_connection()
+        if sheet:
+            # Ensure Status column exists
+            if 'Status' not in st.session_state.data.columns:
+                st.session_state.data['Status'] = 'Current'
+            
+            # Clear existing sheet and write new data
+            sheet.clear()
+            sheet.append_row(st.session_state.data.columns.tolist())
+            for _, row in st.session_state.data.iterrows():
+                sheet.append_row(row.tolist())
+            
+            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.success("Data saved to Google Sheets!")
+    except Exception as e:
+        st.error(f"Error saving to Google Sheets: {e}")
+
+# ====== SYNC BUTTONS ======
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🔄 Load from Google Sheets", help="Fetch latest data from cloud"):
+        load_from_gsheet()
+with col2:
+    if st.button("💾 Save to Google Sheets", help="Backup data to cloud"):
+        save_to_gsheet()
+
+st.caption(f"Last sync: {st.session_state.last_sync}")
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors"])
@@ -114,39 +184,27 @@ if not st.session_state.data.empty:
         display_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']
         display_df = st.session_state.data[display_cols].sort_values(['Date'], ascending=[False])
         
-        # Add index for deletion
-        display_df['Delete'] = [f"<button onclick='deleteEntry({i})'>❌</button>" for i in display_df.index]
-        
-        # Display as HTML table
-        st.markdown(
-            display_df.to_html(escape=False, index=False),
-            unsafe_allow_html=True
-        )
-        
-        # JavaScript for deletion
-        st.markdown("""
-        <script>
-        function deleteEntry(index) {
-            fetch(/delete_entry?index=${index}, {method: 'POST'})
-                .then(() => window.location.reload());
-        }
-        </script>
-        """, unsafe_allow_html=True)
+        # Add delete buttons
+        for i in display_df.index:
+            cols = st.columns([3, 2, 2, 2, 4, 2, 1])
+            with cols[0]:
+                st.write(display_df.loc[i, 'Date'])
+            with cols[1]:
+                st.write(f"{display_df.loc[i, 'Size (mm)']}mm")
+            with cols[2]:
+                st.write(display_df.loc[i, 'Type'])
+            with cols[3]:
+                st.write(display_df.loc[i, 'Quantity'])
+            with cols[4]:
+                st.write(display_df.loc[i, 'Remarks'])
+            with cols[5]:
+                st.write(display_df.loc[i, 'Status'])
+            with cols[6]:
+                if st.button("❌", key=f"delete_{i}"):
+                    st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
+                    st.rerun()
         
     except Exception as e:
         st.error(f"Error displaying movement log: {e}")
 else:
     st.info("No entries to display")
-
-# ====== DELETE FUNCTION ======
-def delete_entry(index):
-    try:
-        st.session_state.data = st.session_state.data.drop(index).reset_index(drop=True)
-        st.success("Entry deleted successfully!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Failed to delete entry: {e}")
-
-# Handle delete requests
-if 'delete_index' in st.query_params:
-    delete_entry(int(st.query_params['delete_index']))
