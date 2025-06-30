@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -6,21 +5,64 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-# ====== PROPER GOOGLE SHEETS AUTHENTICATION ======
+# ====== LOGO IMPLEMENTATION ======
+def add_logo():
+    st.markdown(
+        """
+        <style>
+            .logo-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                margin-bottom: 2rem;
+            }
+            .established {
+                font-family: 'Arial', sans-serif;
+                font-size: 1rem;
+                color: #555555;
+                letter-spacing: 0.1em;
+                margin-bottom: -10px;
+            }
+            .logo-text {
+                font-family: 'Arial Black', sans-serif;
+                font-size: 2rem;
+                font-weight: 900;
+                color: #333333;
+                line-height: 1;
+                text-align: center;
+            }
+            .logo-hr {
+                width: 80%;
+                border: 0;
+                height: 2px;
+                background: linear-gradient(90deg, transparent, #333333, transparent);
+                margin: 0.5rem 0;
+            }
+        </style>
+        <div class="logo-container">
+            <div class="established">EST. 1993</div>
+            <div class="logo-text">MR<br>M.R ENTERPRISES</div>
+            <div class="logo-hr"></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Initialize app
+add_logo()
+st.set_page_config(page_title="MR Enterprises - Rotor Tracker", layout="centered")
+
+# ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet():
     scope = ["https://spreadsheets.google.com/feeds", 
              "https://www.googleapis.com/auth/drive"]
-    
     try:
-        # Parse the service account info properly
         if isinstance(st.secrets["gcp_service_account"], str):
             creds_dict = json.loads(st.secrets["gcp_service_account"])
         else:
             creds_dict = dict(st.secrets["gcp_service_account"])
         
-        # Fix newline characters in private key
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         return client.open("Rotor Log").sheet1
@@ -28,15 +70,19 @@ def get_gsheet():
         st.error(f"Google Sheets connection failed: {str(e)}")
         return None
 
-# ====== DATA SYNC FUNCTIONS ======
 def sync_with_gsheet():
     try:
         sheet = get_gsheet()
         if sheet:
             records = sheet.get_all_records()
-            st.session_state.data = pd.DataFrame(records) if records else pd.DataFrame(
-                columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']
-            )
+            if records:
+                df = pd.DataFrame(records)
+                # Add modification timestamp if not exists
+                if 'Modified' not in df.columns:
+                    df['Modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                st.session_state.data = df
+            else:
+                st.session_state.data = pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Modified'])
     except Exception as e:
         st.error(f"Sync error: {e}")
 
@@ -44,23 +90,21 @@ def update_gsheet():
     try:
         sheet = get_gsheet()
         if sheet:
+            # Update modification timestamp before saving
+            st.session_state.data['Modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             sheet.clear()
-            sheet.append_row(['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
+            sheet.append_row(st.session_state.data.columns.tolist())
             for _, row in st.session_state.data.iterrows():
                 sheet.append_row(row.tolist())
     except Exception as e:
         st.error(f"Update error: {e}")
 
-# ====== INITIALIZE APP ======
+# Initialize data
 if 'data' not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
+    st.session_state.data = pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Modified'])
     sync_with_gsheet()
 
-# ====== REST OF YOUR APP CODE ======
-# (Include all your existing UI components, forms, and functions here)
-# Make sure to call update_gsheet() after any data modifications
-
-# Example delete function:
+# ====== DELETION FUNCTION ======
 def delete_entry(index):
     try:
         st.session_state.data = st.session_state.data.drop(index).reset_index(drop=True)
@@ -69,9 +113,6 @@ def delete_entry(index):
         st.rerun()
     except Exception as e:
         st.error(f"Failed to delete entry: {e}")
-
-
-
 
 # ====== MAIN APP ======
 st.title("🔧 Submersible Pump Rotor Tracker")
@@ -93,7 +134,8 @@ with st.form("entry_form"):
             'Size (mm)': rotor_size, 
             'Type': entry_type, 
             'Quantity': quantity, 
-            'Remarks': remarks
+            'Remarks': remarks,
+            'Modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }])
         st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
         update_gsheet()
@@ -113,13 +155,18 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet.")
 
-# ====== MOVEMENT LOG (HIDDEN BY DEFAULT) ======
-with st.expander("📋 View Full Movement Log", expanded=False):
+# ====== MOVEMENT LOG SORTED BY MODIFICATION DATE ======
+with st.expander("📋 View Full Movement Log (Newest First)", expanded=False):
     if not st.session_state.data.empty:
-        for i in st.session_state.data.index:
+        # Sort by Modified date (newest first)
+        sorted_data = st.session_state.data.sort_values('Modified', ascending=False)
+        
+        for i, row in sorted_data.iterrows():
             cols = st.columns([10, 1])
             with cols[0]:
-                st.dataframe(st.session_state.data.iloc[[i]], use_container_width=True, hide_index=True)
+                # Display only the relevant columns (hide Modified timestamp)
+                display_data = row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].to_frame().T
+                st.dataframe(display_data, use_container_width=True, hide_index=True)
             with cols[1]:
                 if st.button("❌", key=f"delete_{i}"):
                     delete_entry(i)
