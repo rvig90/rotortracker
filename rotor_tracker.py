@@ -14,37 +14,29 @@ def add_logo():
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                margin-bottom: 1rem;
+                margin-bottom: 2rem;
             }
             .established {
                 font-family: 'Arial', sans-serif;
-                font-size: 0.9rem;
+                font-size: 1rem;
                 color: #555555;
                 letter-spacing: 0.1em;
-                margin-bottom: -8px;
+                margin-bottom: -10px;
             }
             .logo-text {
                 font-family: 'Arial Black', sans-serif;
-                font-size: 1.8rem;
+                font-size: 2rem;
                 font-weight: 900;
                 color: #333333;
                 line-height: 1;
                 text-align: center;
             }
             .logo-hr {
-                width: 70%;
+                width: 80%;
                 border: 0;
-                height: 1px;
+                height: 2px;
                 background: linear-gradient(90deg, transparent, #333333, transparent);
                 margin: 0.5rem 0;
-            }
-            .compact-log {
-                font-size: 0.9rem;
-                margin-bottom: 0.5rem;
-            }
-            .log-entry {
-                padding: 0.5rem;
-                border-bottom: 1px solid #eee;
             }
         </style>
         <div class="logo-container">
@@ -85,6 +77,7 @@ def sync_with_gsheet():
             records = sheet.get_all_records()
             if records:
                 df = pd.DataFrame(records)
+                # Add modification timestamp if not exists
                 if 'Modified' not in df.columns:
                     df['Modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 st.session_state.data = df
@@ -97,6 +90,7 @@ def update_gsheet():
     try:
         sheet = get_gsheet()
         if sheet:
+            # Update modification timestamp before saving
             st.session_state.data['Modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             sheet.clear()
             sheet.append_row(st.session_state.data.columns.tolist())
@@ -128,10 +122,10 @@ with st.form("entry_form"):
     col1, col2 = st.columns(2)
     with col1:
         date = st.date_input("📅 Date", value=datetime.today())
-        rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
+        rotor_size = st.number_input("📐 Rotor Size (in mm)", min_value=1, step=1, format="%d")
     with col2:
-        entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
-        quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
+        entry_type = st.selectbox("🔄 Entry Type", ["Inward", "Outgoing"])
+        quantity = st.number_input("🔢 Quantity (number of rotors)", min_value=1, step=1, format="%d")
     remarks = st.text_input("📝 Remarks")
     
     if st.form_submit_button("➕ Add Entry"):
@@ -148,7 +142,7 @@ with st.form("entry_form"):
         st.rerun()
 
 # Stock Summary
-st.subheader("📊 Current Stock by Size")
+st.subheader("📊 Current Stock by Size (mm)")
 if not st.session_state.data.empty:
     summary = st.session_state.data.copy()
     summary['Net Quantity'] = summary.apply(
@@ -157,33 +151,25 @@ if not st.session_state.data.empty:
     )
     stock_summary = summary.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
     stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
-    st.dataframe(stock_summary, use_container_width=True, hide_index=True)
+    st.dataframe(stock_summary, use_container_width=True)
 else:
     st.info("No data available yet.")
 
-# ====== CONDENSED MOVEMENT LOG ======
-with st.expander("📋 Movement Log (Newest First)", expanded=False):
+# ====== MOVEMENT LOG SORTED BY MODIFICATION DATE ======
+with st.expander("📋 View Full Movement Log (Newest First)", expanded=False):
     if not st.session_state.data.empty:
         # Sort by Modified date (newest first)
         sorted_data = st.session_state.data.sort_values('Modified', ascending=False)
         
-        # Display compact log entries
         for i, row in sorted_data.iterrows():
-            cols = st.columns([1, 1, 1, 1, 2, 1])
+            cols = st.columns([10, 1])
             with cols[0]:
-                st.markdown(f"<div class='compact-log'>{row['Date']}</div>", unsafe_allow_html=True)
+                # Display only the relevant columns (hide Modified timestamp)
+                display_data = row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].to_frame().T
+                st.dataframe(display_data, use_container_width=True, hide_index=True)
             with cols[1]:
-                st.markdown(f"<div class='compact-log'>{row['Size (mm)']}mm</div>", unsafe_allow_html=True)
-            with cols[2]:
-                st.markdown(f"<div class='compact-log'>{row['Type']}</div>", unsafe_allow_html=True)
-            with cols[3]:
-                st.markdown(f"<div class='compact-log'>{row['Quantity']}</div>", unsafe_allow_html=True)
-            with cols[4]:
-                st.markdown(f"<div class='compact-log'>{row['Remarks']}</div>", unsafe_allow_html=True)
-            with cols[5]:
                 if st.button("❌", key=f"delete_{i}"):
                     delete_entry(i)
-            st.markdown("<div class='log-entry'></div>", unsafe_allow_html=True)
     else:
         st.info("No entries to display.")
 
