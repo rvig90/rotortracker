@@ -18,15 +18,12 @@ def get_gsheet_connection():
         scope = ["https://spreadsheets.google.com/feeds", 
                 "https://www.googleapis.com/auth/drive"]
         
-        # Handle both string and dict formats for secrets
         if isinstance(st.secrets["gcp_service_account"], str):
             creds_dict = json.loads(st.secrets["gcp_service_account"])
         else:
             creds_dict = dict(st.secrets["gcp_service_account"])
         
-        # Fix private key formatting
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         return client.open("Rotor Log").sheet1
@@ -42,7 +39,7 @@ def load_from_gsheet():
             if records:
                 df = pd.DataFrame(records)
                 if 'Status' not in df.columns:
-                    df['Status'] = 'Current'  # Set default status
+                    df['Status'] = 'Current'
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.success("Data loaded from Google Sheets!")
@@ -55,11 +52,9 @@ def save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
         if sheet:
-            # Ensure Status column exists
             if 'Status' not in st.session_state.data.columns:
                 st.session_state.data['Status'] = 'Current'
             
-            # Clear existing sheet and write new data
             sheet.clear()
             sheet.append_row(st.session_state.data.columns.tolist())
             for _, row in st.session_state.data.iterrows():
@@ -74,10 +69,10 @@ def save_to_gsheet():
 st.write("")  # Spacer
 sync_col1, sync_col2 = st.columns(2)
 with sync_col1:
-    if st.button("🔄 Load from Google Sheets", help="Fetch latest data from cloud"):
+    if st.button("🔄 Load from Google Sheets"):
         load_from_gsheet()
 with sync_col2:
-    if st.button("💾 Save to Google Sheets", help="Backup data to cloud"):
+    if st.button("💾 Save to Google Sheets"):
         save_to_gsheet()
 st.caption(f"Last sync: {st.session_state.last_sync}")
 
@@ -88,12 +83,12 @@ with form_tabs[0]:  # Current Movement
     with st.form("current_form"):
         col1, col2 = st.columns(2)
         with col1:
-            date = st.date_input("📅 Date", value=datetime.today(), key="current_date")
-            rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="current_size")
+            date = st.date_input("📅 Date", value=datetime.today())
+            rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
         with col2:
-            entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], key="current_type")
-            quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="current_qty")
-        remarks = st.text_input("📝 Remarks", key="current_remarks")
+            entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
+            quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
+        remarks = st.text_input("📝 Remarks")
         
         if st.form_submit_button("➕ Add Current Movement"):
             new_entry = pd.DataFrame([{
@@ -111,13 +106,11 @@ with form_tabs[1]:  # Coming Rotors
     with st.form("future_form"):
         col1, col2 = st.columns(2)
         with col1:
-            future_date = st.date_input("📅 Expected Date", 
-                                      min_value=datetime.today() + timedelta(days=1),
-                                      key="future_date")
-            future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="future_size")
+            future_date = st.date_input("📅 Expected Date", min_value=datetime.today() + timedelta(days=1))
+            future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
         with col2:
-            future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="future_qty")
-            future_remarks = st.text_input("📝 Remarks", key="future_remarks")
+            future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
+            future_remarks = st.text_input("📝 Remarks")
         
         if st.form_submit_button("➕ Add Coming Rotors"):
             new_entry = pd.DataFrame([{
@@ -134,12 +127,10 @@ with form_tabs[1]:  # Coming Rotors
 # ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
-    # Ensure Status column exists
     if 'Status' not in st.session_state.data.columns:
         st.session_state.data['Status'] = 'Current'
     
     try:
-        # Current stock
         current_data = st.session_state.data[st.session_state.data['Status'] == 'Current'].copy()
         current_data['Net Quantity'] = current_data.apply(
             lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], 
@@ -148,11 +139,9 @@ if not st.session_state.data.empty:
         stock_summary = current_data.groupby('Size (mm)')['Net Quantity'].sum().reset_index()
         stock_summary = stock_summary[stock_summary['Net Quantity'] != 0]
         
-        # Coming rotors
         future_data = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming_rotors = future_data.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Merge results
         merged = pd.merge(
             stock_summary,
             coming_rotors,
@@ -173,37 +162,32 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG WITH SIDE DELETE BUTTONS ======
+# ====== MOVEMENT LOG (ORIGINAL FORMAT) ======
 st.subheader("📋 Movement Log")
 if not st.session_state.data.empty:
-    # Ensure Status column exists
     if 'Status' not in st.session_state.data.columns:
         st.session_state.data['Status'] = 'Current'
     
     try:
-        # Create display dataframe sorted by date
-        display_df = st.session_state.data.sort_values(['Date'], ascending=[False])
+        # Create a copy of the data for display
+        display_df = st.session_state.data.copy()
         
-        # Display each entry with delete button on the side
-        for idx, row in display_df.iterrows():
-            cols = st.columns([3, 2, 2, 2, 4, 1])
+        # Add delete buttons as a new column
+        display_df['Delete'] = [f"delete_{i}" for i in display_df.index]
+        
+        # Display the table with delete buttons
+        for i in display_df.index:
+            cols = st.columns([10, 1])  # Original ratio from your first version
             with cols[0]:
-                st.write(row['Date'])
+                st.dataframe(
+                    display_df[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']].iloc[[i]],
+                    use_container_width=True,
+                    hide_index=True
+                )
             with cols[1]:
-                st.write(f"{row['Size (mm)']}mm")
-            with cols[2]:
-                st.write(row['Type'])
-            with cols[3]:
-                st.write(row['Quantity'])
-            with cols[4]:
-                st.write(row['Remarks'])
-            with cols[5]:
-                if st.button("❌", key=f"delete_{idx}"):
-                    st.session_state.data = st.session_state.data.drop(idx).reset_index(drop=True)
+                if st.button("❌", key=f"delete_{i}"):
+                    st.session_state.data = st.session_state.data.drop(i).reset_index(drop=True)
                     st.rerun()
-            
-            st.markdown("---")  # Divider between entries
-            
     except Exception as e:
         st.error(f"Error displaying movement log: {e}")
 else:
