@@ -5,7 +5,20 @@ from io import BytesIO
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
-
+st.markdown("""
+<style>
+/* Remove spin buttons from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+/* Firefox */
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+</style>
+""", unsafe_allow_html=True)
 # Initialize session data
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks'])
