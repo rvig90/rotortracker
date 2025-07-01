@@ -76,6 +76,7 @@ def auto_save_to_gsheet():
         st.error(f"Auto-save failed: {e}")
 # ====== SINGLE SYNC BUTTON ======
 # ====== SYNC BUTTONS ======
+# ====== SYNC BUTTONS ======
 col_sync, col_saved = st.columns(2)
 
 with col_sync:
@@ -206,10 +207,9 @@ with st.expander("📋 View Movement Log", expanded=False):
         try:
             st.markdown("### 🔍 Filter Movement Log")
 
-            # Add original index column for editing/deleting after filtering
+            # Add original index column to track filtered rows
             st.session_state.data['__index__'] = st.session_state.data.index
 
-            # ----- Filter UI -----
             filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
             with filter_col1:
@@ -219,7 +219,9 @@ with st.expander("📋 View Movement Log", expanded=False):
             with filter_col3:
                 pending_filter = st.selectbox("✅ Pending", options=["All", "Yes", "No"])
             with filter_col4:
-                remark_filter = st.text_input("📝 Remarks contains")
+                status_filter = st.selectbox("📦 Status", options=["All", "Current", "Future"])
+
+            remark_filter = st.text_input("📝 Remarks contains")
 
             date_start, date_end = st.columns(2)
             with date_start:
@@ -227,10 +229,10 @@ with st.expander("📋 View Movement Log", expanded=False):
             with date_end:
                 end_date = st.date_input("To Date", value=datetime.today())
 
-            # ----- Apply Filters -----
+            # Apply filters
             df = st.session_state.data.copy()
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            df['__index__'] = df['__index__'].astype(int)  # ensure int
+            df['__index__'] = df['__index__'].astype(int)
 
             df = df[(df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))]
             if size_filter:
@@ -241,6 +243,8 @@ with st.expander("📋 View Movement Log", expanded=False):
                 df = df[df['Pending'] == True]
             elif pending_filter == "No":
                 df = df[df['Pending'] == False]
+            if status_filter != "All":
+                df = df[df['Status'] == status_filter]
             if remark_filter:
                 df = df[df['Remarks'].str.contains(remark_filter, case=False, na=False)]
 
@@ -269,7 +273,8 @@ with st.expander("📋 View Movement Log", expanded=False):
                                     'Type': row['Type'],
                                     'Quantity': row['Quantity'],
                                     'Remarks': row['Remarks'],
-                                    'Pending': 'Yes' if row['Pending'] else 'No'
+                                    'Pending': 'Yes' if row['Pending'] else 'No',
+                                    'Status': row['Status']
                                 }])
                                 st.dataframe(display_data, hide_index=True, use_container_width=True)
 
