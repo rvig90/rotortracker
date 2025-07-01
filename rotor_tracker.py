@@ -197,6 +197,9 @@ with st.expander("📋 View Movement Log", expanded=False):
         try:
             st.markdown("### 🔍 Filter Movement Log")
 
+            # Add original index column for editing/deleting after filtering
+            st.session_state.data['__index__'] = st.session_state.data.index
+
             # ----- Filter UI -----
             filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
@@ -218,6 +221,7 @@ with st.expander("📋 View Movement Log", expanded=False):
             # ----- Apply Filters -----
             df = st.session_state.data.copy()
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df['__index__'] = df['__index__'].astype(int)  # ensure int
 
             df = df[(df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))]
             if size_filter:
@@ -235,7 +239,7 @@ with st.expander("📋 View Movement Log", expanded=False):
 
             if not df.empty:
                 for idx, row in df.iterrows():
-                    original_idx = df.index[idx]
+                    original_idx = int(row['__index__'])
                     is_editing = st.session_state.editing == original_idx
 
                     with st.form(f"row_form_{idx}"):
@@ -273,7 +277,7 @@ with st.expander("📋 View Movement Log", expanded=False):
                                     auto_save_to_gsheet()
                                     st.rerun()
                             else:
-                                if st.form_submit_button("✏ Edit"):
+                                if st.form_submit_button("✏️ Edit"):
                                     st.session_state.editing = original_idx
 
                         with row_col3:
@@ -282,7 +286,7 @@ with st.expander("📋 View Movement Log", expanded=False):
                                     st.session_state.editing = None
                                     st.rerun()
                             else:
-                                if st.form_submit_button("🗑 Delete"):
+                                if st.form_submit_button("🗑️ Delete"):
                                     st.session_state.data = st.session_state.data.drop(original_idx).reset_index(drop=True)
                                     auto_save_to_gsheet()
                                     st.rerun()
