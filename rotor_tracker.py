@@ -122,7 +122,7 @@ with form_tabs[1]:  # Coming Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-# ====== ENHANCED STOCK SUMMARY WITH PENDING ROTORS ======
+# ====== STOCK SUMMARY WITH PENDING ROTORS COLUMN ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
@@ -136,24 +136,28 @@ if not st.session_state.data.empty:
         future = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Pending rotors (Outgoing type with Current status)
-        pending = current[current['Type'] == 'Outgoing']
-        pending = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        # Pending outgoing rotors (Current status + Outgoing type)
+        pending_outgoing = current[current['Type'] == 'Outgoing']
+        pending = pending_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Combined view
-        combined = pd.merge(stock, coming, on='Size (mm)', how='outer', suffixes=('_current', '_coming'))
-        combined = pd.merge(combined, pending, on='Size (mm)', how='outer')
+        # Combined view - ensure all sizes are represented
+        all_sizes = pd.DataFrame({'Size (mm)': st.session_state.data['Size (mm)'].unique()})
+        
+        combined = all_sizes.merge(stock, on='Size (mm)', how='left')\
+                           .merge(coming, on='Size (mm)', how='left')\
+                           .merge(pending, on='Size (mm)', how='left')
+        
         combined = combined.fillna(0)
-        
-        # Rename columns and calculate available stock
         combined.columns = ['Size (mm)', 'Current Stock', 'Coming Rotors', 'Pending Outgoing']
+        
+        # Calculate available stock
         combined['Available Stock'] = combined['Current Stock'] - combined['Pending Outgoing']
         
-        # Format the display
+        # Format for display
         display_cols = ['Size (mm)', 'Current Stock', 'Pending Outgoing', 'Available Stock', 'Coming Rotors']
         formatted_df = combined[display_cols]
         
-        # Display with conditional formatting
+        # Apply styling
         def color_negative_red(val):
             color = 'red' if val < 0 else 'black'
             return f'color: {color}'
@@ -164,16 +168,6 @@ if not st.session_state.data.empty:
             hide_index=True
         )
         
-        # Summary statistics
-        with st.expander("📈 Summary Statistics", expanded=False):
-            stats_col1, stats_col2, stats_col3 = st.columns(3)
-            with stats_col1:
-                st.metric("Total Current Stock", int(combined['Current Stock'].sum()))
-            with stats_col2:
-                st.metric("Total Pending Outgoing", int(combined['Pending Outgoing'].sum()))
-            with stats_col3:
-                st.metric("Total Coming Rotors", int(combined['Coming Rotors'].sum()))
-            
     except Exception as e:
         st.error(f"Error generating summary: {e}")
 else:
