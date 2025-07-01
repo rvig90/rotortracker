@@ -149,50 +149,50 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
-# ====== MOVEMENT LOG WITH DATE, REMARKS, AND SIZE FILTERING ======
-with st.expander("📋 View Movement Log", expanded=False):
+# ====== MOVEMENT LOG WITH EDIT 
+# ====== MOBILE-FRIENDLY MOVEMENT LOG WITH FILTERS ======
+with st.expander("📋 View Movement Log", expanded=True):  # Set to expanded by default
     if not st.session_state.data.empty:
         try:
-            # Add filter controls at the top
+            # Add filter controls in a way that works on mobile
             st.write("### Filter Options")
-            filter_col1, filter_col2, filter_col3 = st.columns(3)
             
-            # Date filter
-            with filter_col1:
-                filter_date = st.date_input("Filter by date", value=None)
-                date_filter_applied = st.button("Apply Date Filter")
-            
-            # Remarks search
-            with filter_col2:
-                remarks_search = st.text_input("Search in remarks")
-                remarks_filter_applied = st.button("Search Remarks")
-            
-            # Size filter
-            with filter_col3:
-                size_options = sorted(st.session_state.data['Size (mm)'].unique())
-                selected_size = st.selectbox("Filter by size (mm)", [""] + size_options)
-                size_filter_applied = st.button("Apply Size Filter")
-            
-            # Handle filter applications
-            if date_filter_applied:
-                st.session_state.filter_date = filter_date.strftime('%Y-%m-%d') if filter_date else None
-            
-            if remarks_filter_applied:
-                st.session_state.remarks_search = remarks_search.strip().lower() if remarks_search.strip() else None
-            
-            if size_filter_applied:
-                st.session_state.filter_size = int(selected_size) if selected_size else None
-            
-            # Clear filters button if any filter is active
-            if (hasattr(st.session_state, 'filter_date') and st.session_state.filter_date) or \
-               (hasattr(st.session_state, 'remarks_search') and st.session_state.remarks_search) or \
-               (hasattr(st.session_state, 'filter_size') and st.session_state.filter_size):
-                if st.button("Clear All Filters"):
-                    st.session_state.filter_date = None
-                    st.session_state.remarks_search = None
-                    st.session_state.filter_size = None
-                    st.rerun()
+            # Use tabs for filters on mobile
+            if st.checkbox("Show Filters", value=True, key="show_filters"):
+                filter_tab1, filter_tab2, filter_tab3 = st.tabs(["Date", "Remarks", "Size"])
+                
+                with filter_tab1:
+                    filter_date = st.date_input("Filter by date", value=None)
+                    date_filter_applied = st.button("Apply Date Filter")
+                
+                with filter_tab2:
+                    remarks_search = st.text_input("Search in remarks")
+                    remarks_filter_applied = st.button("Search Remarks")
+                
+                with filter_tab3:
+                    size_options = sorted(st.session_state.data['Size (mm)'].unique())
+                    selected_size = st.selectbox("Filter by size (mm)", [""] + size_options)
+                    size_filter_applied = st.button("Apply Size Filter")
+                
+                # Handle filter applications
+                if date_filter_applied:
+                    st.session_state.filter_date = filter_date.strftime('%Y-%m-%d') if filter_date else None
+                
+                if remarks_filter_applied:
+                    st.session_state.remarks_search = remarks_search.strip().lower() if remarks_search.strip() else None
+                
+                if size_filter_applied:
+                    st.session_state.filter_size = int(selected_size) if selected_size else None
+                
+                # Clear filters button if any filter is active
+                if (hasattr(st.session_state, 'filter_date') and st.session_state.filter_date) or \
+                   (hasattr(st.session_state, 'remarks_search') and st.session_state.remarks_search) or \
+                   (hasattr(st.session_state, 'filter_size') and st.session_state.filter_size):
+                    if st.button("❌ Clear All Filters"):
+                        st.session_state.filter_date = None
+                        st.session_state.remarks_search = None
+                        st.session_state.filter_size = None
+                        st.rerun()
 
             # Apply filters to data
             display_data = st.session_state.data.copy()
@@ -200,7 +200,7 @@ with st.expander("📋 View Movement Log", expanded=False):
             # Apply date filter if set
             if hasattr(st.session_state, 'filter_date') and st.session_state.filter_date:
                 display_data = display_data[display_data['Date'] == st.session_state.filter_date]
-                st.info(f"Showing entries for {st.session_state.filter_date}")
+                st.info(f"📅 Showing entries for {st.session_state.filter_date}")
             
             # Apply remarks search if set
             if hasattr(st.session_state, 'remarks_search') and st.session_state.remarks_search:
@@ -209,65 +209,66 @@ with st.expander("📋 View Movement Log", expanded=False):
                         st.session_state.remarks_search, na=False
                     )
                 ]
-                st.info(f"Showing entries containing: '{st.session_state.remarks_search}'")
+                st.info(f"🔍 Showing entries containing: '{st.session_state.remarks_search}'")
             
             # Apply size filter if set
             if hasattr(st.session_state, 'filter_size') and st.session_state.filter_size:
                 display_data = display_data[display_data['Size (mm)'] == st.session_state.filter_size]
-                st.info(f"Showing entries for size: {st.session_state.filter_size}mm")
+                st.info(f"📏 Showing entries for size: {st.session_state.filter_size}mm")
 
             # Show message if no results
             if display_data.empty:
-                st.warning("No entries match the current filters")
+                st.warning("⚠️ No entries match the current filters")
             else:
                 # Sort data by date (newest first)
                 sorted_data = display_data.sort_values('Date', ascending=False)
                 
-                for idx, row in sorted_data.iterrows():
-                    st.markdown("---")
-                    
-                    # Check if this row is being edited
-                    is_editing = st.session_state.editing_index == idx
-                    
-                    if not is_editing:
-                        # Display mode
-                        cols = st.columns([10, 1, 1])
+                # Use container to ensure proper mobile display
+                log_container = st.container()
+                
+                with log_container:
+                    for idx, row in sorted_data.iterrows():
+                        st.markdown("---")
                         
-                        with cols[0]:
-                            st.dataframe(
-                                pd.DataFrame(row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']]).T,
-                                use_container_width=True,
-                                hide_index=True
-                            )
+                        # Check if this row is being edited
+                        is_editing = st.session_state.editing_index == idx
                         
-                        with cols[1]:
-                            if st.button("✏", key=f"edit_{idx}"):
-                                st.session_state.editing_index = idx
-                                st.session_state.edit_form_data = row.to_dict()
-                                st.rerun()
-                        
-                        with cols[2]:
-                            if st.button("❌", key=f"del_{idx}"):
-                                st.session_state.data = st.session_state.data.drop(idx).reset_index(drop=True)
-                                auto_save_to_gsheet()
-                                st.rerun()
-                    else:
-                        # Edit mode
-                        with st.form(f"edit_form_{idx}"):
-                            col1, col2 = st.columns(2)
-                            with col1:
+                        if not is_editing:
+                            # Mobile-friendly display
+                            cols = st.columns([8, 1, 1])  # Adjusted for mobile
+                            
+                            with cols[0]:
+                                st.dataframe(
+                                    pd.DataFrame(row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']]).T,
+                                    use_container_width=True,
+                                    hide_index=True
+                                )
+                            
+                            with cols[1]:
+                                if st.button("✏️", key=f"edit_{idx}"):
+                                    st.session_state.editing_index = idx
+                                    st.session_state.edit_form_data = row.to_dict()
+                                    st.rerun()
+                            
+                            with cols[2]:
+                                if st.button("❌", key=f"del_{idx}"):
+                                    st.session_state.data = st.session_state.data.drop(idx).reset_index(drop=True)
+                                    auto_save_to_gsheet()
+                                    st.rerun()
+                        else:
+                            # Edit mode - mobile optimized
+                            with st.form(f"edit_form_{idx}"):
                                 edit_date = st.date_input(
                                     "📅 Date", 
                                     value=datetime.strptime(row['Date'], '%Y-%m-%d'), 
                                     key=f"date_{idx}"
                                 )
                                 edit_size = st.number_input(
-                                    "📐 Rotor Size (mm)", 
+                                    "📐 Size (mm)", 
                                     value=row['Size (mm)'], 
                                     min_value=1, 
                                     key=f"size_{idx}"
                                 )
-                            with col2:
                                 edit_type = st.selectbox(
                                     "🔄 Type", 
                                     ["Inward", "Outgoing"], 
@@ -280,39 +281,39 @@ with st.expander("📋 View Movement Log", expanded=False):
                                     min_value=1, 
                                     key=f"qty_{idx}"
                                 )
-                            edit_remarks = st.text_input(
-                                "📝 Remarks", 
-                                value=row['Remarks'], 
-                                key=f"remarks_{idx}"
-                            )
-                            edit_status = st.selectbox(
-                                "Status", 
-                                ["Current", "Future"], 
-                                index=0 if row['Status'] == 'Current' else 1,
-                                key=f"status_{idx}"
-                            )
-                            
-                            # Form submission buttons
-                            save_col, cancel_col = st.columns(2)
-                            with save_col:
-                                if st.form_submit_button("💾 Save Changes"):
-                                    st.session_state.data.at[idx, 'Date'] = edit_date.strftime('%Y-%m-%d')
-                                    st.session_state.data.at[idx, 'Size (mm)'] = edit_size
-                                    st.session_state.data.at[idx, 'Type'] = edit_type
-                                    st.session_state.data.at[idx, 'Quantity'] = edit_qty
-                                    st.session_state.data.at[idx, 'Remarks'] = edit_remarks
-                                    st.session_state.data.at[idx, 'Status'] = edit_status
-                                    auto_save_to_gsheet()
-                                    st.session_state.editing_index = None
-                                    st.session_state.edit_form_data = None
-                                    st.rerun()
-                            with cancel_col:
-                                if st.form_submit_button("❌ Cancel"):
-                                    st.session_state.editing_index = None
-                                    st.session_state.edit_form_data = None
-                                    st.rerun()
-                
-                st.markdown("---")
+                                edit_remarks = st.text_input(
+                                    "📝 Remarks", 
+                                    value=row['Remarks'], 
+                                    key=f"remarks_{idx}"
+                                )
+                                edit_status = st.selectbox(
+                                    "Status", 
+                                    ["Current", "Future"], 
+                                    index=0 if row['Status'] == 'Current' else 1,
+                                    key=f"status_{idx}"
+                                )
+                                
+                                # Form submission buttons
+                                save_col, cancel_col = st.columns(2)
+                                with save_col:
+                                    if st.form_submit_button("💾 Save"):
+                                        st.session_state.data.at[idx, 'Date'] = edit_date.strftime('%Y-%m-%d')
+                                        st.session_state.data.at[idx, 'Size (mm)'] = edit_size
+                                        st.session_state.data.at[idx, 'Type'] = edit_type
+                                        st.session_state.data.at[idx, 'Quantity'] = edit_qty
+                                        st.session_state.data.at[idx, 'Remarks'] = edit_remarks
+                                        st.session_state.data.at[idx, 'Status'] = edit_status
+                                        auto_save_to_gsheet()
+                                        st.session_state.editing_index = None
+                                        st.session_state.edit_form_data = None
+                                        st.rerun()
+                                with cancel_col:
+                                    if st.form_submit_button("❌ Cancel"):
+                                        st.session_state.editing_index = None
+                                        st.session_state.edit_form_data = None
+                                        st.rerun()
+                    
+                    st.markdown("---")
             
         except Exception as e:
             st.error(f"Error displaying log: {e}")
