@@ -150,43 +150,36 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
-# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY AND DATE JUMP ======
-# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY AND DATE JUMP ======
+# ====== MOVEMENT LOG WITH DATE FILTERING ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
         try:
-            # Add date jump feature at the top
-            jump_col, _ = st.columns([3, 1])
-            with jump_col:
-                jump_date = st.date_input("Go to date", value=datetime.today())
-                if st.button("Find Date"):
-                    target_date = jump_date.strftime('%Y-%m-%d')
-                    matching_indices = st.session_state.data.index[
-                        st.session_state.data['Date'] == target_date
-                    ].tolist()
-                    
-                    if matching_indices:
-                        # Store the first matching index to scroll to
-                        st.session_state.scroll_to_index = matching_indices[0]
-                        st.success(f"Found {len(matching_indices)} entries for {target_date}")
+            # Add date filter at the top
+            filter_col, _ = st.columns([3, 1])
+            with filter_col:
+                filter_date = st.date_input("Filter by date", value=None)
+                if st.button("Apply Filter"):
+                    if filter_date:
+                        st.session_state.filter_date = filter_date.strftime('%Y-%m-%d')
                     else:
-                        st.warning(f"No entries found for {target_date}")
-                        st.session_state.scroll_to_index = None
-            
+                        st.session_state.filter_date = None
+                
+                # Clear filter button if a filter is active
+                if hasattr(st.session_state, 'filter_date') and st.session_state.filter_date:
+                    if st.button("Clear Filter"):
+                        st.session_state.filter_date = None
+                        st.rerun()
+
+            # Apply date filter if set
+            display_data = st.session_state.data.copy()
+            if hasattr(st.session_state, 'filter_date') and st.session_state.filter_date:
+                display_data = display_data[display_data['Date'] == st.session_state.filter_date]
+                st.info(f"Showing entries for {st.session_state.filter_date}")
+
             # Sort data by date (newest first)
-            sorted_data = st.session_state.data.sort_values('Date', ascending=False)
+            sorted_data = display_data.sort_values('Date', ascending=False)
             
             for idx, row in sorted_data.iterrows():
-                # Add an anchor/identifier for the date jump
-                row_id = f"row_{idx}"
-                st.markdown(f'<div id="{row_id}"></div>', unsafe_allow_html=True)
-                
-                # Highlight if this is the row we're scrolling to
-                if hasattr(st.session_state, 'scroll_to_index') and idx == st.session_state.scroll_to_index:
-                    st.markdown("""<style>div[data-testid="stMarkdownContainer"]:has(> div[id="row_""" + 
-                               str(idx) + """']) {border-left: 5px solid #ff5722; padding-left: 10px;}</style>""", 
-                               unsafe_allow_html=True)
-                
                 st.markdown("---")
                 
                 # Check if this row is being edited
@@ -277,27 +270,10 @@ with st.expander("📋 View Movement Log", expanded=False):
             
             st.markdown("---")
             
-            # JavaScript to scroll to the highlighted row
-            if hasattr(st.session_state, 'scroll_to_index') and st.session_state.scroll_to_index is not None:
-                scroll_index = st.session_state.scroll_to_index
-                components.html(
-                    f"""
-                    <script>
-                        document.getElementById('row_{scroll_index}').scrollIntoView({{
-                            behavior: 'smooth',
-                            block: 'center'
-                        }});
-                    </script>
-                    """,
-                    height=0
-                )
-                # Clear the scroll target after scrolling
-                st.session_state.scroll_to_index = None
-                
         except Exception as e:
             st.error(f"Error displaying log: {e}")
     else:
         st.info("No entries to display")
-# Status footer
+        # Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
