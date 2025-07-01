@@ -59,14 +59,18 @@ def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
         if sheet and not st.session_state.data.empty:
+            # Convert dataframe to list of lists (including header)
+            records = [st.session_state.data.columns.tolist()] + st.session_state.data.astype(str).values.tolist()
+
+            # Clear the entire sheet (including formatting/data validation)
             sheet.clear()
-            sheet.append_row(st.session_state.data.columns.tolist())
-            for _, row in st.session_state.data.iterrows():
-                sheet.append_row(row.tolist())
+
+            # Use batch update to write all at once
+            sheet.update(records)
+
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
-
 # ====== SINGLE SYNC BUTTON ======
 if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
     load_from_gsheet()
