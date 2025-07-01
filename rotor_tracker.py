@@ -140,50 +140,61 @@ with form_tabs[2]:  # Pending Outgoing
             st.rerun()
 
 # Stock Summary
-# Stock Summary - Corrected Version
+# Stock Summary
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
-        # Current inward stock
+        # Current inward stock (positive additions)
         current_inward = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (st.session_state.data['Type'] == 'Inward')
         ]
         inward_stock = current_inward.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Current outgoing (immediate deductions)
+        # Current outgoing (immediate deductions - negative values)
         current_outgoing = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (st.session_state.data['Type'] == 'Outgoing')
         ]
         outgoing = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing['Quantity'] = -outgoing['Quantity']  # Convert to negative for subtraction
         
-        # Pending outgoing (future deductions)
+        # Pending outgoing (future deductions - shown separately)
         pending_outgoing = st.session_state.data[
             (st.session_state.data['Status'] == 'Pending') & 
             (st.session_state.data['Type'] == 'Outgoing')
         ]
         pending = pending_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Coming rotors
+        # Coming rotors (future additions)
         future = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
         # Combine all data with explicit column naming
-        combined = inward_stock.rename(columns={'Quantity': 'Inward'})\
-                      .merge(outgoing.rename(columns={'Quantity': 'Outgoing'}), 
-                              on='Size (mm)', how='outer')\
-                      .merge(pending.rename(columns={'Quantity': 'Pending'}), 
-                              on='Size (mm)', how='outer')\
-                      .merge(coming.rename(columns={'Quantity': 'Coming'}), 
-                              on='Size (mm)', how='outer')
-        combined = combined.fillna(0)
+        stock = pd.concat([
+            inward_stock.assign(Type='Inward'),
+            outgoing.assign(Type='Outgoing')
+        ])
         
-        # Calculate stock levels with clear column references
-        combined['Current Stock'] = combined['Inward'] - combined['Outgoing']
-        combined['Current Outgoing'] = combined['Outgoing']
-        combined['Pending Outgoing'] = combined['Pending']
-        combined['Coming Rotors'] = combined['Coming']
+        # Calculate net current stock (inward minus outgoing)
+        current_stock = stock.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        current_stock = current_stock.rename(columns={'Quantity': 'Current Stock'})
+        
+        # Get pending and coming quantities
+        pending = pending.rename(columns={'Quantity': 'Pending Outgoing'})
+        coming = coming.rename(columns={'Quantity': 'Coming Rotors'})
+        
+        # Merge all data
+        combined = current_stock.merge(
+            pending, on='Size (mm)', how='left'
+        ).merge(
+            coming, on='Size (mm)', how='left'
+        ).fillna(0)
+        
+        # Add outgoing quantities for reference (absolute values)
+        outgoing_ref = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing_ref = outgoing_ref.rename(columns={'Quantity': 'Current Outgoing'})
+        combined = combined.merge(outgoing_ref, on='Size (mm)', how='left').fillna(0)
         
         # Display
         st.dataframe(
