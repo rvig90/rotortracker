@@ -9,7 +9,7 @@ import time
 # Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
-        'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Actions'
+        'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
     ])
     st.session_state.last_sync = "Never"
     st.session_state.editing_index = None
@@ -343,17 +343,18 @@ else:
 
 # Movement Log - Proper Table Format
 
+
+
 # [Previous Google Sheets functions remain exactly the same...]
 
-# Movement Log - Table with inline edit/delete buttons
+# Movement Log - Proper Table with Inline Actions
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
         try:
             # Search functionality
             search_query = st.text_input("🔍 Search entries", 
-                                       placeholder="Search by size, remarks, or status...",
-                                       key="log_search")
+                                       placeholder="Search by size, remarks, or status...")
             
             # Filter data based on search
             if search_query:
@@ -361,33 +362,41 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
                     st.session_state.data['Remarks'].str.contains(search_query, case=False) |
                     st.session_state.data['Status'].str.contains(search_query, case=False)
-                ].copy()
+                ]
             else:
-                search_df = st.session_state.data.copy()
+                search_df = st.session_state.data
             
             # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Add action buttons to the dataframe
-                search_df['Actions'] = ""
+                # Create a copy of the dataframe for display
+                display_df = search_df.copy()
                 
-                # Display the table with action buttons
-                for idx, row in search_df.iterrows():
+                # Add empty columns for action buttons
+                display_df['Edit'] = ""
+                display_df['Delete'] = ""
+                
+                # Display the table
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Date": st.column_config.DateColumn("Date"),
+                        "Size (mm)": st.column_config.NumberColumn("Size (mm)"),
+                        "Type": "Type",
+                        "Quantity": st.column_config.NumberColumn("Qty"),
+                        "Remarks": "Remarks",
+                        "Status": "Status",
+                        "Edit": st.column_config.Column("", width="small"),
+                        "Delete": st.column_config.Column("", width="small")
+                    }
+                )
+                
+                # Add action buttons for each row
+                for idx in search_df.index:
                     cols = st.columns([2, 1, 1, 1, 2, 1, 0.5, 0.5])
-                    
-                    with cols[0]:
-                        st.text(row['Date'])
-                    with cols[1]:
-                        st.text(row['Size (mm)'])
-                    with cols[2]:
-                        st.text(row['Type'])
-                    with cols[3]:
-                        st.text(row['Quantity'])
-                    with cols[4]:
-                        st.text(row['Remarks'])
-                    with cols[5]:
-                        st.text(row['Status'])
                     with cols[6]:
                         if st.button("✏", key=f"edit_{idx}"):
                             st.session_state.editing_index = idx
@@ -395,8 +404,6 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         if st.button("❌", key=f"del_{idx}"):
                             st.session_state.delete_trigger = idx
                             st.session_state.unsaved_changes = True
-                    
-                    st.markdown("---")  # Divider between entries
                 
                 # Edit form (appears when edit button is clicked)
                 if st.session_state.editing_index is not None:
@@ -467,6 +474,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     else:
         st.info("No entries to display")
 
+# [Rest of the code remains exactly the same...]
 # [Rest of the code remains exactly the same...]
 # [Rest of the code remains exactly the same...]
 
