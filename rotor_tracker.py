@@ -336,7 +336,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# Movement Log - Complete Implementation
+# Movement Log - Restored to original table format
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
@@ -358,92 +358,96 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                for idx, row in search_df.iterrows():
-                    st.markdown("---")
-                    
-                    # Display entry in a clean format
-                    cols = st.columns([1, 1, 1, 1, 2, 1, 0.5, 0.5])
-                    with cols[0]:
-                        st.markdown(f"{row['Date']}")
-                    with cols[1]:
-                        st.markdown(f"{row['Size (mm)']} mm**")
-                    with cols[2]:
-                        st.markdown(f"{row['Type']}")
-                    with cols[3]:
-                        st.markdown(f"{row['Quantity']}")
-                    with cols[4]:
-                        st.markdown(f"{row['Remarks']}")
-                    with cols[5]:
-                        st.markdown(f"{row['Status']}")
-                    
-                    # Edit button
-                    with cols[6]:
-                        if st.button("✏", key=f"edit_{idx}"):
-                            st.session_state.editing_index = idx
-                    
-                    # Delete button
-                    with cols[7]:
-                        if st.button("❌", key=f"del_{idx}"):
-                            st.session_state.delete_trigger = idx
-                            st.session_state.unsaved_changes = True
-                    
-                    # Edit form
-                    if st.session_state.editing_index == idx:
-                        with st.form(key=f"edit_form_{idx}"):
-                            st.subheader("Edit Entry")
-                            # Get current values
-                            current_date = datetime.strptime(row['Date'], '%Y-%m-%d').date()
-                            current_size = row['Size (mm)']
-                            current_type = row['Type']
-                            current_qty = row['Quantity']
-                            current_remarks = row['Remarks']
-                            current_status = row['Status']
-                            
-                            # Create editable fields
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                new_date = st.date_input("Date", value=current_date)
-                                new_size = st.number_input("Size (mm)", value=current_size, min_value=1)
-                            with col2:
-                                new_type = st.selectbox(
-                                    "Type",
-                                    ["Inward", "Outgoing"],
-                                    index=0 if current_type == 'Inward' else 1
-                                )
-                                new_qty = st.number_input("Quantity", value=current_qty, min_value=1)
-                            
-                            new_remarks = st.text_input("Remarks", value=current_remarks)
-                            new_status = st.selectbox(
-                                "Status",
-                                ["Current", "Pending", "Future"],
-                                index=["Current", "Pending", "Future"].index(current_status)
+                # Display the table
+                st.dataframe(
+                    search_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Date": "Date",
+                        "Size (mm)": "Size (mm)",
+                        "Type": "Type",
+                        "Quantity": "Quantity",
+                        "Remarks": "Remarks",
+                        "Status": "Status"
+                    }
+                )
+                
+                # Edit and Delete controls below the table
+                st.write("### Edit or Delete Entries")
+                selected_index = st.selectbox(
+                    "Select entry to modify",
+                    options=search_df.index,
+                    format_func=lambda x: f"{search_df.loc[x, 'Date']} - {search_df.loc[x, 'Type']} - {search_df.loc[x, 'Size (mm)']}mm - {search_df.loc[x, 'Quantity']} units"
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✏ Edit Selected Entry"):
+                        st.session_state.editing_index = selected_index
+                
+                with col2:
+                    if st.button("❌ Delete Selected Entry"):
+                        st.session_state.delete_trigger = selected_index
+                        st.session_state.unsaved_changes = True
+                
+                # Edit form
+                if st.session_state.editing_index is not None:
+                    with st.form(key="edit_form"):
+                        st.subheader("Edit Entry")
+                        row = st.session_state.data.loc[st.session_state.editing_index]
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            new_date = st.date_input(
+                                "Date",
+                                value=datetime.strptime(row['Date'], '%Y-%m-%d').date()
                             )
-                            
-                            # Form buttons
-                            save_col, cancel_col = st.columns(2)
-                            with save_col:
-                                if st.form_submit_button("💾 Save Changes", use_container_width=True):
-                                    st.session_state.data.at[idx, 'Date'] = new_date.strftime('%Y-%m-%d')
-                                    st.session_state.data.at[idx, 'Size (mm)'] = new_size
-                                    st.session_state.data.at[idx, 'Type'] = new_type
-                                    st.session_state.data.at[idx, 'Quantity'] = new_qty
-                                    st.session_state.data.at[idx, 'Remarks'] = new_remarks
-                                    st.session_state.data.at[idx, 'Status'] = new_status
-                                    if auto_save_to_gsheet():
-                                        st.success("Changes saved successfully!")
-                                    st.session_state.editing_index = None
-                                    st.rerun()
-                            with cancel_col:
-                                if st.form_submit_button("❌ Cancel", use_container_width=True):
-                                    st.session_state.editing_index = None
-                                    st.rerun()
+                            new_size = st.number_input(
+                                "Size (mm)",
+                                value=row['Size (mm)'],
+                                min_value=1
+                            )
+                        with col2:
+                            new_type = st.selectbox(
+                                "Type",
+                                ["Inward", "Outgoing"],
+                                index=0 if row['Type'] == 'Inward' else 1
+                            )
+                            new_qty = st.number_input(
+                                "Quantity",
+                                value=row['Quantity'],
+                                min_value=1
+                            )
+                        
+                        new_remarks = st.text_input("Remarks", value=row['Remarks'])
+                        new_status = st.selectbox(
+                            "Status",
+                            ["Current", "Pending", "Future"],
+                            index=["Current", "Pending", "Future"].index(row['Status'])
+                        )
+                        
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            if st.form_submit_button("💾 Save Changes"):
+                                st.session_state.data.at[st.session_state.editing_index, 'Date'] = new_date.strftime('%Y-%m-%d')
+                                st.session_state.data.at[st.session_state.editing_index, 'Size (mm)'] = new_size
+                                st.session_state.data.at[st.session_state.editing_index, 'Type'] = new_type
+                                st.session_state.data.at[st.session_state.editing_index, 'Quantity'] = new_qty
+                                st.session_state.data.at[st.session_state.editing_index, 'Remarks'] = new_remarks
+                                st.session_state.data.at[st.session_state.editing_index, 'Status'] = new_status
+                                if auto_save_to_gsheet():
+                                    st.success("Changes saved successfully!")
+                                st.session_state.editing_index = None
+                                st.rerun()
+                        with cancel_col:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state.editing_index = None
+                                st.rerun()
                 
-                st.markdown("---")
-                
-                # Handle deletion after button press
+                # Handle deletion
                 if st.session_state.get('delete_trigger') is not None:
-                    idx_to_delete = st.session_state.delete_trigger
-                    st.session_state.data = st.session_state.data.drop(idx_to_delete)
+                    st.session_state.data = st.session_state.data.drop(st.session_state.delete_trigger)
                     st.session_state.data = st.session_state.data.reset_index(drop=True)
                     if auto_save_to_gsheet():
                         st.success("Entry deleted successfully!")
@@ -456,6 +460,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     else:
         st.info("No entries to display")
 
+# [Keep all the remaining code from previous implementation...]
 # Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
