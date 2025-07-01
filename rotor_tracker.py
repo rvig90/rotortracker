@@ -144,11 +144,19 @@ with form_tabs[2]:  # Pending Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
+# ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
-        # Current stock
-        current = st.session_state.data[(st.session_state.data['Status'] == 'Current') & (~st.session_state.data['Pending'])].copy()
+        # Convert Pending column to boolean if it's not already
+        st.session_state.data['Pending'] = st.session_state.data['Pending'].astype(bool)
+        
+        # Current stock (non-pending items)
+        current = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (~st.session_state.data['Pending'])  # This is where the error was occurring
+        ].copy()
+        
         current['Net'] = current.apply(lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1)
         stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
         stock = stock[stock['Net'] != 0]
@@ -174,9 +182,11 @@ if not st.session_state.data.empty:
         )
     except Exception as e:
         st.error(f"Error generating summary: {e}")
+        st.write("Debug Info:")
+        st.write("Pending column type:", type(st.session_state.data['Pending'].iloc[0]))
+        st.write("Sample data:", st.session_state.data.head())
 else:
     st.info("No data available yet")
-
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
