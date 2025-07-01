@@ -339,7 +339,9 @@ else:
 # Movement Log - Restored to original table format
 # [Previous imports and session state initialization remain the same...]
 
-# Movement Log - Mobile Responsive Table
+# [Previous Google Sheets functions remain exactly the same...]
+
+# Movement Log - Proper Table Format
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
@@ -349,7 +351,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                                        placeholder="Search by size, remarks, or status...",
                                        key="log_search")
             
-            # Filter and sort data
+            # Filter data based on search
             if search_query:
                 search_df = st.session_state.data[
                     st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
@@ -359,35 +361,49 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             else:
                 search_df = st.session_state.data
             
+            # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Mobile-responsive table using columns
-                for idx, row in search_df.iterrows():
-                    cols = st.columns([2, 1, 1, 1, 0.5, 0.5])
-                    with cols[0]:
-                        st.markdown(f"{row['Date']}**  \n{row['Remarks']}")
-                    with cols[1]:
-                        st.markdown(f"{row['Size (mm)']}mm**")
-                    with cols[2]:
-                        st.markdown(f"{row['Type']}")
-                    with cols[3]:
-                        st.markdown(f"{row['Quantity']}")
-                    with cols[4]:
-                        if st.button("✏", key=f"edit_{idx}"):
-                            st.session_state.editing_index = idx
-                    with cols[5]:
-                        if st.button("❌", key=f"del_{idx}"):
-                            st.session_state.delete_trigger = idx
-                            st.session_state.unsaved_changes = True
-                    
-                    st.markdown("---")  # Divider between entries
+                # Display the table
+                st.dataframe(
+                    search_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_order=["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Status"],
+                    column_config={
+                        "Date": st.column_config.DateColumn("Date"),
+                        "Size (mm)": st.column_config.NumberColumn("Size (mm)"),
+                        "Type": "Type",
+                        "Quantity": st.column_config.NumberColumn("Qty"),
+                        "Remarks": "Remarks",
+                        "Status": "Status"
+                    }
+                )
                 
-                # Edit form (appears when edit button is clicked)
+                # Edit and Delete controls below the table
+                st.write("### Modify Entries")
+                selected_index = st.selectbox(
+                    "Select entry to modify",
+                    options=search_df.index,
+                    format_func=lambda x: f"{search_df.loc[x, 'Date']} | {search_df.loc[x, 'Type']} | {search_df.loc[x, 'Size (mm)']}mm | Qty: {search_df.loc[x, 'Quantity']}"
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✏ Edit Selected Entry", use_container_width=True):
+                        st.session_state.editing_index = selected_index
+                
+                with col2:
+                    if st.button("❌ Delete Selected Entry", use_container_width=True):
+                        st.session_state.delete_trigger = selected_index
+                        st.session_state.unsaved_changes = True
+                
+                # Edit form
                 if st.session_state.editing_index is not None:
                     with st.form(key="edit_form"):
-                        row = st.session_state.data.loc[st.session_state.editing_index]
                         st.subheader("Edit Entry")
+                        row = st.session_state.data.loc[st.session_state.editing_index]
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -421,7 +437,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         
                         save_col, cancel_col = st.columns(2)
                         with save_col:
-                            if st.form_submit_button("💾 Save Changes"):
+                            if st.form_submit_button("💾 Save Changes", use_container_width=True):
                                 st.session_state.data.at[st.session_state.editing_index, 'Date'] = new_date.strftime('%Y-%m-%d')
                                 st.session_state.data.at[st.session_state.editing_index, 'Size (mm)'] = new_size
                                 st.session_state.data.at[st.session_state.editing_index, 'Type'] = new_type
@@ -433,7 +449,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                                 st.session_state.editing_index = None
                                 st.rerun()
                         with cancel_col:
-                            if st.form_submit_button("❌ Cancel"):
+                            if st.form_submit_button("❌ Cancel", use_container_width=True):
                                 st.session_state.editing_index = None
                                 st.rerun()
                 
@@ -451,6 +467,8 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             st.error(f"Error displaying log: {str(e)}")
     else:
         st.info("No entries to display")
+
+# [Rest of the code remains exactly the same...]
 
 # [Rest of the code remains unchanged...]
 # [Keep all the remaining code from previous implementation...]
