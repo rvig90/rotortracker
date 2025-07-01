@@ -194,8 +194,55 @@ with st.expander("📋 View Movement Log", expanded=False):
                 st.session_state.data['Pending'] = False
             st.session_state.data['Pending'] = st.session_state.data['Pending'].astype(bool)
             
-            for idx, row in st.session_state.data.sort_values('Date', ascending=False).iterrows():
-                cols = st.columns([10, 1, 1])
+          # ----- FILTER BAR -----
+st.markdown("### 🔍 Filter Movement Log")
+filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+
+with filter_col1:
+    size_filter = st.multiselect("📐 Size (mm)", options=sorted(st.session_state.data['Size (mm)'].unique().tolist()), default=None)
+
+with filter_col2:
+    type_filter = st.multiselect("🔄 Type", options=["Inward", "Outgoing"], default=None)
+
+with filter_col3:
+    pending_filter = st.selectbox("✅ Pending", options=["All", "Yes", "No"])
+
+with filter_col4:
+    remark_filter = st.text_input("📝 Remarks contains")
+
+# Date filter
+date_start, date_end = st.columns(2)
+with date_start:
+    start_date = st.date_input("From Date", value=datetime(2023, 1, 1))
+with date_end:
+    end_date = st.date_input("To Date", value=datetime.today())
+
+# ----- APPLY FILTERS -----
+filtered_data = st.session_state.data.copy()
+
+# Date filtering
+filtered_data['Date'] = pd.to_datetime(filtered_data['Date'], errors='coerce')
+filtered_data = filtered_data[(filtered_data['Date'] >= pd.to_datetime(start_date)) & (filtered_data['Date'] <= pd.to_datetime(end_date))]
+
+# Size filter
+if size_filter:
+    filtered_data = filtered_data[filtered_data['Size (mm)'].isin(size_filter)]
+
+# Type filter
+if type_filter:
+    filtered_data = filtered_data[filtered_data['Type'].isin(type_filter)]
+
+# Pending filter
+if pending_filter == "Yes":
+    filtered_data = filtered_data[filtered_data['Pending'] == True]
+elif pending_filter == "No":
+    filtered_data = filtered_data[filtered_data['Pending'] == False]
+
+# Remarks filter
+if remark_filter:
+    filtered_data = filtered_data[filtered_data['Remarks'].str.contains(remark_filter, case=False, na=False)]
+     for idx, row in filtered_data.sort_values('Date', ascending=False).iterrows():      
+    cols = st.columns([10, 1, 1])
                 with cols[0]:
                     # Create display data with proper pending status
                     display_data = {
