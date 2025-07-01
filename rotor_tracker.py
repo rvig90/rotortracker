@@ -162,6 +162,85 @@ with status_col:
     if st.session_state.sync_status == "error":
         st.error("Sync failed")
 
+# Entry Forms
+form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Outgoing"])
+
+with form_tabs[0]:  # Current Movement
+    with st.form("current_form"):
+        st.subheader("➕ Add Current Movement")
+        col1, col2 = st.columns(2)
+        with col1:
+            date = st.date_input("📅 Date", value=datetime.today())
+            rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
+        with col2:
+            entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
+            quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
+        remarks = st.text_input("📝 Remarks")
+        
+        if st.form_submit_button("➕ Add Entry"):
+            new_entry = pd.DataFrame([{
+                'Date': date.strftime('%Y-%m-%d'),
+                'Size (mm)': rotor_size, 
+                'Type': entry_type, 
+                'Quantity': quantity, 
+                'Remarks': remarks,
+                'Status': 'Current'
+            }])
+            st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            if auto_save_to_gsheet():
+                st.success("Entry added and saved!")
+            st.rerun()
+
+with form_tabs[1]:  # Coming Rotors
+    with st.form("future_form"):
+        st.subheader("➕ Add Coming Rotors")
+        col1, col2 = st.columns(2)
+        with col1:
+            future_date = st.date_input("📅 Expected Date", min_value=datetime.today() + timedelta(days=1))
+            future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
+        with col2:
+            future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
+            future_remarks = st.text_input("📝 Remarks")
+        
+        if st.form_submit_button("➕ Add Coming Rotors"):
+            new_entry = pd.DataFrame([{
+                'Date': future_date.strftime('%Y-%m-%d'),
+                'Size (mm)': future_size, 
+                'Type': 'Inward', 
+                'Quantity': future_qty, 
+                'Remarks': future_remarks,
+                'Status': 'Future'
+            }])
+            st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            if auto_save_to_gsheet():
+                st.success("Entry added and saved!")
+            st.rerun()
+
+with form_tabs[2]:  # Pending Outgoing
+    with st.form("pending_form"):
+        st.subheader("➕ Add Pending Outgoing")
+        col1, col2 = st.columns(2)
+        with col1:
+            pending_date = st.date_input("📅 Expected Ship Date", value=datetime.today())
+            pending_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="pending_size")
+        with col2:
+            pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="pending_qty")
+            pending_remarks = st.text_input("📝 Remarks", key="pending_remarks")
+        
+        if st.form_submit_button("➕ Add Pending Outgoing"):
+            new_entry = pd.DataFrame([{
+                'Date': pending_date.strftime('%Y-%m-%d'),
+                'Size (mm)': pending_size, 
+                'Type': 'Outgoing', 
+                'Quantity': pending_qty, 
+                'Remarks': f"[PENDING] {pending_remarks}",
+                'Status': 'Pending'
+            }])
+            st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            if auto_save_to_gsheet():
+                st.success("Entry added and saved!")
+            st.rerun()
+
 # Movement Log - Tabular format with side action buttons
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
@@ -214,7 +293,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     cols[4].write(row['Remarks'])
                     cols[5].write(row['Status'])
                     
-                    # Action buttons (styled to fit in table)
+                    # Action buttons
                     with cols[6]:
                         st.button("✏", key=f"edit_{idx}", on_click=lambda i=idx: st.session_state.update({"editing_index": i}))
                     with cols[7]:
