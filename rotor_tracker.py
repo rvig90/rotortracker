@@ -97,6 +97,7 @@ def save_to_gsheet(df):
                 sheet.update('A1', data)
             
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state.unsaved_changes = False
             return True
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {str(e)}")
@@ -125,6 +126,10 @@ st.markdown("""
     .mobile-table {
         width: 100%;
         overflow-x: auto;
+    }
+    .action-btn {
+        min-width: 0 !important;
+        padding: 0.25em 0.5em !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -157,7 +162,7 @@ with status_col:
     if st.session_state.sync_status == "error":
         st.error("Sync failed")
 
-# Movement Log - Tabular format with edit/delete
+# Movement Log - Tabular format with side action buttons
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
@@ -209,14 +214,11 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     cols[4].write(row['Remarks'])
                     cols[5].write(row['Status'])
                     
-                    # Action buttons
+                    # Action buttons (styled to fit in table)
                     with cols[6]:
-                        if st.button("✏", key=f"edit_{idx}"):
-                            st.session_state.editing_index = idx
+                        st.button("✏", key=f"edit_{idx}", on_click=lambda i=idx: st.session_state.update({"editing_index": i}))
                     with cols[7]:
-                        if st.button("❌", key=f"del_{idx}"):
-                            st.session_state.delete_trigger = idx
-                            st.session_state.unsaved_changes = True
+                        st.button("❌", key=f"del_{idx}", on_click=lambda i=idx: [st.session_state.update({"delete_trigger": i, "unsaved_changes": True}), st.rerun()])
                 
                 st.markdown('</div>', unsafe_allow_html=True)
                 
@@ -289,16 +291,88 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     else:
         st.info("No entries to display")
 
-# [Rest of your existing code for forms, stock summary, etc.]
-# [Keep all the remaining code from previous implementation...]
-# Status footer
-if st.session_state.last_sync != "Never":
-    st.caption(f"Last synced: {st.session_state.last_sync}")
+# Stock Summary
+st.subheader("📊 Current Stock Summary")
+if not st.session_state.data.empty:
+    try:
+        # Current inward stock (positive additions)
+        current_inward = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Type'] == 'Inward')
+        ]
+        inward_stock = current_inward.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Current outgoing (immediate deductions - negative values)
+        current_outgoing = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Type'] == 'Outgoing')
+        ]
+        outgoing = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing['Quantity'] = -outgoing['Quantity']  # Convert to negative for subtraction
+        
+        # Pending outgoing (future deductions - shown separately)
+        pending_outgoing = st.session_state.data[
+            (st.session_state.data['Status'] == 'Pending') & 
+            (st.session_state.data['Type'] == 'Outgoing')
+        ]
+        pending = pending_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Coming rotors (future additions)
+        future = st.session_state.data[st.session_state.data['Status'] == 'Future']
+        coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Combine all data with explicit column naming
+        stock = pd.concat([
+            inward_stock.assign(Type='Inward'),
+            outgoing.assign(Type='Outgoing')
+        ])
+        
+        # Calculate net current stock (inward minus outgoing)
+        current_stock = stock.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        current_stock = current_stock.rename(columns={'Quantity': 'Current Stock'})
+        
+        # Get pending and coming quantities
+        pending = pending.rename(columns={'Quantity': 'Pending Outgoing'})
+        coming = coming.rename(columns={'Quantity': 'Coming Rotors'})
+        
+        # Merge all data
+        combined = current_stock.merge(
+            pending, on='Size (mm)', how='left'
+        ).merge(
+            coming, on='Size (mm)', how='left'
+        ).fillna(0)
+        
+        # Add outgoing quantities for reference (absolute values)
+        outgoing_ref = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing_ref = outgoing_ref.rename(columns={'Quantity': 'Current Outgoing'})
+        combined = combined.merge(outgoing_ref, on='Size (mm)', how='left').fillna(0)
+        
+        # Filter out sizes with zero stock and no activity
+        combined = combined[
+            (combined['Current Stock'] != 0) | 
+            (combined['Pending Outgoing'] != 0) | 
+            (combined['Coming Rotors'] != 0)
+        ]
+        
+        # Display
+        if not combined.empty:
+            st.dataframe(
+                combined[['Size (mm)', 'Current Stock', 'Current Outgoing', 'Pending Outgoing', 'Coming Rotors']],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No active stock items to display")
+        
+    except Exception as e:
+        st.error(f"Error generating summary: {str(e)}")
+else:
+    st.info("No data available yet")
 
-# Sidebar with save reminder
+# Sidebar controls
 with st.sidebar:
     st.subheader("System Controls")
-    if st.button("🔄 Reset Session Data", help="Clear all local data"):
+    if st.button("🔄 Reset Session Data"):
         st.session_state.data = pd.DataFrame(columns=[
             'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
         ])
@@ -308,19 +382,8 @@ with st.sidebar:
     
     st.divider()
     st.caption("*Data Safety Notice:*")
-    
     if st.session_state.unsaved_changes:
         st.error("⚠ You have unsaved changes!")
-        st.caption("Please save to Google Sheets before closing the app.")
     else:
         st.success("✓ All changes saved")
-    
-    st.caption(f"Entries in system: *{len(st.session_state.data)}*")
-    
-    if st.secrets.get("DEBUG_MODE", False):
-        st.divider()
-        st.subheader("Debug Information")
-        st.caption(f"Google Sheets connection: {'Working' if get_gsheet_connection() else 'Failed'}")
-        st.caption(f"Sync status: {st.session_state.sync_status}")
-        st.caption(f"Data shape: {st.session_state.data.shape}")
-        st.caption(f"Delete trigger: {st.session_state.get('delete_trigger')}")
+    st.caption(f"Total entries: {len(st.session_state.data)}")
