@@ -144,19 +144,11 @@ with form_tabs[2]:  # Pending Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-# ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
-        # Convert Pending column to boolean if it's not already
-        st.session_state.data['Pending'] = st.session_state.data['Pending'].astype(bool)
-        
-        # Current stock (non-pending items)
-        current = st.session_state.data[
-            (st.session_state.data['Status'] == 'Current') & 
-            (~st.session_state.data['Pending'])  # This is where the error was occurring
-        ].copy()
-        
+        # Current stock
+        current = st.session_state.data[(st.session_state.data['Status'] == 'Current') & (~st.session_state.data['Pending'])].copy()
         current['Net'] = current.apply(lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1)
         stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
         stock = stock[stock['Net'] != 0]
@@ -182,36 +174,23 @@ if not st.session_state.data.empty:
         )
     except Exception as e:
         st.error(f"Error generating summary: {e}")
-        st.write("Debug Info:")
-        st.write("Pending column type:", type(st.session_state.data['Pending'].iloc[0]))
-        st.write("Sample data:", st.session_state.data.head())
 else:
     st.info("No data available yet")
-# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
+
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
         try:
-            # Ensure Pending column exists and is boolean
-            if 'Pending' not in st.session_state.data.columns:
-                st.session_state.data['Pending'] = False
-            st.session_state.data['Pending'] = st.session_state.data['Pending'].astype(bool)
-            
             for idx, row in st.session_state.data.sort_values('Date', ascending=False).iterrows():
                 cols = st.columns([10, 1, 1])
                 with cols[0]:
-                    # Create display data with proper pending status
-                    display_data = {
-                        'Date': row['Date'],
-                        'Size (mm)': row['Size (mm)'],
-                        'Type': row['Type'],
-                        'Quantity': row['Quantity'],
-                        'Remarks': row['Remarks'],
-                        'Pending': 'Yes' if row['Pending'] else 'No'
-                    }
+                    # Display the row data with Pending status
+                    display_data = row[['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Pending']].copy()
+                    display_data['Pending'] = 'Yes' if display_data['Pending'] else 'No'
                     st.dataframe(
-                        pd.DataFrame.from_dict(display_data, orient='index', columns=['Value']),
-                        use_container_width=True
+                        pd.DataFrame(display_data).T,
+                        use_container_width=True,
+                        hide_index=True
                     )
                 
                 with cols[1]:  # Edit button
@@ -224,66 +203,39 @@ with st.expander("📋 View Movement Log", expanded=False):
                         auto_save_to_gsheet()
                         st.rerun()
             
-            # Edit form
+            # Edit form (appears when editing is triggered)
             if st.session_state.editing is not None:
-                edit_row = st.session_state.data.loc[st.session_state.editing]
-                with st.form(f"edit_form_{st.session_state.editing}"):
+                with st.form("edit_form"):
+                    edit_row = st.session_state.data.loc[st.session_state.editing]
                     col1, col2 = st.columns(2)
                     with col1:
-                        edit_date = st.date_input(
-                            "📅 Date",
-                            value=datetime.strptime(edit_row['Date'], '%Y-%m-%d')
-                            if isinstance(edit_row['Date'], str)
-                            else edit_row['Date']
-                        )
-                        edit_size = st.number_input(
-                            "📐 Rotor Size (mm)",
-                            value=int(edit_row['Size (mm)']),
-                            min_value=1
-                        )
+                        edit_date = st.date_input("📅 Date", value=datetime.strptime(edit_row['Date'], '%Y-%m-%d'))
+                        edit_size = st.number_input("📐 Rotor Size (mm)", value=edit_row['Size (mm)'], min_value=1)
                     with col2:
-                        edit_type = st.selectbox(
-                            "🔄 Type",
-                            ["Inward", "Outgoing"],
-                            index=0 if edit_row['Type'] == 'Inward' else 1
-                        )
-                        edit_qty = st.number_input(
-                            "🔢 Quantity",
-                            value=int(edit_row['Quantity']),
-                            min_value=1
-                        )
-                    edit_remarks = st.text_input(
-                        "📝 Remarks",
-                        value=str(edit_row['Remarks'])
-                    )
-                    edit_pending = st.checkbox(
-                        "Pending",
-                        value=bool(edit_row['Pending'])
-                    )
+                        edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], index=0 if edit_row['Type'] == 'Inward' else 1)
+                        edit_qty = st.number_input("🔢 Quantity", value=edit_row['Quantity'], min_value=1)
+                    edit_remarks = st.text_input("📝 Remarks", value=edit_row['Remarks'])
+                    edit_pending = st.checkbox("Pending", value=edit_row['Pending'])
                     
-                    save_col, cancel_col = st.columns(2)
-                    with save_col:
-                        if st.form_submit_button("💾 Save Changes"):
-                            st.session_state.data.at[st.session_state.editing, 'Date'] = edit_date.strftime('%Y-%m-%d')
-                            st.session_state.data.at[st.session_state.editing, 'Size (mm)'] = edit_size
-                            st.session_state.data.at[st.session_state.editing, 'Type'] = edit_type
-                            st.session_state.data.at[st.session_state.editing, 'Quantity'] = edit_qty
-                            st.session_state.data.at[st.session_state.editing, 'Remarks'] = edit_remarks
-                            st.session_state.data.at[st.session_state.editing, 'Pending'] = edit_pending
-                            st.session_state.editing = None
-                            auto_save_to_gsheet()
-                            st.rerun()
+                    if st.form_submit_button("💾 Save Changes"):
+                        st.session_state.data.at[st.session_state.editing, 'Date'] = edit_date.strftime('%Y-%m-%d')
+                        st.session_state.data.at[st.session_state.editing, 'Size (mm)'] = edit_size
+                        st.session_state.data.at[st.session_state.editing, 'Type'] = edit_type
+                        st.session_state.data.at[st.session_state.editing, 'Quantity'] = edit_qty
+                        st.session_state.data.at[st.session_state.editing, 'Remarks'] = edit_remarks
+                        st.session_state.data.at[st.session_state.editing, 'Pending'] = edit_pending
+                        st.session_state.editing = None
+                        auto_save_to_gsheet()
+                        st.rerun()
                     
-                    with cancel_col:
-                        if st.form_submit_button("❌ Cancel"):
-                            st.session_state.editing = None
-                            st.rerun()
+                    if st.form_submit_button("❌ Cancel"):
+                        st.session_state.editing = None
+                        st.rerun()
         except Exception as e:
             st.error(f"Error displaying log: {e}")
-            st.write("Debug Info:")
-            st.write(st.session_state.data[['Pending']].value_counts())
     else:
         st.info("No entries to display")
+
 # Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
