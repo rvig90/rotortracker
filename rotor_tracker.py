@@ -38,15 +38,15 @@ def load_from_gsheet():
             records = sheet.get_all_records()
             if records:
                 df = pd.DataFrame(records)
-                
+
                 if 'Status' not in df.columns:
                     df['Status'] = 'Current'
                 if 'Pending' not in df.columns:
                     df['Pending'] = False
                 else:
-                    # Fix pending values to boolean
+                    # Normalize to boolean
                     df['Pending'] = df['Pending'].apply(lambda x: str(x).strip().lower() in ['true', 'yes', '1'])
-                
+
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.success("Data loaded successfully!")
@@ -54,19 +54,22 @@ def load_from_gsheet():
                 st.info("No data found in Google Sheet")
     except Exception as e:
         st.error(f"Error loading data: {e}")
-
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
-        if sheet and not st.session_state.data.empty:
-            # Convert dataframe to list of lists (including header)
-            records = [st.session_state.data.columns.tolist()] + st.session_state.data.astype(str).values.tolist()
+        if sheet:
+            sheet.clear()  # Clears all values from the sheet
 
-            # Clear the entire sheet (including formatting/data validation)
-            sheet.clear()
-
-            # Use batch update to write all at once
-            sheet.update(records)
+            if not st.session_state.data.empty:
+                # Prepare data: convert boolean to string (since Google Sheets stores as text)
+                df = st.session_state.data.copy()
+                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                
+                # Prepare as list of lists
+                records = [df.columns.tolist()] + df.values.tolist()
+                
+                # Write data
+                sheet.update(records)
 
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
