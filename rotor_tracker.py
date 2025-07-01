@@ -18,6 +18,7 @@ if 'data' not in st.session_state:
     st.session_state.delete_trigger = None
     st.session_state.unsaved_changes = False
 
+
 # Google Sheets integration
 def get_gsheet_connection():
     try:
@@ -344,10 +345,9 @@ else:
 # Movement Log - Proper Table Format
 
 
-
 # [Previous Google Sheets functions remain exactly the same...]
 
-# Movement Log - Proper Table with Inline Actions
+# Movement Log - Table with integrated action buttons
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
@@ -362,24 +362,21 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
                     st.session_state.data['Remarks'].str.contains(search_query, case=False) |
                     st.session_state.data['Status'].str.contains(search_query, case=False)
-                ]
+                ].copy()
             else:
-                search_df = st.session_state.data
+                search_df = st.session_state.data.copy()
             
             # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Create a copy of the dataframe for display
-                display_df = search_df.copy()
+                # Add action buttons to the dataframe
+                search_df['Edit'] = "✏"
+                search_df['Delete'] = "❌"
                 
-                # Add empty columns for action buttons
-                display_df['Edit'] = ""
-                display_df['Delete'] = ""
-                
-                # Display the table
+                # Display the table with action buttons
                 st.dataframe(
-                    display_df,
+                    search_df,
                     use_container_width=True,
                     hide_index=True,
                     column_config={
@@ -389,19 +386,19 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         "Quantity": st.column_config.NumberColumn("Qty"),
                         "Remarks": "Remarks",
                         "Status": "Status",
-                        "Edit": st.column_config.Column("", width="small"),
-                        "Delete": st.column_config.Column("", width="small")
+                        "Edit": st.column_config.Column("Edit", width="small"),
+                        "Delete": st.column_config.Column("Delete", width="small")
                     }
                 )
                 
-                # Add action buttons for each row
+                # Add click handlers for the action buttons
+                cols = st.columns(8)
                 for idx in search_df.index:
-                    cols = st.columns([2, 1, 1, 1, 2, 1, 0.5, 0.5])
-                    with cols[6]:
-                        if st.button("✏", key=f"edit_{idx}"):
+                    with cols[6]:  # Edit button column
+                        if st.button("Edit", key=f"edit_{idx}"):
                             st.session_state.editing_index = idx
-                    with cols[7]:
-                        if st.button("❌", key=f"del_{idx}"):
+                    with cols[7]:  # Delete button column
+                        if st.button("Delete", key=f"del_{idx}"):
                             st.session_state.delete_trigger = idx
                             st.session_state.unsaved_changes = True
                 
@@ -475,7 +472,9 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
         st.info("No entries to display")
 
 # [Rest of the code remains exactly the same...]
-# [Rest of the code remains exactly the same...]
+
+# [Previous Google Sheets functions remain exactly the same...]
+
 # [Rest of the code remains exactly the same...]
 
 # [Rest of the code remains unchanged...]
