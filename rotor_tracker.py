@@ -15,6 +15,7 @@ if 'data' not in st.session_state:
     st.session_state.editing_index = None
     st.session_state.log_expanded = True
     st.session_state.sync_status = "idle"
+    st.session_state.delete_trigger = None  # Track deletions for better sync
 
 # Improved Google Sheets integration
 def get_gsheet_connection():
@@ -105,12 +106,12 @@ def save_to_gsheet(df):
             # Clear existing data
             sheet.clear()
             
-            # Prepare data for writing
-            headers = df.columns.tolist()
-            data = [headers] + df.fillna('').values.tolist()
-            
-            # Batch write all data
-            if data:
+            # Prepare data for writing - only if there's data to write
+            if not df.empty:
+                headers = df.columns.tolist()
+                data = [headers] + df.fillna('').values.tolist()
+                
+                # Batch write all data
                 sheet.update('A1', data)
             
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -130,6 +131,11 @@ def auto_save_to_gsheet():
     if not st.session_state.data.empty:
         if save_to_gsheet(st.session_state.data):
             st.toast("Auto-saved to Google Sheets", icon="✅")
+            return True
+    elif st.session_state.delete_trigger:  # Handle empty data after deletion
+        if save_to_gsheet(st.session_state.data):
+            st.toast("Deletion saved to Google Sheets", icon="✅")
+            st.session_state.delete_trigger = None
             return True
     return False
 
@@ -356,13 +362,24 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         if st.button("✏", key=f"edit_{idx}"):
                             st.session_state.editing_index = idx
                     
-                    # Delete button
+                    # Delete button (FIXED)
                     with cols[2]:
                         if st.button("❌", key=f"del_{idx}"):
-                            st.session_state.data = st.session_state.data.drop(idx)
-                            if auto_save_to_gsheet():
-                                st.success("Entry deleted and saved!")
-                            st.rerun()
+                            # Store the index to delete
+                            st.session_state.delete_trigger = idx
+                    
+                    # Handle deletion after button press
+                    if st.session_state.get('delete_trigger') == idx:
+                        # Remove from DataFrame
+                        st.session_state.data = st.session_state.data.drop(idx)
+                        # Reset index to prevent issues
+                        st.session_state.data = st.session_state.data.reset_index(drop=True)
+                        # Save to Google Sheets
+                        if auto_save_to_gsheet():
+                            st.success("Entry deleted and saved!")
+                        # Clear deletion trigger
+                        st.session_state.delete_trigger = None
+                        st.rerun()
                     
                     # Edit form
                     if st.session_state.editing_index == idx:
@@ -450,3 +467,4 @@ with st.sidebar:
         st.caption(f"Google Sheets connection: {'Working' if get_gsheet_connection() else 'Failed'}")
         st.caption(f"Sync status: {st.session_state.sync_status}")
         st.caption(f"Data shape: {st.session_state.data.shape}")
+        st.caption(f"Delete trigger: {st.session_state.get('delete_trigger')}")
