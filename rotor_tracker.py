@@ -150,13 +150,13 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
-# ====== MOVEMENT LOG WITH FILTERS AND FULL DISPLAY ======
+# ====== MOVEMENT LOG WITH DATE, REMARKS, AND SIZE FILTERING ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
         try:
             # Add filter controls at the top
             st.write("### Filter Options")
-            filter_col1, filter_col2 = st.columns(2)
+            filter_col1, filter_col2, filter_col3 = st.columns(3)
             
             # Date filter
             with filter_col1:
@@ -168,6 +168,12 @@ with st.expander("📋 View Movement Log", expanded=False):
                 remarks_search = st.text_input("Search in remarks")
                 remarks_filter_applied = st.button("Search Remarks")
             
+            # Size filter
+            with filter_col3:
+                size_options = sorted(st.session_state.data['Size (mm)'].unique())
+                selected_size = st.selectbox("Filter by size (mm)", [""] + size_options)
+                size_filter_applied = st.button("Apply Size Filter")
+            
             # Handle filter applications
             if date_filter_applied:
                 st.session_state.filter_date = filter_date.strftime('%Y-%m-%d') if filter_date else None
@@ -175,12 +181,17 @@ with st.expander("📋 View Movement Log", expanded=False):
             if remarks_filter_applied:
                 st.session_state.remarks_search = remarks_search.strip().lower() if remarks_search.strip() else None
             
+            if size_filter_applied:
+                st.session_state.filter_size = int(selected_size) if selected_size else None
+            
             # Clear filters button if any filter is active
             if (hasattr(st.session_state, 'filter_date') and st.session_state.filter_date) or \
-               (hasattr(st.session_state, 'remarks_search') and st.session_state.remarks_search):
+               (hasattr(st.session_state, 'remarks_search') and st.session_state.remarks_search) or \
+               (hasattr(st.session_state, 'filter_size') and st.session_state.filter_size):
                 if st.button("Clear All Filters"):
                     st.session_state.filter_date = None
                     st.session_state.remarks_search = None
+                    st.session_state.filter_size = None
                     st.rerun()
 
             # Apply filters to data
@@ -199,6 +210,11 @@ with st.expander("📋 View Movement Log", expanded=False):
                     )
                 ]
                 st.info(f"Showing entries containing: '{st.session_state.remarks_search}'")
+            
+            # Apply size filter if set
+            if hasattr(st.session_state, 'filter_size') and st.session_state.filter_size:
+                display_data = display_data[display_data['Size (mm)'] == st.session_state.filter_size]
+                st.info(f"Showing entries for size: {st.session_state.filter_size}mm")
 
             # Show message if no results
             if display_data.empty:
