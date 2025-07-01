@@ -15,75 +15,121 @@ if 'data' not in st.session_state:
     st.session_state.edit_form_data = None
     st.session_state.log_expanded = True
 
-# ====== GOOGLE SHEETS INTEGRATION ======
+# ====== IMPROVED GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
     try:
+        # Verify credentials exist
         if 'gcp_service_account' not in st.secrets:
-            st.error("Google Sheets credentials not configured")
+            st.error("❌ Google Sheets credentials not found in secrets")
             return None
             
         scope = ["https://spreadsheets.google.com/feeds", 
                 "https://www.googleapis.com/auth/drive"]
         
-        # Handle both string and dict credential formats
-        if isinstance(st.secrets["gcp_service_account"], str):
-            try:
+        # Handle credential format
+        try:
+            if isinstance(st.secrets["gcp_service_account"], str):
                 creds_dict = json.loads(st.secrets["gcp_service_account"])
-            except json.JSONDecodeError:
-                st.error("Invalid JSON in service account credentials")
-                return None
-        else:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-        
-        if 'private_key' not in creds_dict:
-            st.error("Missing private key in credentials")
+            else:
+                creds_dict = dict(st.secrets["gcp_service_account"])
+        except Exception as e:
+            st.error(f"❌ Invalid credential format: {str(e)}")
             return None
-            
+        
+        # Verify required fields
+        required_fields = ['private_key', 'client_email', 'token_uri']
+        for field in required_fields:
+            if field not in creds_dict:
+                st.error(f"❌ Missing required field in credentials: {field}")
+                return None
+                
+        # Fix newlines in private key
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
+        # Create credentials
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open("Rotor Log").sheet1
         
+        # Test connection
+        try:
+            sheet = client.open("Rotor Log").sheet1
+            sheet.get_all_records()  # Test read
+            return sheet
+        except gspread.exceptions.SpreadsheetNotFound:
+            st.error("❌ 'Rotor Log' spreadsheet not found")
+            return None
+        except Exception as e:
+            st.error(f"❌ Sheets API error: {str(e)}")
+            return None
+            
     except Exception as e:
-        st.error(f"Google Sheets connection failed: {str(e)}")
+        st.error(f"❌ Connection failed: {str(e)}")
         return None
 
 def load_from_gsheet():
     try:
         sheet = get_gsheet_connection()
         if not sheet:
-            return
+            return False
             
         records = sheet.get_all_records()
         if records:
             df = pd.DataFrame(records)
+            # Ensure required columns exist
+            required_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks']
+            for col in required_cols:
+                if col not in df.columns:
+                    st.error(f"❌ Missing column in sheet: {col}")
+                    return False
+            
+            # Add Status if missing
             if 'Status' not in df.columns:
                 df['Status'] = 'Current'
+                
             st.session_state.data = df
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.success("Data loaded successfully!")
+            st.success("✅ Data loaded successfully!")
+            return True
         else:
-            st.info("Google Sheet is empty")
+            st.info("ℹ Google Sheet is empty")
+            return True
+            
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
+        st.error(f"❌ Load error: {str(e)}")
+        return False
 
 def auto_save_to_gsheet():
     try:
+        if st.session_state.data.empty:
+            return True
+            
         sheet = get_gsheet_connection()
-        if sheet and not st.session_state.data.empty:
-            sheet.clear()
-            sheet.append_row(st.session_state.data.columns.tolist())
-            for _, row in st.session_state.data.iterrows():
-                sheet.append_row(row.tolist())
-            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if not sheet:
+            return False
+            
+        # Prepare data for saving
+        data_to_save = st.session_state.data.copy()
+        if 'Status' not in data_to_save.columns:
+            data_to_save['Status'] = 'Current'
+            
+        # Save to sheet
+        sheet.clear()
+        sheet.append_row(data_to_save.columns.tolist())
+        for _, row in data_to_save.iterrows():
+            sheet.append_row(row.tolist())
+            
+        st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return True
+        
     except Exception as e:
-        st.error(f"Auto-save failed: {str(e)}")
+        st.error(f"❌ Save failed: {str(e)}")
+        return False
 
 # ====== SYNC BUTTON ======
 if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
-    with st.spinner("Syncing..."):
-        load_from_gsheet()
+    with st.spinner("Syncing with Google Sheets..."):
+        if load_from_gsheet():
+            st.rerun()
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Outgoing"])
@@ -92,12 +138,12 @@ with form_tabs[0]:  # Current Movement
     with st.form("current_form"):
         col1, col2 = st.columns(2)
         with col1:
-            date = st.date_input("📅 Date", value=datetime.today())
-            rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
+            date = st.date_input("📅 Date", value=datetime.today(), key="current_date")
+            rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="current_size")
         with col2:
-            entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
-            quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
-        remarks = st.text_input("📝 Remarks")
+            entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], key="current_type")
+            quantity = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="current_qty")
+        remarks = st.text_input("📝 Remarks", key="current_remarks")
         
         if st.form_submit_button("➕ Add Entry"):
             new_entry = pd.DataFrame([{
@@ -109,18 +155,18 @@ with form_tabs[0]:  # Current Movement
                 'Status': 'Current'
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
-            auto_save_to_gsheet()
-            st.rerun()
+            if auto_save_to_gsheet():
+                st.rerun()
 
 with form_tabs[1]:  # Coming Rotors
     with st.form("future_form"):
         col1, col2 = st.columns(2)
         with col1:
-            future_date = st.date_input("📅 Expected Date", min_value=datetime.today() + timedelta(days=1))
-            future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
+            future_date = st.date_input("📅 Expected Date", min_value=datetime.today() + timedelta(days=1), key="future_date")
+            future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="future_size")
         with col2:
-            future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
-            future_remarks = st.text_input("📝 Remarks")
+            future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="future_qty")
+            future_remarks = st.text_input("📝 Remarks", key="future_remarks")
         
         if st.form_submit_button("➕ Add Coming Rotors"):
             new_entry = pd.DataFrame([{
@@ -132,14 +178,14 @@ with form_tabs[1]:  # Coming Rotors
                 'Status': 'Future'
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
-            auto_save_to_gsheet()
-            st.rerun()
+            if auto_save_to_gsheet():
+                st.rerun()
 
 with form_tabs[2]:  # Pending Outgoing
     with st.form("pending_form"):
         col1, col2 = st.columns(2)
         with col1:
-            pending_date = st.date_input("📅 Ship Date", value=datetime.today())
+            pending_date = st.date_input("📅 Ship Date", value=datetime.today(), key="pending_date")
             pending_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="pending_size")
         with col2:
             pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="pending_qty")
@@ -155,8 +201,8 @@ with form_tabs[2]:  # Pending Outgoing
                 'Status': 'Current'
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
-            auto_save_to_gsheet()
-            st.rerun()
+            if auto_save_to_gsheet():
+                st.rerun()
 
 # ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
@@ -190,9 +236,9 @@ if not st.session_state.data.empty:
         )
         
     except Exception as e:
-        st.error(f"Error generating summary: {str(e)}")
+        st.error(f"❌ Summary error: {str(e)}")
 else:
-    st.info("No data available yet")
+    st.info("ℹ No data available yet")
 
 # ====== MOVEMENT LOG ======
 with st.expander("📋 View Movement Log", expanded=True):
@@ -203,17 +249,17 @@ with st.expander("📋 View Movement Log", expanded=True):
             filter_col1, filter_col2, filter_col3 = st.columns(3)
             
             with filter_col1:
-                filter_date = st.date_input("Filter by date", value=None)
-                date_filter_applied = st.button("Apply Date Filter")
+                filter_date = st.date_input("Filter by date", value=None, key="filter_date")
+                date_filter_applied = st.button("Apply Date Filter", key="date_filter_btn")
             
             with filter_col2:
-                remarks_search = st.text_input("Search remarks")
-                remarks_filter_applied = st.button("Search Remarks")
+                remarks_search = st.text_input("Search remarks", key="remarks_search")
+                remarks_filter_applied = st.button("Search Remarks", key="remarks_filter_btn")
             
             with filter_col3:
                 size_options = sorted(st.session_state.data['Size (mm)'].unique())
-                selected_size = st.selectbox("Filter by size", [""] + size_options)
-                size_filter_applied = st.button("Apply Size Filter")
+                selected_size = st.selectbox("Filter by size", [""] + size_options, key="size_filter")
+                size_filter_applied = st.button("Apply Size Filter", key="size_filter_btn")
             
             # Handle filters
             if date_filter_applied:
@@ -227,7 +273,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             if (st.session_state.get('filter_date') or 
                 st.session_state.get('remarks_search') or 
                 st.session_state.get('filter_size')):
-                if st.button("❌ Clear All Filters"):
+                if st.button("❌ Clear All Filters", key="clear_filters"):
                     st.session_state.filter_date = None
                     st.session_state.remarks_search = None
                     st.session_state.filter_size = None
@@ -245,7 +291,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             
             # Display filtered data
             if display_data.empty:
-                st.warning("No entries match filters")
+                st.warning("⚠ No entries match filters")
             else:
                 for idx, row in display_data.sort_values('Date', ascending=False).iterrows():
                     cols = st.columns([8, 1, 1])
@@ -259,14 +305,14 @@ with st.expander("📋 View Movement Log", expanded=True):
                     with cols[2]:
                         if st.button("❌", key=f"del_{idx}"):
                             st.session_state.data = st.session_state.data.drop(idx)
-                            auto_save_to_gsheet()
-                            st.rerun()
+                            if auto_save_to_gsheet():
+                                st.rerun()
                     st.markdown("---")
                     
         except Exception as e:
-            st.error(f"Error displaying log: {str(e)}")
+            st.error(f"❌ Log error: {str(e)}")
     else:
-        st.info("No entries to display")
+        st.info("ℹ No entries to display")
 
 # Status footer
 if st.session_state.last_sync != "Never":
