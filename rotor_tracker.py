@@ -31,7 +31,6 @@ def get_gsheet_connection():
     except Exception as e:
         st.error(f"Google Sheets connection failed: {str(e)}")
         return None
-
 def load_from_gsheet():
     try:
         sheet = get_gsheet_connection()
@@ -39,10 +38,15 @@ def load_from_gsheet():
             records = sheet.get_all_records()
             if records:
                 df = pd.DataFrame(records)
+                
                 if 'Status' not in df.columns:
                     df['Status'] = 'Current'
                 if 'Pending' not in df.columns:
-                    df['Pending'] = False  # Initialize Pending column if missing
+                    df['Pending'] = False
+                else:
+                    # Fix pending values to boolean
+                    df['Pending'] = df['Pending'].apply(lambda x: str(x).strip().lower() in ['true', 'yes', '1'])
+                
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.success("Data loaded successfully!")
