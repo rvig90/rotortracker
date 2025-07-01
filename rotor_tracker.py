@@ -17,6 +17,8 @@ if 'data' not in st.session_state:
     st.session_state.sync_status = "idle"
     st.session_state.delete_trigger = None
     st.session_state.unsaved_changes = False
+
+
 # Google Sheets integration
 def get_gsheet_connection():
     try:
@@ -341,26 +343,16 @@ else:
 # [Previous Google Sheets functions remain exactly the same...]
 
 # Movement Log - Proper Table Format
-
-
 # [Previous Google Sheets functions remain exactly the same...]
 
-# Movement Log - Table with integrated action buttons
-# [Rest of the code remains exactly the same...]
-
-# [Previous Google Sheets functions remain exactly the same...]
-
-
-# [Previous Google Sheets functions remain exactly the same...]
-
-# Movement Log - Table with inline action buttons
+# Movement Log - Table with side action buttons
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
         try:
             # Search functionality
             search_query = st.text_input("🔍 Search entries", 
-                                      placeholder="Search by size, remarks, or status...")
+                                       placeholder="Search by size, remarks, or status...")
             
             # Filter data based on search
             if search_query:
@@ -376,20 +368,17 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Create a container for our custom table
-                table_container = st.container()
-                
-                # Table header
-                with table_container:
-                    cols = st.columns([2, 1, 1, 1, 2, 1, 0.5, 0.5])
-                    headers = ["Date", "Size (mm)", "Type", "Qty", "Remarks", "Status", "Edit", "Delete"]
+                # Create a custom table using columns
+                with st.container():
+                    # Table header
+                    cols = st.columns([3, 1.5, 1.5, 1.5, 3, 1.5, 0.8, 0.8])
+                    headers = ["Date", "Size (mm)", "Type", "Qty", "Remarks", "Status", "", ""]
                     for i, header in enumerate(headers):
                         cols[i].write(f"{header}")
-                
-                # Table rows with action buttons
-                for idx, row in search_df.iterrows():
-                    with table_container:
-                        cols = st.columns([2, 1, 1, 1, 2, 1, 0.5, 0.5])
+                    
+                    # Table rows
+                    for idx, row in search_df.iterrows():
+                        cols = st.columns([3, 1.5, 1.5, 1.5, 3, 1.5, 0.8, 0.8])
                         
                         # Data columns
                         cols[0].write(row['Date'])
@@ -399,7 +388,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         cols[4].write(row['Remarks'])
                         cols[5].write(row['Status'])
                         
-                        # Action buttons
+                        # Action buttons (aligned to the side)
                         with cols[6]:
                             if st.button("✏", key=f"edit_{idx}"):
                                 st.session_state.editing_index = idx
@@ -478,7 +467,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
         st.info("No entries to display")
 
 # [Rest of the code remains exactly the same...]
-# [Rest of the code remains exactly the same...]
+
 
 # [Rest of the code remains unchanged...]
 # [Keep all the remaining code from previous implementation...]
