@@ -340,62 +340,98 @@ else:
 # Movement Log - Restored to original table format
 # [Previous imports and session state initialization remain the same...]
 
+
 # [Previous Google Sheets functions remain exactly the same...]
 
-# Movement Log - Proper Table Format
-# [Previous Google Sheets functions remain exactly the same...]
-
-# Movement Log - Table with side action buttons
+# Movement Log - Mobile friendly with date search
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
         try:
+            # Convert Date column to datetime for proper searching
+            search_df = st.session_state.data.copy()
+            search_df['Date'] = pd.to_datetime(search_df['Date'])
+            
             # Search functionality
-            search_query = st.text_input("🔍 Search entries", 
-                                       placeholder="Search by size, remarks, or status...")
+            search_col1, search_col2 = st.columns(2)
+            with search_col1:
+                date_query = st.date_input(
+                    "📅 Search by date",
+                    value=None,
+                    help="Filter entries by specific date"
+                )
+            with search_col2:
+                text_query = st.text_input(
+                    "🔍 Search other fields",
+                    placeholder="Size, Type, Remarks, Status...",
+                    help="Search across all other fields"
+                )
             
             # Filter data based on search
-            if search_query:
-                search_df = st.session_state.data[
-                    st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
-                    st.session_state.data['Remarks'].str.contains(search_query, case=False) |
-                    st.session_state.data['Status'].str.contains(search_query, case=False)
+            if date_query:
+                date_query = pd.to_datetime(date_query)
+                search_df = search_df[search_df['Date'].dt.date == date_query.date()]
+            
+            if text_query:
+                search_df = search_df[
+                    search_df['Size (mm)'].astype(str).str.contains(text_query, case=False) |
+                    search_df['Type'].str.contains(text_query, case=False) |
+                    search_df['Remarks'].str.contains(text_query, case=False) |
+                    search_df['Status'].str.contains(text_query, case=False)
                 ]
-            else:
-                search_df = st.session_state.data
             
             # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Create a custom table using columns
-                with st.container():
-                    # Table header
+                # Mobile-responsive table using CSS
+                st.markdown("""
+                <style>
+                    .mobile-table {
+                        width: 100%;
+                        overflow-x: auto;
+                    }
+                    .mobile-table table {
+                        min-width: 100%;
+                    }
+                    .mobile-table th, .mobile-table td {
+                        padding: 8px 12px;
+                        white-space: nowrap;
+                    }
+                    @media (max-width: 768px) {
+                        .mobile-table {
+                            font-size: 14px;
+                        }
+                        .mobile-table th, .mobile-table td {
+                            padding: 6px 8px;
+                        }
+                    }
+                </style>
+                <div class="mobile-table">
+                """, unsafe_allow_html=True)
+                
+                # Display the table with action buttons
+                for idx, row in search_df.iterrows():
                     cols = st.columns([3, 1.5, 1.5, 1.5, 3, 1.5, 0.8, 0.8])
-                    headers = ["Date", "Size (mm)", "Type", "Qty", "Remarks", "Status", "", ""]
-                    for i, header in enumerate(headers):
-                        cols[i].write(f"{header}")
                     
-                    # Table rows
-                    for idx, row in search_df.iterrows():
-                        cols = st.columns([3, 1.5, 1.5, 1.5, 3, 1.5, 0.8, 0.8])
-                        
-                        # Data columns
-                        cols[0].write(row['Date'])
-                        cols[1].write(row['Size (mm)'])
-                        cols[2].write(row['Type'])
-                        cols[3].write(row['Quantity'])
-                        cols[4].write(row['Remarks'])
-                        cols[5].write(row['Status'])
-                        
-                        # Action buttons (aligned to the side)
-                        with cols[6]:
-                            if st.button("✏", key=f"edit_{idx}"):
-                                st.session_state.editing_index = idx
-                        with cols[7]:
-                            if st.button("❌", key=f"del_{idx}"):
-                                st.session_state.delete_trigger = idx
-                                st.session_state.unsaved_changes = True
+                    # Data columns
+                    cols[0].write(row['Date'].strftime('%Y-%m-%d'))
+                    cols[1].write(row['Size (mm)'])
+                    cols[2].write(row['Type'])
+                    cols[3].write(row['Quantity'])
+                    cols[4].write(row['Remarks'])
+                    cols[5].write(row['Status'])
+                    
+                    # Action buttons (aligned to the side)
+                    with cols[6]:
+                        if st.button("✏", key=f"edit_{idx}"):
+                            st.session_state.editing_index = idx
+                    with cols[7]:
+                        if st.button("❌", key=f"del_{idx}"):
+                            st.session_state.delete_trigger = idx
+                            st.session_state.unsaved_changes = True
+                
+                st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Edit form (appears when edit button is clicked)
                 if st.session_state.editing_index is not None:
@@ -460,11 +496,13 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     st.session_state.delete_trigger = None
                     st.rerun()
             else:
-                st.info("No entries match your search")
+                st.info("No entries match your search criteria")
         except Exception as e:
             st.error(f"Error displaying log: {str(e)}")
     else:
         st.info("No entries to display")
+
+# [Rest of the code remains exactly the same...]
 
 # [Rest of the code remains exactly the same...]
 
