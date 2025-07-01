@@ -9,7 +9,7 @@ import time
 # Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
-        'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
+        'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Actions'
     ])
     st.session_state.last_sync = "Never"
     st.session_state.editing_index = None
@@ -342,6 +342,10 @@ else:
 # [Previous Google Sheets functions remain exactly the same...]
 
 # Movement Log - Proper Table Format
+
+# [Previous Google Sheets functions remain exactly the same...]
+
+# Movement Log - Table with inline edit/delete buttons
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
@@ -357,53 +361,48 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                     st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
                     st.session_state.data['Remarks'].str.contains(search_query, case=False) |
                     st.session_state.data['Status'].str.contains(search_query, case=False)
-                ]
+                ].copy()
             else:
-                search_df = st.session_state.data
+                search_df = st.session_state.data.copy()
             
             # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Display the table
-                st.dataframe(
-                    search_df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_order=["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Status"],
-                    column_config={
-                        "Date": st.column_config.DateColumn("Date"),
-                        "Size (mm)": st.column_config.NumberColumn("Size (mm)"),
-                        "Type": "Type",
-                        "Quantity": st.column_config.NumberColumn("Qty"),
-                        "Remarks": "Remarks",
-                        "Status": "Status"
-                    }
-                )
+                # Add action buttons to the dataframe
+                search_df['Actions'] = ""
                 
-                # Edit and Delete controls below the table
-                st.write("### Modify Entries")
-                selected_index = st.selectbox(
-                    "Select entry to modify",
-                    options=search_df.index,
-                    format_func=lambda x: f"{search_df.loc[x, 'Date']} | {search_df.loc[x, 'Type']} | {search_df.loc[x, 'Size (mm)']}mm | Qty: {search_df.loc[x, 'Quantity']}"
-                )
+                # Display the table with action buttons
+                for idx, row in search_df.iterrows():
+                    cols = st.columns([2, 1, 1, 1, 2, 1, 0.5, 0.5])
+                    
+                    with cols[0]:
+                        st.text(row['Date'])
+                    with cols[1]:
+                        st.text(row['Size (mm)'])
+                    with cols[2]:
+                        st.text(row['Type'])
+                    with cols[3]:
+                        st.text(row['Quantity'])
+                    with cols[4]:
+                        st.text(row['Remarks'])
+                    with cols[5]:
+                        st.text(row['Status'])
+                    with cols[6]:
+                        if st.button("✏", key=f"edit_{idx}"):
+                            st.session_state.editing_index = idx
+                    with cols[7]:
+                        if st.button("❌", key=f"del_{idx}"):
+                            st.session_state.delete_trigger = idx
+                            st.session_state.unsaved_changes = True
+                    
+                    st.markdown("---")  # Divider between entries
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✏ Edit Selected Entry", use_container_width=True):
-                        st.session_state.editing_index = selected_index
-                
-                with col2:
-                    if st.button("❌ Delete Selected Entry", use_container_width=True):
-                        st.session_state.delete_trigger = selected_index
-                        st.session_state.unsaved_changes = True
-                
-                # Edit form
+                # Edit form (appears when edit button is clicked)
                 if st.session_state.editing_index is not None:
                     with st.form(key="edit_form"):
-                        st.subheader("Edit Entry")
                         row = st.session_state.data.loc[st.session_state.editing_index]
+                        st.subheader("Edit Entry")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -437,7 +436,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                         
                         save_col, cancel_col = st.columns(2)
                         with save_col:
-                            if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                            if st.form_submit_button("💾 Save Changes"):
                                 st.session_state.data.at[st.session_state.editing_index, 'Date'] = new_date.strftime('%Y-%m-%d')
                                 st.session_state.data.at[st.session_state.editing_index, 'Size (mm)'] = new_size
                                 st.session_state.data.at[st.session_state.editing_index, 'Type'] = new_type
@@ -449,7 +448,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
                                 st.session_state.editing_index = None
                                 st.rerun()
                         with cancel_col:
-                            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            if st.form_submit_button("❌ Cancel"):
                                 st.session_state.editing_index = None
                                 st.rerun()
                 
@@ -468,6 +467,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     else:
         st.info("No entries to display")
 
+# [Rest of the code remains exactly the same...]
 # [Rest of the code remains exactly the same...]
 
 # [Rest of the code remains unchanged...]
