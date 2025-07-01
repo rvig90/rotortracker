@@ -67,7 +67,7 @@ if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
     load_from_gsheet()
 
 # Entry forms
-form_tabs = st.tabs(["Current Movement", "Coming Rotors"])
+form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Outgoing"])
 
 with form_tabs[0]:  # Current Movement
     with st.form("current_form"):
@@ -81,14 +81,13 @@ with form_tabs[0]:  # Current Movement
         remarks = st.text_input("📝 Remarks")
         
         if st.form_submit_button("➕ Add Entry"):
-            status = 'Pending' if entry_type == 'Outgoing' else 'Current'
             new_entry = pd.DataFrame([{
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': rotor_size, 
                 'Type': entry_type, 
                 'Quantity': quantity, 
                 'Remarks': remarks,
-                'Status': status
+                'Status': 'Current'  # All current movements are 'Current' status
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
             auto_save_to_gsheet()
@@ -117,18 +116,48 @@ with form_tabs[1]:  # Coming Rotors
             auto_save_to_gsheet()
             st.rerun()
 
+with form_tabs[2]:  # Pending Outgoing
+    with st.form("pending_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            pending_date = st.date_input("📅 Expected Ship Date", value=datetime.today())
+            pending_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d", key="pending_size")
+        with col2:
+            pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d", key="pending_qty")
+            pending_remarks = st.text_input("📝 Remarks", key="pending_remarks")
+        
+        if st.form_submit_button("➕ Add Pending Outgoing"):
+            new_entry = pd.DataFrame([{
+                'Date': pending_date.strftime('%Y-%m-%d'),
+                'Size (mm)': pending_size, 
+                'Type': 'Outgoing', 
+                'Quantity': pending_qty, 
+                'Remarks': f"[PENDING] {pending_remarks}",
+                'Status': 'Pending'  # Special status for pending shipments
+            }])
+            st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+            auto_save_to_gsheet()
+            st.rerun()
+
 # Stock Summary
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
-        # Current stock (inward)
+        # Current inward stock
         current_inward = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (st.session_state.data['Type'] == 'Inward')
         ]
         inward_stock = current_inward.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Pending outgoing
+        # Current outgoing (immediate deductions)
+        current_outgoing = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Type'] == 'Outgoing')
+        ]
+        outgoing = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Pending outgoing (future deductions)
         pending_outgoing = st.session_state.data[
             (st.session_state.data['Status'] == 'Pending') & 
             (st.session_state.data['Type'] == 'Outgoing')
@@ -140,18 +169,20 @@ if not st.session_state.data.empty:
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
         # Combine all data
-        combined = pd.merge(inward_stock, pending, on='Size (mm)', how='outer', suffixes=('_inward', '_pending'))
+        combined = pd.merge(inward_stock, outgoing, on='Size (mm)', how='outer', suffixes=('_inward', '_outgoing'))
+        combined = pd.merge(combined, pending, on='Size (mm)', how='outer')
         combined = pd.merge(combined, coming, on='Size (mm)', how='outer')
         combined = combined.fillna(0)
         
-        # Calculate available stock
-        combined['Current Stock'] = combined['Quantity_inward'] - combined['Quantity_pending']
-        combined['Pending Outgoing'] = combined['Quantity_pending']
-        combined['Coming Rotors'] = combined['Quantity']
+        # Calculate stock levels
+        combined['Current Stock'] = combined['Quantity_inward'] - combined['Quantity_outgoing']
+        combined['Current Outgoing'] = combined['Quantity_outgoing']
+        combined['Pending Outgoing'] = combined['Quantity']
+        combined['Coming Rotors'] = combined['Quantity_y']
         
         # Display
         st.dataframe(
-            combined[['Size (mm)', 'Current Stock', 'Pending Outgoing', 'Coming Rotors']],
+            combined[['Size (mm)', 'Current Stock', 'Current Outgoing', 'Pending Outgoing', 'Coming Rotors']],
             use_container_width=True,
             hide_index=True
         )
@@ -181,7 +212,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                 with cols[1]:
                     if st.button("✏", key=f"edit_{idx}"):
                         st.session_state.editing_index = idx
-                        st.session_state.edit_form_data = row.to_dict()
                 
                 # Delete button
                 with cols[2]:
@@ -193,50 +223,51 @@ with st.expander("📋 View Movement Log", expanded=True):
                 # Edit form
                 if st.session_state.editing_index == idx:
                     with st.form(key=f"edit_form_{idx}"):
-                        edited_data = st.session_state.edit_form_data.copy()
+                        # Get current values
+                        current_date = datetime.strptime(row['Date'], '%Y-%m-%d').date()
+                        current_size = row['Size (mm)']
+                        current_type = row['Type']
+                        current_qty = row['Quantity']
+                        current_remarks = row['Remarks']
+                        current_status = row['Status']
                         
+                        # Create editable fields
                         col1, col2 = st.columns(2)
                         with col1:
-                            edited_data['Date'] = st.date_input(
-                                "Date",
-                                value=datetime.strptime(edited_data['Date'], '%Y-%m-%d')
-                            ).strftime('%Y-%m-%d')
-                            edited_data['Size (mm)'] = st.number_input(
-                                "Size (mm)",
-                                value=edited_data['Size (mm)'],
-                                min_value=1
-                            )
+                            new_date = st.date_input("Date", value=current_date)
+                            new_size = st.number_input("Size (mm)", value=current_size, min_value=1)
                         with col2:
-                            edited_data['Type'] = st.selectbox(
+                            new_type = st.selectbox(
                                 "Type",
                                 ["Inward", "Outgoing"],
-                                index=0 if edited_data['Type'] == 'Inward' else 1
+                                index=0 if current_type == 'Inward' else 1
                             )
-                            edited_data['Quantity'] = st.number_input(
-                                "Quantity",
-                                value=edited_data['Quantity'],
-                                min_value=1
-                            )
+                            new_qty = st.number_input("Quantity", value=current_qty, min_value=1)
                         
-                        edited_data['Remarks'] = st.text_input(
-                            "Remarks",
-                            value=edited_data['Remarks']
-                        )
-                        edited_data['Status'] = st.selectbox(
+                        new_remarks = st.text_input("Remarks", value=current_remarks)
+                        new_status = st.selectbox(
                             "Status",
                             ["Current", "Pending", "Future"],
-                            index=["Current", "Pending", "Future"].index(edited_data['Status'])
+                            index=["Current", "Pending", "Future"].index(current_status)
                         )
                         
-                        if st.form_submit_button("💾 Save Changes"):
-                            st.session_state.data.loc[idx] = edited_data
-                            auto_save_to_gsheet()
-                            st.session_state.editing_index = None
-                            st.rerun()
-                        
-                        if st.form_submit_button("❌ Cancel"):
-                            st.session_state.editing_index = None
-                            st.rerun()
+                        # Form buttons
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            if st.form_submit_button("💾 Save Changes"):
+                                st.session_state.data.at[idx, 'Date'] = new_date.strftime('%Y-%m-%d')
+                                st.session_state.data.at[idx, 'Size (mm)'] = new_size
+                                st.session_state.data.at[idx, 'Type'] = new_type
+                                st.session_state.data.at[idx, 'Quantity'] = new_qty
+                                st.session_state.data.at[idx, 'Remarks'] = new_remarks
+                                st.session_state.data.at[idx, 'Status'] = new_status
+                                auto_save_to_gsheet()
+                                st.session_state.editing_index = None
+                                st.rerun()
+                        with cancel_col:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state.editing_index = None
+                                st.rerun()
                 
             st.markdown("---")
         except Exception as e:
