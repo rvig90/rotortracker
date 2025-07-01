@@ -149,11 +149,29 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
+# ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY AND DATE JUMP ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
         try:
+            # Add date jump feature at the top
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                jump_date = st.date_input("Jump to date", value=datetime.today())
+            with col2:
+                if st.button("Go to Date", use_container_width=True):
+                    target_date = jump_date.strftime('%Y-%m-%d')
+                    matching_dates = st.session_state.data[st.session_state.data['Date'] == target_date]
+                    if not matching_dates.empty:
+                        st.success(f"Showing {len(matching_dates)} entries from {target_date}")
+                    else:
+                        st.warning(f"No entries found for {target_date}")
+            
             # Sort data by date (newest first)
             sorted_data = st.session_state.data.sort_values('Date', ascending=False)
+            
+            # Filter by date if a date was selected
+            if 'jump_date' in locals():
+                sorted_data = sorted_data[sorted_data['Date'] == jump_date.strftime('%Y-%m-%d')]
             
             for idx, row in sorted_data.iterrows():
                 st.markdown("---")
@@ -245,11 +263,17 @@ with st.expander("📋 View Movement Log", expanded=False):
                                 st.rerun()
             
             st.markdown("---")
+            
+            # Add "Show All" button when filtered
+            if 'jump_date' in locals():
+                if st.button("Show All Entries", use_container_width=True):
+                    # This will rerun without the date filter
+                    pass
+                
         except Exception as e:
             st.error(f"Error displaying log: {e}")
     else:
         st.info("No entries to display")
-
 # Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
