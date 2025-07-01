@@ -122,7 +122,7 @@ with form_tabs[1]:  # Coming Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-# ====== STOCK SUMMARY WITH PENDING ROTORS COLUMN ======
+# ====== STOCK SUMMARY WITH PENDING COLUMN ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
@@ -137,33 +137,19 @@ if not st.session_state.data.empty:
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
         # Pending outgoing rotors (Current status + Outgoing type)
-        pending_outgoing = current[current['Type'] == 'Outgoing']
-        pending = pending_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        pending = current[current['Type'] == 'Outgoing']
+        pending = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Combined view - ensure all sizes are represented
-        all_sizes = pd.DataFrame({'Size (mm)': st.session_state.data['Size (mm)'].unique()})
+        # Combined view
+        combined = pd.merge(stock, coming, on='Size (mm)', how='outer').fillna(0)
+        combined = pd.merge(combined, pending, on='Size (mm)', how='outer').fillna(0)
         
-        combined = all_sizes.merge(stock, on='Size (mm)', how='left')\
-                           .merge(coming, on='Size (mm)', how='left')\
-                           .merge(pending, on='Size (mm)', how='left')
-        
-        combined = combined.fillna(0)
+        # Rename columns to match your desired output
         combined.columns = ['Size (mm)', 'Current Stock', 'Coming Rotors', 'Pending Outgoing']
         
-        # Calculate available stock
-        combined['Available Stock'] = combined['Current Stock'] - combined['Pending Outgoing']
-        
-        # Format for display
-        display_cols = ['Size (mm)', 'Current Stock', 'Pending Outgoing', 'Available Stock', 'Coming Rotors']
-        formatted_df = combined[display_cols]
-        
-        # Apply styling
-        def color_negative_red(val):
-            color = 'red' if val < 0 else 'black'
-            return f'color: {color}'
-        
+        # Display the table with all columns
         st.dataframe(
-            formatted_df.style.applymap(color_negative_red, subset=['Available Stock']),
+            combined[['Size (mm)', 'Current Stock', 'Pending Outgoing', 'Coming Rotors']],
             use_container_width=True,
             hide_index=True
         )
@@ -172,7 +158,6 @@ if not st.session_state.data.empty:
         st.error(f"Error generating summary: {e}")
 else:
     st.info("No data available yet")
-
 # ====== MOVEMENT LOG WITH EDIT 
 # ====== FIXED MOVEMENT LOG THAT STAYS OPEN ======
 with st.expander("📋 View Movement Log", expanded=True):  # Forced to stay open
