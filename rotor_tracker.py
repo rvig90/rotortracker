@@ -15,52 +15,73 @@ if 'data' not in st.session_state:
     st.session_state.log_expanded = True
 
 # Google Sheets integration
-def get_gsheet_connection():
+# Stock Summary
+st.subheader("📊 Current Stock Summary")
+if not st.session_state.data.empty:
     try:
-        scope = ["https://spreadsheets.google.com/feeds", 
-                "https://www.googleapis.com/auth/drive"]
+        # Current inward stock (positive additions)
+        current_inward = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Type'] == 'Inward')
+        ]
+        inward_stock = current_inward.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        if isinstance(st.secrets["gcp_service_account"], str):
-            creds_dict = json.loads(st.secrets["gcp_service_account"])
-        else:
-            creds_dict = dict(st.secrets["gcp_service_account"])
+        # Current outgoing (immediate deductions - negative values)
+        current_outgoing = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Type'] == 'Outgoing')
+        ]
+        outgoing = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing['Quantity'] = -outgoing['Quantity']  # Convert to negative for subtraction
         
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        return client.open("Rotor Log").sheet1
+        # Pending outgoing (future deductions - shown separately)
+        pending_outgoing = st.session_state.data[
+            (st.session_state.data['Status'] == 'Pending') & 
+            (st.session_state.data['Type'] == 'Outgoing')
+        ]
+        pending = pending_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Coming rotors (future additions)
+        future = st.session_state.data[st.session_state.data['Status'] == 'Future']
+        coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        
+        # Combine all data with explicit column naming
+        stock = pd.concat([
+            inward_stock.assign(Type='Inward'),
+            outgoing.assign(Type='Outgoing')
+        ])
+        
+        # Calculate net current stock (inward minus outgoing)
+        current_stock = stock.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        current_stock = current_stock.rename(columns={'Quantity': 'Current Stock'})
+        
+        # Get pending and coming quantities
+        pending = pending.rename(columns={'Quantity': 'Pending Outgoing'})
+        coming = coming.rename(columns={'Quantity': 'Coming Rotors'})
+        
+        # Merge all data
+        combined = current_stock.merge(
+            pending, on='Size (mm)', how='left'
+        ).merge(
+            coming, on='Size (mm)', how='left'
+        ).fillna(0)
+        
+        # Add outgoing quantities for reference (absolute values)
+        outgoing_ref = current_outgoing.groupby('Size (mm)')['Quantity'].sum().reset_index()
+        outgoing_ref = outgoing_ref.rename(columns={'Quantity': 'Current Outgoing'})
+        combined = combined.merge(outgoing_ref, on='Size (mm)', how='left').fillna(0)
+        
+        # Display
+        st.dataframe(
+            combined[['Size (mm)', 'Current Stock', 'Current Outgoing', 'Pending Outgoing', 'Coming Rotors']],
+            use_container_width=True,
+            hide_index=True
+        )
+        
     except Exception as e:
-        st.error(f"Google Sheets connection failed: {str(e)}")
-        return None
-
-def load_from_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            records = sheet.get_all_records()
-            if records:
-                df = pd.DataFrame(records)
-                if 'Status' not in df.columns:
-                    df['Status'] = 'Current'
-                st.session_state.data = df
-                st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.success("Data loaded successfully!")
-            else:
-                st.info("No data found in Google Sheet")
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-
-def auto_save_to_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet and not st.session_state.data.empty:
-            sheet.clear()
-            sheet.append_row(st.session_state.data.columns.tolist())
-            for _, row in st.session_state.data.iterrows():
-                sheet.append_row(row.tolist())
-            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    except Exception as e:
-        st.error(f"Auto-save failed: {e}")
+        st.error(f"Error generating summary: {str(e)}")
+else:
+    st.info("No data available yet")
 
 # Sync button
 if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
