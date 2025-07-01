@@ -337,14 +337,19 @@ else:
     st.info("No data available yet")
 
 # Movement Log - Restored to original table format
+# [Previous imports and session state initialization remain the same...]
+
+# Movement Log - Mobile Responsive Table
 st.subheader("📋 Movement Log")
 with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     if not st.session_state.data.empty:
         try:
             # Search functionality
-            search_query = st.text_input("🔍 Search entries", placeholder="Search by size, remarks, or status...")
+            search_query = st.text_input("🔍 Search entries", 
+                                       placeholder="Search by size, remarks, or status...",
+                                       key="log_search")
             
-            # Filter data based on search
+            # Filter and sort data
             if search_query:
                 search_df = st.session_state.data[
                     st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
@@ -354,48 +359,35 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             else:
                 search_df = st.session_state.data
             
-            # Sort by date descending
             search_df = search_df.sort_values('Date', ascending=False)
             
             if not search_df.empty:
-                # Display the table
-                st.dataframe(
-                    search_df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Date": "Date",
-                        "Size (mm)": "Size (mm)",
-                        "Type": "Type",
-                        "Quantity": "Quantity",
-                        "Remarks": "Remarks",
-                        "Status": "Status"
-                    }
-                )
+                # Mobile-responsive table using columns
+                for idx, row in search_df.iterrows():
+                    cols = st.columns([2, 1, 1, 1, 0.5, 0.5])
+                    with cols[0]:
+                        st.markdown(f"{row['Date']}**  \n{row['Remarks']}")
+                    with cols[1]:
+                        st.markdown(f"{row['Size (mm)']}mm**")
+                    with cols[2]:
+                        st.markdown(f"{row['Type']}")
+                    with cols[3]:
+                        st.markdown(f"{row['Quantity']}")
+                    with cols[4]:
+                        if st.button("✏", key=f"edit_{idx}"):
+                            st.session_state.editing_index = idx
+                    with cols[5]:
+                        if st.button("❌", key=f"del_{idx}"):
+                            st.session_state.delete_trigger = idx
+                            st.session_state.unsaved_changes = True
+                    
+                    st.markdown("---")  # Divider between entries
                 
-                # Edit and Delete controls below the table
-                st.write("### Edit or Delete Entries")
-                selected_index = st.selectbox(
-                    "Select entry to modify",
-                    options=search_df.index,
-                    format_func=lambda x: f"{search_df.loc[x, 'Date']} - {search_df.loc[x, 'Type']} - {search_df.loc[x, 'Size (mm)']}mm - {search_df.loc[x, 'Quantity']} units"
-                )
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✏ Edit Selected Entry"):
-                        st.session_state.editing_index = selected_index
-                
-                with col2:
-                    if st.button("❌ Delete Selected Entry"):
-                        st.session_state.delete_trigger = selected_index
-                        st.session_state.unsaved_changes = True
-                
-                # Edit form
+                # Edit form (appears when edit button is clicked)
                 if st.session_state.editing_index is not None:
                     with st.form(key="edit_form"):
-                        st.subheader("Edit Entry")
                         row = st.session_state.data.loc[st.session_state.editing_index]
+                        st.subheader("Edit Entry")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -460,6 +452,7 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
     else:
         st.info("No entries to display")
 
+# [Rest of the code remains unchanged...]
 # [Keep all the remaining code from previous implementation...]
 # Status footer
 if st.session_state.last_sync != "Never":
