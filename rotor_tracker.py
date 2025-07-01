@@ -44,30 +44,44 @@ def load_from_gsheet():
         st.session_state.sync_status = "loading"
         client = get_gsheet_connection()
         if client:
-            sheet = client.open("Rotor Log").sheet1
-            records = sheet.get_all_records()
-            
-            if records:
-                df = pd.DataFrame(records)
-                # Ensure all required columns exist
-                for col in ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']:
-                    if col not in df.columns:
-                        df[col] = None if col == 'Remarks' else '' if col == 'Status' else 0
+            try:
+                # Try to open existing spreadsheet
+                spreadsheet = client.open("Rotor Log")
+                sheet = spreadsheet.sheet1
+                records = sheet.get_all_records()
                 
-                st.session_state.data = df
+                if records:
+                    df = pd.DataFrame(records)
+                    # Ensure all required columns exist
+                    for col in ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status']:
+                        if col not in df.columns:
+                            df[col] = None if col == 'Remarks' else '' if col == 'Status' else 0
+                    
+                    st.session_state.data = df
+                    st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    st.session_state.sync_status = "success"
+                    st.toast("Data loaded successfully from Google Sheets!", icon="✅")
+                else:
+                    st.session_state.sync_status = "success"
+                    st.toast("Google Sheet exists but contains no data", icon="ℹ")
+            except gspread.SpreadsheetNotFound:
+                # Create spreadsheet if it doesn't exist
+                spreadsheet = client.create("Rotor Log")
+                # Share with service account email for access
+                sa_email = creds.service_account_email
+                spreadsheet.share(sa_email, perm_type='user', role='writer')
+                st.session_state.sync_status = "success"
+                st.toast("Created new Google Sheet 'Rotor Log'", icon="🆕")
+                # Initialize with empty data
+                st.session_state.data = pd.DataFrame(columns=[
+                    'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status'
+                ])
+                save_to_gsheet(st.session_state.data)
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.session_state.sync_status = "success"
-                st.toast("Data loaded successfully from Google Sheets!", icon="✅")
-            else:
-                st.session_state.sync_status = "success"
-                st.toast("Google Sheet exists but contains no data", icon="ℹ")
     except gspread.exceptions.APIError as e:
         st.session_state.sync_status = "error"
         st.error(f"Google API Error: {str(e)}")
         st.error("Please check your Google Sheets API quota and permissions")
-    except gspread.exceptions.SpreadsheetNotFound:
-        st.session_state.sync_status = "error"
-        st.error("Spreadsheet 'Rotor Log' not found. Please create it first.")
     except Exception as e:
         st.session_state.sync_status = "error"
         st.error(f"Error loading data: {str(e)}")
@@ -82,10 +96,9 @@ def save_to_gsheet(df):
                 # Create spreadsheet if it doesn't exist
                 spreadsheet = client.create("Rotor Log")
                 # Share with service account email for access
-                client.insert_permission(spreadsheet.id, 
-                                        creds_dict["client_email"], 
-                                        perm_type="user", 
-                                        role="writer")
+                sa_email = creds.service_account_email
+                spreadsheet.share(sa_email, perm_type='user', role='writer')
+                time.sleep(3)  # Wait for permissions to propagate
                 
             sheet = spreadsheet.sheet1
             
@@ -97,7 +110,8 @@ def save_to_gsheet(df):
             data = [headers] + df.fillna('').values.tolist()
             
             # Batch write all data
-            sheet.update('A1', data)
+            if data:
+                sheet.update('A1', data)
             
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return True
@@ -314,9 +328,9 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
             # Filter data based on search
             if search_query:
                 search_df = st.session_state.data[
-                    st.session_state_data['Size (mm)'].astype(str).str.contains(search_query) |
-                    st.session_state_data['Remarks'].str.contains(search_query, case=False) |
-                    st.session_state_data['Status'].str.contains(search_query, case=False)
+                    st.session_state.data['Size (mm)'].astype(str).str.contains(search_query) |
+                    st.session_state.data['Remarks'].str.contains(search_query, case=False) |
+                    st.session_state.data['Status'].str.contains(search_query, case=False)
                 ]
             else:
                 search_df = st.session_state.data
@@ -413,11 +427,6 @@ with st.expander("View/Edit Entries", expanded=st.session_state.log_expanded):
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
 
-# Auto-save notification
-if st.session_state.get('auto_save_success'):
-    st.toast("Auto-save completed", icon="✅")
-    st.session_state.auto_save_success = False
-
 # Add a reset button in sidebar
 with st.sidebar:
     st.subheader("System Controls")
@@ -433,3 +442,11 @@ with st.sidebar:
     st.caption("*Data Safety Notice:*")
     st.caption("All changes are automatically saved to Google Sheets. Manual saves are recommended before closing.")
     st.caption(f"Entries in system: *{len(st.session_state.data)}*")
+    
+    # Debug info (visible only in development)
+    if st.secrets.get("DEBUG_MODE", False):
+        st.divider()
+        st.subheader("Debug Information")
+        st.caption(f"Google Sheets connection: {'Working' if get_gsheet_connection() else 'Failed'}")
+        st.caption(f"Sync status: {st.session_state.sync_status}")
+        st.caption(f"Data shape: {st.session_state.data.shape}")
