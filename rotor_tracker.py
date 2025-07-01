@@ -140,6 +140,7 @@ with form_tabs[2]:  # Pending Outgoing
             st.rerun()
 
 # Stock Summary
+# Stock Summary - Corrected Version
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
@@ -168,17 +169,21 @@ if not st.session_state.data.empty:
         future = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
         
-        # Combine all data
-        combined = pd.merge(inward_stock, outgoing, on='Size (mm)', how='outer', suffixes=('_inward', '_outgoing'))
-        combined = pd.merge(combined, pending, on='Size (mm)', how='outer')
-        combined = pd.merge(combined, coming, on='Size (mm)', how='outer')
+        # Combine all data with explicit column naming
+        combined = inward_stock.rename(columns={'Quantity': 'Inward'})\
+                      .merge(outgoing.rename(columns={'Quantity': 'Outgoing'}), 
+                              on='Size (mm)', how='outer')\
+                      .merge(pending.rename(columns={'Quantity': 'Pending'}), 
+                              on='Size (mm)', how='outer')\
+                      .merge(coming.rename(columns={'Quantity': 'Coming'}), 
+                              on='Size (mm)', how='outer')
         combined = combined.fillna(0)
         
-        # Calculate stock levels
-        combined['Current Stock'] = combined['Quantity_inward'] - combined['Quantity_outgoing']
-        combined['Current Outgoing'] = combined['Quantity_outgoing']
-        combined['Pending Outgoing'] = combined['Quantity']
-        combined['Coming Rotors'] = combined['Quantity_y']
+        # Calculate stock levels with clear column references
+        combined['Current Stock'] = combined['Inward'] - combined['Outgoing']
+        combined['Current Outgoing'] = combined['Outgoing']
+        combined['Pending Outgoing'] = combined['Pending']
+        combined['Coming Rotors'] = combined['Coming']
         
         # Display
         st.dataframe(
@@ -188,7 +193,7 @@ if not st.session_state.data.empty:
         )
         
     except Exception as e:
-        st.error(f"Error generating summary: {e}")
+        st.error(f"Error generating summary: {str(e)}")
 else:
     st.info("No data available yet")
 
