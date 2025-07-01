@@ -79,7 +79,7 @@ if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Outgoing"])
 
-with form_tabs[0]:  # Current Movement
+with form_tabs[0]:  # Current Movement (immediate changes)
     with st.form("current_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -97,7 +97,7 @@ with form_tabs[0]:  # Current Movement
                 'Type': entry_type, 
                 'Quantity': quantity, 
                 'Remarks': remarks,
-                'Status': 'Current'
+                'Status': 'Current'  # Always 'Current' for immediate movements
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
             auto_save_to_gsheet()
@@ -126,7 +126,7 @@ with form_tabs[1]:  # Coming Rotors
             auto_save_to_gsheet()
             st.rerun()
 
-with form_tabs[2]:  # Pending Outgoing
+with form_tabs[2]:  # Pending Outgoing (future shipments)
     with st.form("pending_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -143,7 +143,7 @@ with form_tabs[2]:  # Pending Outgoing
                 'Type': 'Outgoing', 
                 'Quantity': pending_qty, 
                 'Remarks': f"[PENDING] {pending_remarks}",
-                'Status': 'Pending'  # Changed from 'Current' to 'Pending'
+                'Status': 'Pending'  # Special status for pending shipments
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
             auto_save_to_gsheet()
@@ -205,7 +205,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 with cols[1]:
                     if st.button("✏️", key=f"edit_{idx}"):
                         st.session_state.editing_index = idx
-                        st.session_state.edit_form_data = row.to_dict()
+                        st.rerun()  # Force refresh to show edit form
                 
                 # Delete button
                 with cols[2]:
@@ -217,42 +217,37 @@ with st.expander("📋 View Movement Log", expanded=True):
                 # Edit form (appears when edit button is clicked)
                 if st.session_state.editing_index == idx:
                     with st.form(f"edit_form_{idx}"):
+                        st.write("### Edit Entry")
                         col1, col2 = st.columns(2)
                         with col1:
                             edit_date = st.date_input(
                                 "📅 Date", 
-                                value=datetime.strptime(row['Date'], '%Y-%m-%d'), 
-                                key=f"date_{idx}"
+                                value=datetime.strptime(row['Date'], '%Y-%m-%d')
                             )
                             edit_size = st.number_input(
                                 "📐 Rotor Size (mm)", 
                                 value=row['Size (mm)'], 
-                                min_value=1, 
-                                key=f"size_{idx}"
+                                min_value=1
                             )
                         with col2:
                             edit_type = st.selectbox(
                                 "🔄 Type", 
                                 ["Inward", "Outgoing"], 
-                                index=0 if row['Type'] == 'Inward' else 1,
-                                key=f"type_{idx}"
+                                index=0 if row['Type'] == 'Inward' else 1
                             )
                             edit_qty = st.number_input(
                                 "🔢 Quantity", 
                                 value=row['Quantity'], 
-                                min_value=1, 
-                                key=f"qty_{idx}"
+                                min_value=1
                             )
                         edit_remarks = st.text_input(
                             "📝 Remarks", 
-                            value=row['Remarks'], 
-                            key=f"remarks_{idx}"
+                            value=row['Remarks']
                         )
                         edit_status = st.selectbox(
                             "Status", 
                             ["Current", "Pending", "Future"], 
-                            index=0 if row['Status'] == 'Current' else 1 if row['Status'] == 'Pending' else 2,
-                            key=f"status_{idx}"
+                            index=0 if row['Status'] == 'Current' else 1 if row['Status'] == 'Pending' else 2
                         )
                         
                         # Form submission buttons
@@ -267,12 +262,10 @@ with st.expander("📋 View Movement Log", expanded=True):
                                 st.session_state.data.at[idx, 'Status'] = edit_status
                                 auto_save_to_gsheet()
                                 st.session_state.editing_index = None
-                                st.session_state.edit_form_data = None
                                 st.rerun()
                         with cancel_col:
                             if st.form_submit_button("❌ Cancel"):
                                 st.session_state.editing_index = None
-                                st.session_state.edit_form_data = None
                                 st.rerun()
                 
                 st.markdown("---")
