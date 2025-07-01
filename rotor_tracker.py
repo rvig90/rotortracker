@@ -75,8 +75,17 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 # ====== SINGLE SYNC BUTTON ======
-if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
-    load_from_gsheet()
+# ====== SYNC BUTTONS ======
+col_sync, col_saved = st.columns(2)
+
+with col_sync:
+    if st.button("🔄 Sync Now", help="Save current data to Google Sheets"):
+        auto_save_to_gsheet()
+
+with col_saved:
+    if st.button("📂 Load Previously Saved", help="Load the last saved version from Google Sheets"):
+        load_from_gsheet()
+        st.rerun()
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
