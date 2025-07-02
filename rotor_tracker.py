@@ -58,22 +58,29 @@ def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
         if sheet:
-            sheet.clear()  # Clears all values from the sheet
+            sheet.clear()
 
             if not st.session_state.data.empty:
-                # Prepare data: convert boolean to string (since Google Sheets stores as text)
                 df = st.session_state.data.copy()
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
-                
-                # Prepare as list of lists
                 records = [df.columns.tolist()] + df.values.tolist()
-                
-                # Write data
                 sheet.update(records)
+
+                # ✅ Backup to secondary sheet
+                save_to_backup_sheet(df.copy())
 
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
+def save_to_backup_sheet(df):
+    try:
+        backup_sheet = get_gsheet_connection().spreadsheet.worksheet("Backup")
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        df.insert(0, 'Backup Time', timestamp)
+        records = [df.columns.tolist()] + df.values.tolist()
+        backup_sheet.append_rows(records)
+    except Exception as e:
+        st.warning(f"Backup failed: {e}")
 # ====== SINGLE SYNC BUTTON ======
 # ====== SYNC BUTTONS ======
 # ====== SYNC BUTTONS ======
