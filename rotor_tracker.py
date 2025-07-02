@@ -6,13 +6,19 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 
 # ====== INITIALIZE DATA ======
+# ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending'
     ])
     st.session_state.last_sync = "Never"
-    st.session_state.editing = None  # Track which row is being edited
-
+    st.session_state.editing = None
+    st.session_state.first_load_done = False  # 👈 Flag to prevent repeated loading
+    
+# ====== AUTO LOAD ON FIRST RUN ======
+if not st.session_state.first_load_done:
+    load_from_gsheet()
+    st.session_state.first_load_done = True
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
     try:
