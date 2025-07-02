@@ -160,6 +160,9 @@ with form_tabs[2]:
             add_entry(new_entry)
 
 # ====== STOCK SUMMARY ======
+# Fix Pending type
+if 'Pending' in st.session_state.data.columns:
+    st.session_state.data['Pending'] = st.session_state.data['Pending'].astype(str).str.lower().isin(['true', 'yes'])
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     current = st.session_state.data[
