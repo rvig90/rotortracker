@@ -69,7 +69,6 @@ def save_to_backup_sheet(df):
         backup_sheet.append_rows(records)
     except Exception as e:
         st.warning(f"Backup failed: {e}")
-
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
@@ -78,16 +77,28 @@ def auto_save_to_gsheet():
 
             if not st.session_state.data.empty:
                 df = st.session_state.data.copy()
+
+                # ✅ Ensure Pending is string format for Google Sheets
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+
+                # ✅ Ensure all columns are present and in order
+                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                for col in expected_cols:
+                    if col not in df.columns:
+                        df[col] = ""
+
+                df = df[expected_cols]  # Reorder columns if necessary
+
+                # ✅ Save to main sheet
                 records = [df.columns.tolist()] + df.values.tolist()
                 sheet.update(records)
 
-                # ✅ Backup to backup sheet
+                # ✅ Backup
                 save_to_backup_sheet(df.copy())
 
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        st.error(f"Auto-save failed: {e}")
+        st.error(f"❌ Auto-save failed: {e}")
 
 # ====== AUTO-LOAD DATA ON FIRST RUN ======
 if not st.session_state.first_load_done:
