@@ -239,138 +239,117 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH EDIT FUNCTIONALITY ======
-with st.expander("📋 View Movement Log", expanded=True):
+with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
         try:
             df = st.session_state.data.copy()
 
+            # Convert data types if necessary
+            df["Pending"] = df["Pending"].astype(bool)
+            df["Date"] = pd.to_datetime(df["Date"])
+
             st.markdown("### 🔍 Filter Movement Log")
-
-            # ==== FILTERS ====
-            col1, col2, col3 = st.columns(3)
-
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
-                status_filter = st.selectbox("📂 Status", ["All", "Current", "Future"])
+                selected_status = st.multiselect("📂 Status", df["Status"].unique().tolist(), default=df["Status"].unique())
             with col2:
-                size_filter = st.multiselect("📐 Size (mm)", options=sorted(df['Size (mm)'].unique()))
+                selected_pending = st.selectbox("❗ Pending", ["All", "Yes", "No"])
             with col3:
-                pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
+                selected_size = st.multiselect("📐 Size (mm)", sorted(df["Size (mm)"].unique().tolist()), default=sorted(df["Size (mm)"].unique()))
+            with col4:
+                remark_filter = st.text_input("📝 Remarks contains")
 
-            remark_search = st.text_input("📝 Search Remarks")
-            date_range = st.date_input("📅 Date Range", value=[
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ])
+            # Apply filters
+            filtered_data = df[
+                df["Status"].isin(selected_status) &
+                df["Size (mm)"].isin(selected_size)
+            ]
 
-            # ==== APPLY FILTERS ====
-            if status_filter != "All":
-                df = df[df["Status"] == status_filter]
-            if pending_filter == "Yes":
-                df = df[df["Pending"] == True]
-            elif pending_filter == "No":
-                df = df[df["Pending"] == False]
-            if size_filter:
-                df = df[df["Size (mm)"].isin(size_filter)]
-            if remark_search:
-                df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
-            if isinstance(date_range, list) and len(date_range) == 2:
-                start_date, end_date = date_range
-                df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(start_date)) & 
-                        (pd.to_datetime(df["Date"]) <= pd.to_datetime(end_date))]
+            if selected_pending != "All":
+                pending_val = True if selected_pending == "Yes" else False
+                filtered_data = filtered_data[filtered_data["Pending"] == pending_val]
 
-            df = df.reset_index(drop=True)
+            if remark_filter:
+                filtered_data = filtered_data[filtered_data["Remarks"].str.contains(remark_filter, case=False, na=False)]
 
-            # ==== DISPLAY TABLE ====
-            st.markdown("### 📄 Filtered Entries")
-        for idx, row in filtered_data.iterrows():
-    # Get original index in st.session_state.data to identify the row uniquely
-        row_index = st.session_state.data[
-        (st.session_state.data["Date"] == row["Date"]) &
-        (st.session_state.data["Size (mm)"] == row["Size (mm)"]) &
-        (st.session_state.data["Type"] == row["Type"]) &
-        (st.session_state.data["Quantity"] == row["Quantity"]) &
-        (st.session_state.data["Remarks"] == row["Remarks"]) &
-        (st.session_state.data["Status"] == row["Status"]) &
-        (st.session_state.data["Pending"] == row["Pending"])
-    ].index
+            filtered_data = filtered_data.sort_values("Date", ascending=False).reset_index(drop=True)
 
-    if len(row_index) == 0:
-        continue  # Skip if not found (edge case)
-    row_index = row_index[0]
+            for idx, row in filtered_data.iterrows():
+                row_index = st.session_state.data[
+                    (st.session_state.data["Date"] == row["Date"].strftime("%Y-%m-%d")) &
+                    (st.session_state.data["Size (mm)"] == row["Size (mm)"]) &
+                    (st.session_state.data["Type"] == row["Type"]) &
+                    (st.session_state.data["Quantity"] == row["Quantity"]) &
+                    (st.session_state.data["Remarks"] == row["Remarks"]) &
+                    (st.session_state.data["Status"] == row["Status"]) &
+                    (st.session_state.data["Pending"] == row["Pending"])
+                ].index
 
-    cols = st.columns([10, 1, 1])
-    with cols[0]:
-        display = {
-            "Date": row["Date"],
-            "Size (mm)": row["Size (mm)"],
-            "Type": row["Type"],
-            "Quantity": row["Quantity"],
-            "Remarks": row["Remarks"],
-            "Status": row["Status"],
-            "Pending": "Yes" if row["Pending"] else "No"
-        }
-        st.dataframe(pd.DataFrame([display]), hide_index=True, use_container_width=True)
+                if len(row_index) == 0:
+                    continue
+                row_index = row_index[0]
 
-    with cols[1]:
-        if st.button("✏", key=f"edit_{row_index}"):
-            st.session_state.editing = row_index
+                cols = st.columns([10, 1, 1])
+                with cols[0]:
+                    display = {
+                        "Date": row["Date"].strftime("%Y-%m-%d"),
+                        "Size (mm)": row["Size (mm)"],
+                        "Type": row["Type"],
+                        "Quantity": row["Quantity"],
+                        "Remarks": row["Remarks"],
+                        "Status": row["Status"],
+                        "Pending": "Yes" if row["Pending"] else "No"
+                    }
+                    st.dataframe(pd.DataFrame([display]), hide_index=True, use_container_width=True)
 
-    with cols[2]:
-        if st.button("❌", key=f"del_{row_index}"):
-            st.session_state.data = st.session_state.data.drop(row_index).reset_index(drop=True)
-            auto_save_to_gsheet()
-            st.rerun()
+                with cols[1]:
+                    if st.button("✏", key=f"edit_{row_index}"):
+                        st.session_state.editing = row_index
 
-    # ===== Inline Edit Form (just below the entry being edited) =====
-    if st.session_state.editing == row_index:
-        edit_row = st.session_state.data.loc[row_index]
-        with st.form(f"edit_form_{row_index}"):
-            col1, col2 = st.columns(2)
-            with col1:
-                edit_date = st.date_input("📅 Date",
-                    value=pd.to_datetime(edit_row["Date"]),
-                    key=f"edit_date_{row_index}")
-                edit_size = st.number_input("📐 Rotor Size (mm)", min_value=1,
-                    value=int(edit_row["Size (mm)"]),
-                    key=f"edit_size_{row_index}")
-            with col2:
-                edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"],
-                    index=0 if edit_row["Type"] == "Inward" else 1,
-                    key=f"edit_type_{row_index}")
-                edit_qty = st.number_input("🔢 Quantity", min_value=1,
-                    value=int(edit_row["Quantity"]),
-                    key=f"edit_qty_{row_index}")
-            edit_remarks = st.text_input("📝 Remarks",
-                value=edit_row["Remarks"],
-                key=f"edit_remarks_{row_index}")
-            edit_status = st.selectbox("📂 Status", ["Current", "Future"],
-                index=0 if edit_row["Status"] == "Current" else 1,
-                key=f"edit_status_{row_index}")
-            edit_pending = st.checkbox("❗ Pending",
-                value=edit_row["Pending"],
-                key=f"edit_pending_{row_index}")
+                with cols[2]:
+                    if st.button("❌", key=f"delete_{row_index}"):
+                        st.session_state.data = st.session_state.data.drop(row_index).reset_index(drop=True)
+                        auto_save_to_gsheet()
+                        st.rerun()
 
-            save_col, cancel_col = st.columns(2)
-            with save_col:
-                if st.form_submit_button("💾 Save Changes"):
-                    st.session_state.data.at[row_index, "Date"] = edit_date.strftime("%Y-%m-%d")
-                    st.session_state.data.at[row_index, "Size (mm)"] = edit_size
-                    st.session_state.data.at[row_index, "Type"] = edit_type
-                    st.session_state.data.at[row_index, "Quantity"] = edit_qty
-                    st.session_state.data.at[row_index, "Remarks"] = edit_remarks
-                    st.session_state.data.at[row_index, "Status"] = edit_status
-                    st.session_state.data.at[row_index, "Pending"] = edit_pending
-                    st.session_state.editing = None
-                    auto_save_to_gsheet()
-                    st.rerun()
-            with cancel_col:
-                if st.form_submit_button("❌ Cancel"):
-                    st.session_state.editing = None
-                    st.rerun()
-                    except Exception as e:
-            st.error(f"❌ Error showing movement log: {e}")
+                # Inline edit form for this entry
+                if st.session_state.editing == row_index:
+                    edit_row = st.session_state.data.loc[row_index]
+                    with st.form(f"edit_form_{row_index}"):
+                        ec1, ec2 = st.columns(2)
+                        with ec1:
+                            edit_date = st.date_input("📅 Date", value=pd.to_datetime(edit_row["Date"]), key=f"date_{row_index}")
+                            edit_size = st.number_input("📐 Rotor Size (mm)", value=int(edit_row["Size (mm)"]), min_value=1, key=f"size_{row_index}")
+                        with ec2:
+                            edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], index=0 if edit_row["Type"] == "Inward" else 1, key=f"type_{row_index}")
+                            edit_qty = st.number_input("🔢 Quantity", value=int(edit_row["Quantity"]), min_value=1, key=f"qty_{row_index}")
+                        edit_remarks = st.text_input("📝 Remarks", value=edit_row["Remarks"], key=f"remarks_{row_index}")
+                        edit_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if edit_row["Status"] == "Current" else 1, key=f"status_{row_index}")
+                        edit_pending = st.checkbox("❗ Pending", value=edit_row["Pending"], key=f"pending_{row_index}")
+
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            if st.form_submit_button("💾 Save Changes"):
+                                st.session_state.data.at[row_index, "Date"] = edit_date.strftime("%Y-%m-%d")
+                                st.session_state.data.at[row_index, "Size (mm)"] = edit_size
+                                st.session_state.data.at[row_index, "Type"] = edit_type
+                                st.session_state.data.at[row_index, "Quantity"] = edit_qty
+                                st.session_state.data.at[row_index, "Remarks"] = edit_remarks
+                                st.session_state.data.at[row_index, "Status"] = edit_status
+                                st.session_state.data.at[row_index, "Pending"] = edit_pending
+                                st.session_state.editing = None
+                                auto_save_to_gsheet()
+                                st.rerun()
+
+                        with cancel_col:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state.editing = None
+                                st.rerun()
+
+        except Exception as e:
+            st.error(f"Error displaying movement log: {e}")
     else:
-        st.info("No entries to show yet.")
+        st.info("No entries to show.")
 # Status footer
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
