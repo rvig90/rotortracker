@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+import time
 
 # ====== SESSION STATE INITIALIZATION ======
 if 'data' not in st.session_state:
@@ -68,7 +69,7 @@ def save_to_backup_sheet(df):
         records = [df.columns.tolist()] + df.values.tolist()
         backup_sheet.append_rows(records)
     except Exception as e:
-        st.warning(f"Backup failed: {e}")import time  # ensure this is imported at top of your file
+        st.warning(f"Backup failed: {e}")  # ensure this is imported at top of your file
 
 def auto_save_to_gsheet(retries=3, delay=2):
     attempt = 1
