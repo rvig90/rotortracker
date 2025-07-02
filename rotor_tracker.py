@@ -58,18 +58,37 @@ def load_from_gsheet():
                 st.info("No data found in Google Sheet")
     except Exception as e:
         st.error(f"Error loading data: {e}")
-
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
-        if sheet and not st.session_state.data.empty:
+        if sheet:
             sheet.clear()
-            sheet.append_row(st.session_state.data.columns.tolist())
-            for _, row in st.session_state.data.iterrows():
-                sheet.append_row(row.tolist())
+
+            if not st.session_state.data.empty:
+                df = st.session_state.data.copy()
+
+                # ✅ Ensure Pending is string format for Google Sheets
+                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+
+                # ✅ Ensure all columns are present and in order
+                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                for col in expected_cols:
+                    if col not in df.columns:
+                        df[col] = ""
+
+                df = df[expected_cols]  # Reorder columns if necessary
+
+                # ✅ Save to main sheet
+                records = [df.columns.tolist()] + df.values.tolist()
+                sheet.update(records)
+
+                # ✅ Backup
+                save_to_backup_sheet(df.copy())
+
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        st.error(f"Auto-save failed: {e}")
+        st.error(f"❌ Auto-save failed: {e}")
+
 
 # ====== SYNC BUTTON ======
 if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
