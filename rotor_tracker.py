@@ -152,12 +152,14 @@ with form_tabs[2]:  # Pending Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
+# ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
         # ✅ Ensure Pending column is boolean
         st.session_state.data = normalize_pending_column(st.session_state.data)
 
+        # Current inward stock (excluding pending)
         current = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (~st.session_state.data['Pending'])
@@ -166,12 +168,18 @@ if not st.session_state.data.empty:
         stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
         stock = stock[stock['Net'] != 0]
 
+        # Future rotors (coming rotors)
         future = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
-        pending = st.session_state.data[st.session_state.data['Pending']]
+        # ✅ Pending rotors (only if marked Pending and Status = Current)
+        pending = st.session_state.data[
+            (st.session_state.data['Status'] == 'Current') & 
+            (st.session_state.data['Pending'])
+        ]
         pending_rotors = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
+        # Merge all
         combined = pd.merge(stock, coming, on='Size (mm)', how='outer')
         combined = pd.merge(combined, pending_rotors, on='Size (mm)', how='outer', suffixes=('', '_pending'))
         combined = combined.fillna(0)
@@ -186,7 +194,6 @@ if not st.session_state.data.empty:
         st.error(f"Error generating summary: {e}")
 else:
     st.info("No data available yet")
-
 # ====== MOVEMENT LOG WITH EDIT/DELETE ======
 with st.expander("📋 View Movement Log", expanded=False):
     if not st.session_state.data.empty:
