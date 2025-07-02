@@ -282,9 +282,9 @@ with st.expander("📋 View Movement Log", expanded=True):
 
             # ==== DISPLAY TABLE ====
             st.markdown("### 📄 Filtered Entries")
-            for idx, row in filtered_data.iterrows():
+        for idx, row in filtered_data.iterrows():
     # Get original index in st.session_state.data to identify the row uniquely
-    row_index = st.session_state.data[
+        row_index = st.session_state.data[
         (st.session_state.data["Date"] == row["Date"]) &
         (st.session_state.data["Size (mm)"] == row["Size (mm)"]) &
         (st.session_state.data["Type"] == row["Type"]) &
