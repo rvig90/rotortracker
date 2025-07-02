@@ -225,7 +225,8 @@ with st.expander("📋 View Movement Log", expanded=True):
                 (df['Size (mm)'].isin(selected_size)) &
                 (pd.to_datetime(df['Date']) >= pd.to_datetime(start_date)) &
                 (pd.to_datetime(df['Date']) <= pd.to_datetime(end_date))
-            ]
+            ].copy()
+
             if selected_pending != "All":
                 filtered = filtered[filtered['Pending'] == (selected_pending == "Yes")]
             if search_remarks:
@@ -235,11 +236,13 @@ with st.expander("📋 View Movement Log", expanded=True):
                 st.warning("No entries match the selected filters.")
             else:
                 st.markdown("### 📋 Filtered Movement Log")
+                filtered['orig_index'] = filtered.index  # Track original index from full data
 
-                for idx, row in filtered.sort_values("Date", ascending=False).iterrows():
+                for _, row in filtered.sort_values("Date", ascending=False).iterrows():
+                    idx = row['orig_index']
                     is_editing = st.session_state.editing == idx
+
                     if not is_editing:
-                        # Show table row view
                         row_df = pd.DataFrame([{
                             "Date": row['Date'],
                             "Size (mm)": row['Size (mm)'],
@@ -259,7 +262,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                                 st.session_state.data = st.session_state.data.drop(idx).reset_index(drop=True)
                                 auto_save_to_gsheet()
                                 st.rerun()
-
                     else:
                         st.markdown("### ✏ Edit Entry")
                         with st.form(f"edit_form_{idx}"):
@@ -293,6 +295,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.error(f"Error in movement log: {e}")
     else:
         st.info("No entries available.")
+# ====== MOVEMENT LOG WITH TABLE LAYOUT, FILTERS, INLINE EDIT ======
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
