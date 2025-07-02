@@ -68,37 +68,45 @@ def save_to_backup_sheet(df):
         records = [df.columns.tolist()] + df.values.tolist()
         backup_sheet.append_rows(records)
     except Exception as e:
-        st.warning(f"Backup failed: {e}")
-def auto_save_to_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            sheet.clear()
+        st.warning(f"Backup failed: {e}")import time  # ensure this is imported at top of your file
 
-            if not st.session_state.data.empty:
-                df = st.session_state.data.copy()
+def auto_save_to_gsheet(retries=3, delay=2):
+    attempt = 1
+    while attempt <= retries:
+        try:
+            sheet = get_gsheet_connection()
+            if sheet:
+                sheet.clear()
 
-                # ✅ Ensure Pending is string format for Google Sheets
-                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                if not st.session_state.data.empty:
+                    df = st.session_state.data.copy()
 
-                # ✅ Ensure all columns are present and in order
-                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
-                for col in expected_cols:
-                    if col not in df.columns:
-                        df[col] = ""
+                    # Convert Pending boolean to string for Google Sheets
+                    df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
 
-                df = df[expected_cols]  # Reorder columns if necessary
+                    # Ensure expected columns
+                    expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                    for col in expected_cols:
+                        if col not in df.columns:
+                            df[col] = ""
+                    df = df[expected_cols]
 
-                # ✅ Save to main sheet
-                records = [df.columns.tolist()] + df.values.tolist()
-                sheet.update(records)
+                    # Push to sheet
+                    records = [df.columns.tolist()] + df.values.tolist()
+                    sheet.update(records)
 
-                # ✅ Backup
-                save_to_backup_sheet(df.copy())
+                    # Also backup
+                    save_to_backup_sheet(df.copy())
 
-            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    except Exception as e:
-        st.error(f"❌ Auto-save failed: {e}")
+                st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                return  # ✅ Success, exit function
+        except Exception as e:
+            if attempt < retries:
+                time.sleep(delay)
+                attempt += 1
+            else:
+                st.error(f"❌ Auto-save failed after {retries} attempts: {e}")
+                return
 
 # ====== AUTO-LOAD DATA ON FIRST RUN ======
 if not st.session_state.first_load_done:
