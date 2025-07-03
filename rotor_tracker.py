@@ -199,26 +199,26 @@ with st.expander("📋 View Movement Log", expanded=True):
         selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
 
       # Copy of data to filter
-df = st.session_state.data.copy()
+        df = st.session_state.data.copy()
 
 # Ensure correct data types
-df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
 # Apply filters conditionally
-if status_filter != "All":
-    df = df[df['Status'] == status_filter]
+        if status_filter != "All":
+            df = df[df['Status'] == status_filter]
 
-if size_filter:
-    df = df[df['Size (mm)'].isin(size_filter)]
+        if size_filter:
+            df = df[df['Size (mm)'].isin(size_filter)]
 
-if pending_filter != "All":
-    df = df[df['Pending'] == (pending_filter == "Yes")]
+        if pending_filter != "All":
+            df = df[df['Pending'] == (pending_filter == "Yes")]
 
-if remark_search:
-    df = df[df['Remarks'].str.contains(remark_search, case=False, na=False)]
+        if remark_search:
+            df = df[df['Remarks'].str.contains(remark_search, case=False, na=False)]
 
-if selected_date:
-    df = df[df['Date'] == pd.to_datetime(selected_date)]
+        if selected_date:
+            df = df[df['Date'] == pd.to_datetime(selected_date)]
         for i, row in df.iterrows():
             actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
