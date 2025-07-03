@@ -198,21 +198,27 @@ with st.expander("📋 View Movement Log", expanded=True):
         remark_search = st.text_input("📝 Search Remarks")
         selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
 
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        if selected_date:
-            df = df[df['Date'] == pd.to_datetime(selected_date)]
+      # Copy of data to filter
+df = st.session_state.data.copy()
 
-        if status_filter != "All":
-            df = df[df["Status"] == status_filter]
-        if size_filter:
-            df = df[df["Size (mm)"].isin(size_filter)]
-        if pending_filter == "Yes":
-            df = df[df["Pending"] == True]
-        elif pending_filter == "No":
-            df = df[df["Pending"] == False]
-        if remark_search:
-            df = df[df["Remarks"].str.contains(remark_search, case=False)]
+# Ensure correct data types
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
+# Apply filters conditionally
+if status_filter != "All":
+    df = df[df['Status'] == status_filter]
+
+if size_filter:
+    df = df[df['Size (mm)'].isin(size_filter)]
+
+if pending_filter != "All":
+    df = df[df['Pending'] == (pending_filter == "Yes")]
+
+if remark_search:
+    df = df[df['Remarks'].str.contains(remark_search, case=False, na=False)]
+
+if selected_date:
+    df = df[df['Date'] == pd.to_datetime(selected_date)]
         for i, row in df.iterrows():
             actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
