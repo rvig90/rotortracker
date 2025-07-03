@@ -194,7 +194,6 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         date_range = st.date_input("📅 Date Range", [
             pd.to_datetime(df["Date"]).min(),
             pd.to_datetime(df["Date"]).max()
