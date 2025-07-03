@@ -201,7 +201,7 @@ with st.expander("📋 View Movement Log", expanded=True):
 
 # Apply date filter
         df = df[df['Date'] == pd.to_datetime(selected_date)]
-             for i, row in df.iterrows():
+        for i, row in df.iterrows():
              actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
                 (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
