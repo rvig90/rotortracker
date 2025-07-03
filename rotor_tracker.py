@@ -196,9 +196,10 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
-        selected_date = st.date_input("📅 Filter by Specific Date")
+        selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
 
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        if selected_date:
         df = df[df['Date'] == pd.to_datetime(selected_date)]
 
         if status_filter != "All":
