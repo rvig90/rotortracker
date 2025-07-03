@@ -182,12 +182,16 @@ else:
     st.info("No data available")
 
 # Movement Log
-# ====== MOVEMENT LOG ======
+# ====== MOVEMENT LOG (Debug-friendly version) ======
 with st.expander("📋 View Movement Log", expanded=True):
-    if not st.session_state.data.empty:
-        df = st.session_state.data.copy()
+    df = st.session_state.data.copy()
 
+    # Show raw data for debugging
+    st.write("🛠 Raw Data Snapshot", df)
+
+    if not df.empty:
         st.markdown("### 🔍 Filter Movement Log")
+
         col1, col2, col3 = st.columns(3)
         with col1:
             status_filter = st.selectbox("📂 Status", ["All", "Current", "Future"])
@@ -197,12 +201,14 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
-        selected_date = st.date_input("📅 Filter by Specific Date (optional)")
+        selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
 
+        # Fix date column
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date'])
 
-        # Optional date filter
-        if selected_date != datetime.today().date():
+        # Apply filters only if selected
+        if selected_date:
             df = df[df['Date'] == pd.to_datetime(selected_date)]
 
         if status_filter != "All":
@@ -216,72 +222,74 @@ with st.expander("📋 View Movement Log", expanded=True):
         if remark_search:
             df = df[df["Remarks"].str.contains(remark_search, case=False)]
 
-        # Show filtered table for debug
-        st.markdown("### 🛠 Filtered Log Preview")
-        st.dataframe(df, use_container_width=True)
+        # If filtered data is still empty
+        if df.empty:
+            st.warning("🚫 No matching entries. Try changing filters.")
+        else:
+            for i, row in df.iterrows():
+                actual_idx = st.session_state.data[
+                    (st.session_state.data['Date'] == row['Date']) &
+                    (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
+                    (st.session_state.data['Type'] == row['Type']) &
+                    (st.session_state.data['Quantity'] == row['Quantity']) &
+                    (st.session_state.data['Remarks'] == row['Remarks']) &
+                    (st.session_state.data['Status'] == row['Status']) &
+                    (st.session_state.data['Pending'] == row['Pending'])
+                ].index
+                if len(actual_idx) == 0:
+                    continue
+                actual_idx = actual_idx[0]
 
-        for i, row in df.iterrows():
-            actual_idx = st.session_state.data[
-                (st.session_state.data['Date'] == row['Date']) &
-                (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
-                (st.session_state.data['Type'] == row['Type']) &
-                (st.session_state.data['Quantity'] == row['Quantity']) &
-                (st.session_state.data['Remarks'] == row['Remarks']) &
-                (st.session_state.data['Status'] == row['Status']) &
-                (st.session_state.data['Pending'] == row['Pending'])
-            ].index
-            if len(actual_idx) == 0:
-                continue
-            actual_idx = actual_idx[0]
-
-            if st.session_state.editing == actual_idx:
-                with st.form(f"edit_{actual_idx}"):
-                    col1, col2 = st.columns(2)
+                if st.session_state.editing == actual_idx:
+                    with st.form(f"edit_{actual_idx}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_date = st.date_input("📅 Date", value=pd.to_datetime(row["Date"]), key=f"date_{actual_idx}")
+                            edit_size = st.number_input("📐 Size (mm)", value=int(row["Size (mm)"]), key=f"size_{actual_idx}")
+                        with col2:
+                            edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], index=0 if row["Type"] == "Inward" else 1, key=f"type_{actual_idx}")
+                            edit_qty = st.number_input("🔢 Quantity", value=int(row["Quantity"]), key=f"qty_{actual_idx}")
+                        edit_remarks = st.text_input("📝 Remarks", value=row["Remarks"], key=f"rem_{actual_idx}")
+                        edit_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if row["Status"] == "Current" else 1, key=f"status_{actual_idx}")
+                        edit_pending = st.checkbox("❗ Pending", value=row["Pending"], key=f"pend_{actual_idx}")
+                        colA, colB = st.columns(2)
+                        with colA:
+                            if st.form_submit_button("💾 Save"):
+                                st.session_state.data.at[actual_idx, "Date"] = edit_date.strftime('%Y-%m-%d')
+                                st.session_state.data.at[actual_idx, "Size (mm)"] = edit_size
+                                st.session_state.data.at[actual_idx, "Type"] = edit_type
+                                st.session_state.data.at[actual_idx, "Quantity"] = edit_qty
+                                st.session_state.data.at[actual_idx, "Remarks"] = edit_remarks
+                                st.session_state.data.at[actual_idx, "Status"] = edit_status
+                                st.session_state.data.at[actual_idx, "Pending"] = edit_pending
+                                st.session_state.editing = None
+                                auto_save_to_gsheet()
+                                st.rerun()
+                        with colB:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state.editing = None
+                                st.rerun()
+                else:
+                    col1, col2 = st.columns([10, 1])
                     with col1:
-                        edit_date = st.date_input("📅 Date", value=pd.to_datetime(row["Date"]), key=f"date_{actual_idx}")
-                        edit_size = st.number_input("📐 Size (mm)", value=int(row["Size (mm)"]), key=f"size_{actual_idx}")
+                        st.dataframe(pd.DataFrame([{
+                            "Date": row["Date"],
+                            "Size (mm)": row["Size (mm)"],
+                            "Type": row["Type"],
+                            "Quantity": row["Quantity"],
+                            "Remarks": row["Remarks"],
+                            "Status": row["Status"],
+                            "Pending": "Yes" if row["Pending"] else "No"
+                        }]), hide_index=True, use_container_width=True)
                     with col2:
-                        edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], index=0 if row["Type"] == "Inward" else 1, key=f"type_{actual_idx}")
-                        edit_qty = st.number_input("🔢 Quantity", value=int(row["Quantity"]), key=f"qty_{actual_idx}")
-                    edit_remarks = st.text_input("📝 Remarks", value=row["Remarks"], key=f"rem_{actual_idx}")
-                    edit_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if row["Status"] == "Current" else 1, key=f"status_{actual_idx}")
-                    edit_pending = st.checkbox("❗ Pending", value=row["Pending"], key=f"pend_{actual_idx}")
-                    colA, colB = st.columns(2)
-                    with colA:
-                        if st.form_submit_button("💾 Save"):
-                            st.session_state.data.at[actual_idx, "Date"] = edit_date.strftime('%Y-%m-%d')
-                            st.session_state.data.at[actual_idx, "Size (mm)"] = edit_size
-                            st.session_state.data.at[actual_idx, "Type"] = edit_type
-                            st.session_state.data.at[actual_idx, "Quantity"] = edit_qty
-                            st.session_state.data.at[actual_idx, "Remarks"] = edit_remarks
-                            st.session_state.data.at[actual_idx, "Status"] = edit_status
-                            st.session_state.data.at[actual_idx, "Pending"] = edit_pending
-                            st.session_state.editing = None
+                        if st.button("✏", key=f"edit_{actual_idx}"):
+                            st.session_state.editing = actual_idx
+                        if st.button("❌", key=f"del_{actual_idx}"):
+                            st.session_state.data = st.session_state.data.drop(actual_idx).reset_index(drop=True)
                             auto_save_to_gsheet()
                             st.rerun()
-                    with colB:
-                        if st.form_submit_button("❌ Cancel"):
-                            st.session_state.editing = None
-                            st.rerun()
-            else:
-                col1, col2 = st.columns([10, 1])
-                with col1:
-                    st.dataframe(pd.DataFrame([{
-                        "Date": row["Date"],
-                        "Size (mm)": row["Size (mm)"],
-                        "Type": row["Type"],
-                        "Quantity": row["Quantity"],
-                        "Remarks": row["Remarks"],
-                        "Status": row["Status"],
-                        "Pending": "Yes" if row["Pending"] else "No"
-                    }]), hide_index=True, use_container_width=True)
-                with col2:
-                    if st.button("✏", key=f"edit_{actual_idx}"):
-                        st.session_state.editing = actual_idx
-                    if st.button("❌", key=f"del_{actual_idx}"):
-                        st.session_state.data = st.session_state.data.drop(actual_idx).reset_index(drop=True)
-                        auto_save_to_gsheet()
-                        st.rerun()
+    else:
+        st.warning("📭 No data loaded from Google Sheet yet.")
 
 # Sync time
 if st.session_state.last_sync != "Never":
