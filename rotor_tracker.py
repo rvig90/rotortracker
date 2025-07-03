@@ -194,24 +194,13 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
-        date_range = st.date_input("📅 Date Range", [
-            pd.to_datetime(df["Date"]).min(),
-            pd.to_datetime(df["Date"]).max()
-        ])
+        selected_date = st.date_input("📅 Filter by Specific Date")
 
-        if status_filter != "All":
-            df = df[df["Status"] == status_filter]
-        if pending_filter == "Yes":
-            df = df[df["Pending"] == True]
-        elif pending_filter == "No":
-            df = df[df["Pending"] == False]
-        if size_filter:
-            df = df[df["Size (mm)"].isin(size_filter)]
-        if remark_search:
-            df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
-        df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(date_range[0])) &
-                (pd.to_datetime(df["Date"]) <= pd.to_datetime(date_range[1]))].reset_index(drop=True)
+# Ensure date column is in datetime format
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
+# Apply date filter
+df = df[df['Date'] == pd.to_datetime(selected_date)]
         for i, row in df.iterrows():
             actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
