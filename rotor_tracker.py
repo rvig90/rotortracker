@@ -1,3 +1,5 @@
+# Full working version with specific date filter and indentation fixes
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -5,7 +7,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
-# ====== INITIALIZE SESSION STATE ======
+# Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending'
@@ -14,14 +16,14 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.loaded = False
 
-# ====== NORMALIZE PENDING COLUMN ======
+# Normalize pending
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
         lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
     )
     return df
 
-# ====== GOOGLE SHEETS SETUP ======
+# Google Sheet connection
 def get_gsheet_connection():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -34,7 +36,7 @@ def get_gsheet_connection():
         st.error(f"Google Sheets connection failed: {str(e)}")
         return None
 
-# ====== LOAD DATA FROM GOOGLE SHEETS ======
+# Load from Google Sheet
 def load_from_gsheet():
     try:
         sheet = get_gsheet_connection()
@@ -53,12 +55,12 @@ def load_from_gsheet():
     except Exception as e:
         st.error(f"❌ Error loading from Google Sheet: {e}")
 
-# ====== AUTOLOAD ON FIRST RUN ======
+# Auto-load
 if not st.session_state.loaded:
     load_from_gsheet()
     st.session_state.loaded = True
 
-# ====== AUTO SAVE TO GOOGLE SHEETS ======
+# Auto-save
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
@@ -78,11 +80,11 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"❌ Auto-save failed: {e}")
 
-# ====== MANUAL SYNC BUTTON ======
+# Sync button
 if st.button("🔄 Sync Now"):
     load_from_gsheet()
 
-# ====== ENTRY FORMS ======
+# Entry Forms
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
 
 with form_tabs[0]:
@@ -158,7 +160,7 @@ with form_tabs[2]:
             auto_save_to_gsheet()
             st.rerun()
 
-# ====== STOCK SUMMARY ======
+# Stock Summary
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
@@ -179,7 +181,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available")
 
-# ====== MOVEMENT LOG ======
+# Movement Log
 with st.expander("📋 View Movement Log", expanded=True):
     if not st.session_state.data.empty:
         df = st.session_state.data.copy()
@@ -189,18 +191,27 @@ with st.expander("📋 View Movement Log", expanded=True):
         with col1:
             status_filter = st.selectbox("📂 Status", ["All", "Current", "Future"])
         with col2:
-            size_filter = st.multiselect("📐 Size (mm)", sorted(df['Size (mm)'].unique()))
+            size_filter = st.multiselect("📐 Size (mm)", sorted(df['Size (mm)'].dropna().unique()))
         with col3:
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
         selected_date = st.date_input("📅 Filter by Specific Date")
 
-# Ensure date column is in datetime format
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-
-# Apply date filter
         df = df[df['Date'] == pd.to_datetime(selected_date)]
+
+        if status_filter != "All":
+            df = df[df["Status"] == status_filter]
+        if size_filter:
+            df = df[df["Size (mm)"].isin(size_filter)]
+        if pending_filter == "Yes":
+            df = df[df["Pending"] == True]
+        elif pending_filter == "No":
+            df = df[df["Pending"] == False]
+        if remark_search:
+            df = df[df["Remarks"].str.contains(remark_search, case=False)]
+
         for i, row in df.iterrows():
             actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
@@ -264,6 +275,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                         auto_save_to_gsheet()
                         st.rerun()
 
-# ====== SYNC TIMESTAMP ======
+# Sync time
 if st.session_state.last_sync != "Never":
     st.caption(f"🕒 Last synced: {st.session_state.last_sync}")
