@@ -182,6 +182,7 @@ else:
     st.info("No data available")
 
 # Movement Log
+# ====== MOVEMENT LOG ======
 with st.expander("📋 View Movement Log", expanded=True):
     if not st.session_state.data.empty:
         df = st.session_state.data.copy()
@@ -196,11 +197,13 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
         remark_search = st.text_input("📝 Search Remarks")
-        selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
+        selected_date = st.date_input("📅 Filter by Specific Date (optional)")
 
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        if selected_date:
-        df = df[df['Date'] == pd.to_datetime(selected_date)]
+
+        # Optional date filter
+        if selected_date != datetime.today().date():
+            df = df[df['Date'] == pd.to_datetime(selected_date)]
 
         if status_filter != "All":
             df = df[df["Status"] == status_filter]
@@ -212,6 +215,10 @@ with st.expander("📋 View Movement Log", expanded=True):
             df = df[df["Pending"] == False]
         if remark_search:
             df = df[df["Remarks"].str.contains(remark_search, case=False)]
+
+        # Show filtered table for debug
+        st.markdown("### 🛠 Filtered Log Preview")
+        st.dataframe(df, use_container_width=True)
 
         for i, row in df.iterrows():
             actual_idx = st.session_state.data[
