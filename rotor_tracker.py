@@ -200,7 +200,7 @@ with st.expander("📋 View Movement Log", expanded=True):
 
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         if selected_date:
-        df = df[df['Date'] == pd.to_datetime(selected_date)]
+            df = df[df['Date'] == pd.to_datetime(selected_date)]
 
         if status_filter != "All":
             df = df[df["Status"] == status_filter]
