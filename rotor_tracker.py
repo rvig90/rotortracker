@@ -197,12 +197,12 @@ with st.expander("📋 View Movement Log", expanded=True):
         selected_date = st.date_input("📅 Filter by Specific Date")
 
 # Ensure date column is in datetime format
-df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
 # Apply date filter
-df = df[df['Date'] == pd.to_datetime(selected_date)]
-        for i, row in df.iterrows():
-            actual_idx = st.session_state.data[
+        df = df[df['Date'] == pd.to_datetime(selected_date)]
+             for i, row in df.iterrows():
+             actual_idx = st.session_state.data[
                 (st.session_state.data['Date'] == row['Date']) &
                 (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
                 (st.session_state.data['Type'] == row['Type']) &
