@@ -92,7 +92,43 @@ with st.expander("🐞 Raw Data Preview"):
 st.subheader("📋 Movement Log")
 if not st.session_state.data.empty:
     df = st.session_state.data.copy()
-    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.markdown("### 🔍 Filter Movement Log")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        status_filter = st.selectbox("📂 Status", ["All", "Current", "Future"])
+    with col2:
+        size_filter = st.multiselect("📐 Size (mm)", sorted(df['Size (mm)'].dropna().unique()))
+    with col3:
+        pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
+
+    remark_search = st.text_input("📝 Search Remarks")
+    selected_date = st.date_input("📅 Filter by Specific Date (optional)")
+
+    # Filter logic
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+    if status_filter != "All":
+        df = df[df["Status"] == status_filter]
+
+    if size_filter:
+        df = df[df["Size (mm)"].isin(size_filter)]
+
+    if pending_filter == "Yes":
+        df = df[df["Pending"] == True]
+    elif pending_filter == "No":
+        df = df[df["Pending"] == False]
+
+    if remark_search:
+        df = df[df["Remarks"].str.contains(remark_search, case=False)]
+
+    if selected_date:
+        df = df[df['Date'] == pd.to_datetime(selected_date)]
+
+    if df.empty:
+        st.warning("⚠ No matching entries found. Try adjusting filters.")
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
 else:
     st.info("ℹ No entries available yet.")
 
