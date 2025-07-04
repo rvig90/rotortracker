@@ -15,144 +15,67 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.loaded = False
 
-# Refresh every 3 seconds (3000 ms), limit to avoid infinite reloads
-count = st_autorefresh(interval=30000, limit=None, key="autorefresh")
+# Sheet names
+MAIN_SHEET_NAME = "Rotor Log"
+BACKUP_SHEET_NAME = "Backup"
 
-# Track the last backup snapshot
-if 'last_backup_data' not in st.session_state:
-    st.session_state.last_backup_data = None
-# ====== NORMALIZE PENDING COLUMN ======
-def normalize_pending_column(df):
-    df['Pending'] = df['Pending'].apply(
-        lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
-    )
-    return df
+# Columns to maintain
+COLUMNS = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
 
-# ====== GOOGLE SHEETS CONNECTION ======
-def get_gsheet_connection():
-    try:
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds_dict = (
-            json.loads(st.secrets["gcp_service_account"])
-            if isinstance(st.secrets["gcp_service_account"], str)
-            else dict(st.secrets["gcp_service_account"])
-        )
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        return client.open("Rotor Log").sheet1
-    except Exception as e:
-        st.error(f"Google Sheets connection failed: {e}")
-        return None
+# Connect to Google Sheets
+def get_gsheet(sheet_name=MAIN_SHEET_NAME):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(st.secrets["gcp_service_account"]) if isinstance(st.secrets["gcp_service_account"], str) else dict(st.secrets["gcp_service_account"])
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open(sheet_name)
 
-# ====== LOAD DATA FROM GOOGLE SHEETS ======
+# Load data from main Google Sheet
 def load_from_gsheet():
     try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
+        sheet = get_gsheet().worksheet("Sheet1")
         records = sheet.get_all_records()
         df = pd.DataFrame(records)
-        if 'Status' not in df.columns:
-            df['Status'] = 'Current'
-        if 'Pending' not in df.columns:
-            df['Pending'] = False
-        df = normalize_pending_column(df)
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=["Date"])
-        st.session_state.data = df
-        st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.success("✅ Data loaded from Google Sheet")
-    except Exception as e:
-        st.error(f"Error loading from Google Sheet: {e}")
-
-
-# Auto-load once
-if not st.session_state.loaded:
-    load_from_gsheet()
-    st.session_state.loaded = True
-# Manual backup to "Backup" sheet
-def backup_to_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            client = sheet.spreadsheet
-            backup_sheet_name = "Backup"
-
-            try:
-                backup_sheet = client.worksheet(backup_sheet_name)
-            except gspread.exceptions.WorksheetNotFound:
-                backup_sheet = client.add_worksheet(title=backup_sheet_name, rows="1000", cols="20")
-
-            backup_sheet.clear()
-            df = st.session_state.data.copy()
-
-            if not df.empty:
-                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
-                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
-                for col in expected_cols:
-                    if col not in df.columns:
-                        df[col] = ""
-                df = df[expected_cols]
-                records = [df.columns.tolist()] + df.values.tolist()
-                backup_sheet.update('A1', records)
-                st.success("✅ Backup saved to 'Backup' sheet.")
+        if df.empty:
+            df = pd.DataFrame(columns=COLUMNS)
+        else:
+            if 'Pending' in df.columns:
+                df['Pending'] = df['Pending'].apply(lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x))
             else:
-                st.warning("⚠ No data to back up.")
+                df['Pending'] = False
+        return df
     except Exception as e:
-        st.error(f"❌ Backup failed: {e}")
+        st.error(f"❌ Failed to load from Google Sheet: {e}")
+        return pd.DataFrame(columns=COLUMNS)
 
-def auto_backup_to_sheet():
+# Save data to main sheet and backup sheet
+def save_to_gsheet(data: pd.DataFrame):
     try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            df = st.session_state.data.copy()
-            if not df.empty:
-                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
-                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
-                for col in expected_cols:
-                    if col not in df.columns:
-                        df[col] = ""
-                df = df[expected_cols]
+        sheet = get_gsheet()
+        main_ws = sheet.worksheet("Sheet1")
+        backup_ws = sheet.worksheet(BACKUP_SHEET_NAME)
 
-                # Check if data changed since last backup
-                if st.session_state.last_backup_data is None or not df.equals(st.session_state.last_backup_data):
-                    backup_sheet = get_gsheet_connection()
-                    if backup_sheet:
-                        backup_sheet.clear()
-                        records = [df.columns.tolist()] + df.values.tolist()
-                        backup_sheet.update('A1', records)
-                        st.session_state.last_backup_data = df.copy()
-                        st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        st.toast("🔁 Auto-backup successful.")
-    except Exception as e:
-        st.error(f"Auto-backup failed: {e}")
-        # Auto backup on every refresh (if data changed)
+        # Format data
+        df = data.copy()
+        df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+        df = df[COLUMNS]
 
-# ====== AUTO-SAVE TO GOOGLE SHEETS ======
-def auto_save_to_gsheet():
-    try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
-        sheet.clear()
-        df = st.session_state.data.copy()
-        if not df.empty:
-            df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
-            df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
-            expected = ['Date','Size (mm)','Type','Quantity','Remarks','Status','Pending']
-            for col in expected:
-                if col not in df.columns:
-                    df[col] = ""
-            df = df[expected]
-            sheet.update('A1', [df.columns.tolist()] + df.values.tolist())
+        # Prepare for upload
+        records = [df.columns.tolist()] + df.values.tolist()
+
+        # Update both sheets
+        main_ws.clear()
+        main_ws.update('A1', records)
+
+        backup_ws.clear()
+        backup_ws.update('A1', records)
+
+        st.success("✅ Saved to Google Sheet and Backup")
         st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        st.error(f"Error saving to Google Sheet: {e}")
-
+        st.error(f"❌ Failed to save to Google Sheet: {e}")
 # ====== MANUAL SYNC BUTTON ======
 if st.button("🔄 Sync Now"):
     load_from_gsheet()
