@@ -227,10 +227,23 @@ with st.expander("📋 View Movement Log", expanded=True):
             remark_search = st.text_input("📝 Search Remarks")
 
             # Safe date range input
-            min_date = df["Parsed_Date"].min().date() if not df["Parsed_Date"].isna().all() else datetime.today().date()
-            max_date = df["Parsed_Date"].max().date() if not df["Parsed_Date"].isna().all() else datetime.today().date()
+           # Safely convert 'Date' column to datetime
+        df["Parsed_Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
-            date_range = st.date_input("📅 Date Range", value=[min_date, max_date])
+# Normalize to just date (ignore time part)
+        df["Parsed_Date"] = df["Parsed_Date"].dt.date
+
+# Determine safe min and max for the picker
+        min_date = df["Parsed_Date"].min() if not df["Parsed_Date"].isna().all() else datetime.today().date()
+        max_date = df["Parsed_Date"].max() if not df["Parsed_Date"].isna().all() else datetime.today().date()
+
+# Date range input
+        date_range = st.date_input("📅 Date Range", value=[min_date, max_date])
+
+# Apply date filter if selected
+             if isinstance(date_range, list) and len(date_range) == 2:
+                start_date, end_date = date_range
+                df = df[(df["Parsed_Date"] >= start_date) & (df["Parsed_Date"] <= end_date)]
 
             # Apply filters
             if status_filter != "All":
@@ -243,9 +256,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 df = df[df["Size (mm)"].isin(size_filter)]
             if remark_search:
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
-            if isinstance(date_range, list) and len(date_range) == 2:
-                start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
-                df = df[(df["Parsed_Date"] >= start_date) & (df["Parsed_Date"] <= end_date)]
+           
 
             df = df.reset_index(drop=True)
 
