@@ -262,43 +262,43 @@ with st.expander("📋 View Movement Log", expanded=True):
 
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
+for idx, row in df.iterrows():
+    # find the index in session_state.data
+    mask = (
+        (st.session_state.data['Date'] == row['Date']) &
+        (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
+        (st.session_state.data['Type'] == row['Type']) &
+        (st.session_state.data['Quantity'] == row['Quantity']) &
+        (st.session_state.data['Remarks'] == row['Remarks']) &
+        (st.session_state.data['Status'] == row['Status']) &
+        (st.session_state.data['Pending'] == row['Pending'])
+    )
+    orig_idx = st.session_state.data[mask].index
+    if orig_idx.empty:
+        continue
+    orig_idx = orig_idx[0]
 
-        for idx, row in df.iterrows():
-            # find the index in session_state.data
-            mask = (
-                (st.session_state.data['Date']==row['Date']) &
-                (st.session_state.data['Size (mm)']==row['Size (mm)']) &
-                (st.session_state.data['Type']==row['Type']) &
-                (st.session_state.data['Quantity']==row['Quantity']) &
-                (st.session_state.data['Remarks']==row['Remarks']) &
-                (st.session_state.data['Status']==row['Status']) &
-                (st.session_state.data['Pending']==row['Pending'])
-            )
-            orig_idx = st.session_state.data[mask].index
-            if orig_idx.empty:
-                continue
-            orig_idx = orig_idx[0]
+    cols = st.columns([10, 1, 1])
+    with cols[0]:
+        disp = {
+            "Date": row["Date"],
+            "Size (mm)": row["Size (mm)"],
+            "Type": row["Type"],
+            "Quantity": row["Quantity"],
+            "Remarks": row["Remarks"],
+            "Status": row["Status"],
+            "Pending": "Yes" if row["Pending"] else "No"
+        }
+        st.dataframe(pd.DataFrame([disp]), hide_index=True, use_container_width=True)
+    with cols[1]:
+        if st.button("✏", key=f"edit_{orig_idx}"):
+            st.session_state.editing = orig_idx
+    with cols[2]:
+        if st.button("❌", key=f"del_{orig_idx}"):
+            st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
+            auto_save_to_gsheet()
+            st.rerun()
 
-            cols = st.columns([10,1,1])
-            with cols[0]:
-                disp = {
-                    "Date": row["Date"],
-                    "Size (mm)": row["Size (mm)"],
-                    "Type": row["Type"],
-                    "Quantity": row["Quantity"],
-                    "Remarks": row["Remarks"],
-                    "Status": row["Status"],
-                    "Pending": "Yes" if row["Pending"] else "No"
-                }
-                st.dataframe(pd.DataFrame([disp]), hide_index=True, use_container_width=True)
-            with cols[1]:
-                if st.button("✏", key=f"edit_{orig_idx}"):
-                    st.session_state.editing = orig_idx
-            with cols[2]:
-                if st.button("❌", key=f"del_{orig_idx}"):
-                    st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
-                    auto_save_to_gsheet()
-                    st.rerun()
     # === INLINE EDIT FORM ===
     if st.session_state.editing == orig_idx:
         er = st.session_state.data.loc[orig_idx]
@@ -334,6 +334,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                 if st.form_submit_button("❌ Cancel", key=f"cancel_{orig_idx}"):
                     st.session_state.editing = None
                     st.rerun()
-# ====== LAST SYNC STATUS ======
+         ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
