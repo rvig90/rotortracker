@@ -6,6 +6,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 from streamlit_autorefresh import st_autorefresh
 
+# Normalize the Pending column to boolean True/False
+def normalize_pending_column(df):
+    df['Pending'] = df['Pending'].apply(
+        lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
+    )
+    return df
+
 # ====== INITIALIZE SESSION STATE ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
