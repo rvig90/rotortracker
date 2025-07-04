@@ -3,3 +3,4 @@ pandas
 XlsxWriter
 gspread
 oauth2client
+streamlit-autorefresh
