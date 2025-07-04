@@ -72,6 +72,7 @@ def auto_save_to_gsheet():
         if spreadsheet:
             sheet = spreadsheet.sheet1
             df = st.session_state.data.copy()
+            df['Date'] = df['Date'].astype(str)
             if not df.empty:
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
                 expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
