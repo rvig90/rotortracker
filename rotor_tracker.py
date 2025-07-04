@@ -221,10 +221,13 @@ with st.expander("📋 View Movement Log", expanded=True):
                 pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
             remark_search = st.text_input("📝 Search Remarks")
-            date_range = st.date_input("📅 Date Range", value=[
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ])
+           # Safely parse any kind of date or datetime string
+df["Parsed_Date"] = pd.to_datetime(df["Date"], errors='coerce')
+
+date_range = st.date_input("📅 Date Range", value=[
+    df["Parsed_Date"].min().date(),
+    df["Parsed_Date"].max().date()
+])
 
             if status_filter != "All":
                 df = df[df["Status"] == status_filter]
@@ -237,9 +240,9 @@ with st.expander("📋 View Movement Log", expanded=True):
             if remark_search:
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
             if isinstance(date_range, list) and len(date_range) == 2:
-                start_date, end_date = date_range
-                df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(start_date)) & 
-                        (pd.to_datetime(df["Date"]) <= pd.to_datetime(end_date))]
+    start_date, end_date = date_range
+    df = df[(df["Parsed_Date"] >= pd.to_datetime(start_date)) & 
+            (df["Parsed_Date"] <= pd.to_datetime(end_date))]
 
             df = df.reset_index(drop=True)
 
