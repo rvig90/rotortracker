@@ -73,6 +73,36 @@ def load_from_gsheet():
 if not st.session_state.loaded:
     load_from_gsheet()
     st.session_state.loaded = True
+# Manual backup to "Backup" sheet
+def backup_to_gsheet():
+    try:
+        sheet = get_gsheet_connection()
+        if sheet:
+            client = sheet.spreadsheet
+            backup_sheet_name = "Backup"
+
+            try:
+                backup_sheet = client.worksheet(backup_sheet_name)
+            except gspread.exceptions.WorksheetNotFound:
+                backup_sheet = client.add_worksheet(title=backup_sheet_name, rows="1000", cols="20")
+
+            backup_sheet.clear()
+            df = st.session_state.data.copy()
+
+            if not df.empty:
+                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                for col in expected_cols:
+                    if col not in df.columns:
+                        df[col] = ""
+                df = df[expected_cols]
+                records = [df.columns.tolist()] + df.values.tolist()
+                backup_sheet.update('A1', records)
+                st.success("✅ Backup saved to 'Backup' sheet.")
+            else:
+                st.warning("⚠ No data to back up.")
+    except Exception as e:
+        st.error(f"❌ Backup failed: {e}")
 
 def auto_backup_to_sheet():
     try:
