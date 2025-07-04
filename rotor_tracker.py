@@ -224,7 +224,17 @@ with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
     else:
+        # Create working copy of the data
         df = st.session_state.data.copy()
+        
+        # Convert to proper types for editing
+        display_df = df.copy()
+        display_df['Date'] = pd.to_datetime(display_df['Date']).dt.date
+        display_df['Size (mm)'] = display_df['Size (mm)'].astype(int)
+        display_df['Quantity'] = display_df['Quantity'].astype(int)
+        display_df['Pending'] = display_df['Pending'].map({True: 'Yes', False: 'No'})
+
+        # ===== FILTER UI =====
         st.markdown("### 🔍 Filter Movement Log")
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -244,31 +254,24 @@ with st.expander("📋 View Movement Log", expanded=True):
 
         # APPLY FILTERS
         if status_f != "All":
-            df = df[df['Status']==status_f]
-        if pending_f=="Yes":
-            df = df[df['Pending']==True]
-        elif pending_f=="No":
-            df = df[df['Pending']==False]
+            display_df = display_df[display_df['Status']==status_f]
+        if pending_f != "All":
+            display_df = display_df[display_df['Pending']==pending_f]
         if size_f:
-            df = df[df['Size (mm)'].isin(size_f)]
+            display_df = display_df[display_df['Size (mm)'].isin(size_f)]
         if remark_s:
-            df = df[df['Remarks'].str.contains(remark_s, case=False, na=False)]
+            display_df = display_df[display_df['Remarks'].str.contains(remark_s, case=False, na=False)]
         if isinstance(date_range, (list, tuple)) and len(date_range)==2:
             start, end = date_range
-            df = df[
-                (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
-                (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
+            display_df = display_df[
+                (pd.to_datetime(display_df['Date']) >= pd.to_datetime(start)) &
+                (pd.to_datetime(display_df['Date']) <= pd.to_datetime(end))
             ]
 
-        df = df.reset_index(drop=True)
+        # ===== SPREADSHEET EDITOR =====
         st.markdown("### 📄 Filtered Entries")
-
-        # Convert Pending to Yes/No for display
-        display_df = df.copy()
-        display_df['Pending'] = display_df['Pending'].apply(lambda x: 'Yes' if x else 'No')
-
-        # Define editable columns configuration
-        editable_cols = {
+        
+        column_config = {
             "Date": st.column_config.DateColumn(
                 "Date",
                 format="YYYY-MM-DD",
@@ -304,78 +307,94 @@ with st.expander("📋 View Movement Log", expanded=True):
             )
         }
 
-        # Display the editable dataframe
         edited_df = st.data_editor(
             display_df,
-            column_config=editable_cols,
+            column_config=column_config,
             use_container_width=True,
             hide_index=True,
             num_rows="fixed",
             key="movement_log_editor"
         )
 
-        # Check for changes and update session state
+        # ===== HANDLE EDITS =====
         if not edited_df.equals(display_df):
-            # Convert Pending back to boolean
-            edited_df['Pending'] = edited_df['Pending'].apply(lambda x: x == 'Yes')
+            # Convert back to original format
+            edited_df['Date'] = edited_df['Date'].astype(str)
+            edited_df['Pending'] = edited_df['Pending'].map({'Yes': True, 'No': False})
             
-            # Update the original indices in session state
-            for idx in edited_df.index:
-                orig_idx = st.session_state.data[
-                    (st.session_state.data['Date'] == df.loc[idx, 'Date']) &
-                    (st.session_state.data['Size (mm)'] == df.loc[idx, 'Size (mm)']) &
-                    (st.session_state.data['Type'] == df.loc[idx, 'Type']) &
-                    (st.session_state.data['Quantity'] == df.loc[idx, 'Quantity']) &
-                    (st.session_state.data['Remarks'] == df.loc[idx, 'Remarks']) &
-                    (st.session_state.data['Status'] == df.loc[idx, 'Status']) &
-                    (st.session_state.data['Pending'] == df.loc[idx, 'Pending'])
-                ].index
+            # Update session state by matching original indices
+            for idx, row in edited_df.iterrows():
+                # Find matching row in original data
+                mask = (
+                    (st.session_state.data['Date'] == row['Date']) &
+                    (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
+                    (st.session_state.data['Type'] == row['Type']) &
+                    (st.session_state.data['Quantity'] == row['Quantity']) &
+                    (st.session_state.data['Remarks'] == row['Remarks']) &
+                    (st.session_state.data['Status'] == row['Status']) &
+                    (st.session_state.data['Pending'] == row['Pending'])
+                )
                 
-                if not orig_idx.empty:
-                    orig_idx = orig_idx[0]
+                # If new row was added
+                if not any(mask):
+                    st.session_state.data = pd.concat([
+                        st.session_state.data, 
+                        pd.DataFrame([row])
+                    ], ignore_index=True)
+                # If existing row was modified
+                else:
+                    orig_idx = st.session_state.data[mask].index[0]
                     for col in edited_df.columns:
-                        st.session_state.data.at[orig_idx, col] = edited_df.loc[idx, col]
+                        st.session_state.data.at[orig_idx, col] = row[col]
             
             auto_save_to_gsheet()
             st.rerun()
 
-        # Add delete functionality (since data_editor doesn't support row deletion)
+        # ===== DELETE FUNCTIONALITY =====
         st.markdown("### ❌ Delete Entries")
+        
+        # Create descriptive strings for each row
+        delete_options = [
+            f"{row['Date']} | {row['Size (mm)']}mm | {row['Type']} | Qty: {row['Quantity']} | {row['Remarks']}"
+            for _, row in display_df.iterrows()
+        ]
+        
         to_delete = st.multiselect(
-            "Select entries to delete",
-            options=[f"{row['Date']} - {row['Size (mm)']}mm - {row['Type']} - Qty: {row['Quantity']}" 
-                    for _, row in df.iterrows()],
+            "Select entries to delete:",
+            options=delete_options,
             key="delete_selector"
         )
-
-        if st.button("Delete Selected"):
+        
+        if st.button("Delete Selected", type="primary"):
             if to_delete:
-                # Find the indices of selected entries to delete
+                # Find indices of selected rows
                 delete_indices = []
                 for desc in to_delete:
-                    parts = desc.split(" - ")
+                    parts = desc.split(" | ")
                     date = parts[0]
                     size = int(parts[1].replace("mm", ""))
                     typ = parts[2]
                     qty = int(parts[3].replace("Qty: ", ""))
+                    remarks = parts[4]
                     
                     mask = (
                         (st.session_state.data['Date'] == date) &
                         (st.session_state.data['Size (mm)'] == size) &
                         (st.session_state.data['Type'] == typ) &
-                        (st.session_state.data['Quantity'] == qty)
+                        (st.session_state.data['Quantity'] == qty) &
+                        (st.session_state.data['Remarks'] == remarks)
                     )
                     matches = st.session_state.data[mask].index
-                    if not matches.empty:
-                        delete_indices.extend(matches.tolist())
+                    delete_indices.extend(matches.tolist())
                 
-                if delete_indices:
-                    st.session_state.data = st.session_state.data.drop(delete_indices).reset_index(drop=True)
-                    auto_save_to_gsheet()
-                    st.success(f"Deleted {len(delete_indices)} entries")
-                    st.rerun()
+                # Remove duplicates and delete
+                delete_indices = list(set(delete_indices))
+                st.session_state.data = st.session_state.data.drop(delete_indices).reset_index(drop=True)
+                auto_save_to_gsheet()
+                st.success(f"Deleted {len(delete_indices)} entries")
+                st.rerun()
             else:
-                st.warning("Please select entries to delete")
+                st.warning("Please select at least one entry to delete")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
