@@ -62,6 +62,7 @@ def load_from_gsheet():
             df['Pending'] = False
         df = normalize_pending_column(df)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=["Date"])
         st.session_state.data = df
         st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         st.success("✅ Data loaded from Google Sheet")
