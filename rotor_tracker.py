@@ -263,100 +263,119 @@ with st.expander("📋 View Movement Log", expanded=True):
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
 
-        for idx, row in df.iterrows():
-            # find the index in session_state.data
-            mask = (
-                (st.session_state.data['Date']==row['Date']) &
-                (st.session_state.data['Size (mm)']==row['Size (mm)']) &
-                (st.session_state.data['Type']==row['Type']) &
-                (st.session_state.data['Quantity']==row['Quantity']) &
-                (st.session_state.data['Remarks']==row['Remarks']) &
-                (st.session_state.data['Status']==row['Status']) &
-                (st.session_state.data['Pending']==row['Pending'])
-            )
-            orig_idx = st.session_state.data[mask].index
-            if orig_idx.empty:
-                continue
-            orig_idx = orig_idx[0]
+        # Convert Pending to Yes/No for display
+        display_df = df.copy()
+        display_df['Pending'] = display_df['Pending'].apply(lambda x: 'Yes' if x else 'No')
 
-            # Check if this row is being edited
-            is_editing = st.session_state.get('editing') == orig_idx
+        # Define editable columns configuration
+        editable_cols = {
+            "Date": st.column_config.DateColumn(
+                "Date",
+                format="YYYY-MM-DD",
+                required=True
+            ),
+            "Size (mm)": st.column_config.NumberColumn(
+                "Size (mm)",
+                min_value=1,
+                required=True
+            ),
+            "Type": st.column_config.SelectboxColumn(
+                "Type",
+                options=["Inward", "Outgoing"],
+                required=True
+            ),
+            "Quantity": st.column_config.NumberColumn(
+                "Quantity",
+                min_value=1,
+                required=True
+            ),
+            "Remarks": st.column_config.TextColumn(
+                "Remarks"
+            ),
+            "Status": st.column_config.SelectboxColumn(
+                "Status",
+                options=["Current", "Future"],
+                required=True
+            ),
+            "Pending": st.column_config.SelectboxColumn(
+                "Pending",
+                options=["Yes", "No"],
+                required=True
+            )
+        }
+
+        # Display the editable dataframe
+        edited_df = st.data_editor(
+            display_df,
+            column_config=editable_cols,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            key="movement_log_editor"
+        )
+
+        # Check for changes and update session state
+        if not edited_df.equals(display_df):
+            # Convert Pending back to boolean
+            edited_df['Pending'] = edited_df['Pending'].apply(lambda x: x == 'Yes')
             
-            if is_editing:
-                # Inline edit form
-                with st.form(f"edit_form_{orig_idx}"):
-                    cols = st.columns([3, 2, 2, 2, 3, 2, 2, 2])
-                    with cols[0]:
-                        e_date = st.date_input("Date", value=pd.to_datetime(row["Date"]), 
-                                             key=f"date_{orig_idx}", label_visibility="collapsed")
-                    with cols[1]:
-                        e_size = st.number_input("Size", value=int(row["Size (mm)"]), 
-                                               min_value=1, key=f"size_{orig_idx}", label_visibility="collapsed")
-                    with cols[2]:
-                        e_type = st.selectbox("Type", ["Inward", "Outgoing"], 
-                                           index=0 if row["Type"]=="Inward" else 1,
-                                           key=f"type_{orig_idx}", label_visibility="collapsed")
-                    with cols[3]:
-                        e_qty = st.number_input("Qty", value=int(row["Quantity"]), 
-                                              min_value=1, key=f"qty_{orig_idx}", label_visibility="collapsed")
-                    with cols[4]:
-                        e_remarks = st.text_input("Remarks", value=row["Remarks"],
-                                                key=f"remarks_{orig_idx}", label_visibility="collapsed")
-                    with cols[5]:
-                        e_status = st.selectbox("Status", ["Current", "Future"],
-                                              index=0 if row["Status"]=="Current" else 1,
-                                              key=f"status_{orig_idx}", label_visibility="collapsed")
-                    with cols[6]:
-                        e_pending = st.checkbox("Pending", value=row["Pending"],
-                                             key=f"pending_{orig_idx}", label_visibility="collapsed")
+            # Update the original indices in session state
+            for idx in edited_df.index:
+                orig_idx = st.session_state.data[
+                    (st.session_state.data['Date'] == df.loc[idx, 'Date']) &
+                    (st.session_state.data['Size (mm)'] == df.loc[idx, 'Size (mm)']) &
+                    (st.session_state.data['Type'] == df.loc[idx, 'Type']) &
+                    (st.session_state.data['Quantity'] == df.loc[idx, 'Quantity']) &
+                    (st.session_state.data['Remarks'] == df.loc[idx, 'Remarks']) &
+                    (st.session_state.data['Status'] == df.loc[idx, 'Status']) &
+                    (st.session_state.data['Pending'] == df.loc[idx, 'Pending'])
+                ].index
+                
+                if not orig_idx.empty:
+                    orig_idx = orig_idx[0]
+                    for col in edited_df.columns:
+                        st.session_state.data.at[orig_idx, col] = edited_df.loc[idx, col]
+            
+            auto_save_to_gsheet()
+            st.rerun()
+
+        # Add delete functionality (since data_editor doesn't support row deletion)
+        st.markdown("### ❌ Delete Entries")
+        to_delete = st.multiselect(
+            "Select entries to delete",
+            options=[f"{row['Date']} - {row['Size (mm)']}mm - {row['Type']} - Qty: {row['Quantity']}" 
+                    for _, row in df.iterrows()],
+            key="delete_selector"
+        )
+
+        if st.button("Delete Selected"):
+            if to_delete:
+                # Find the indices of selected entries to delete
+                delete_indices = []
+                for desc in to_delete:
+                    parts = desc.split(" - ")
+                    date = parts[0]
+                    size = int(parts[1].replace("mm", ""))
+                    typ = parts[2]
+                    qty = int(parts[3].replace("Qty: ", ""))
                     
-                    # Action buttons
-                    with cols[7]:
-                        save_col, cancel_col = st.columns(2)
-                        with save_col:
-                            if st.form_submit_button("💾", use_container_width=True):
-                                st.session_state.data.at[orig_idx, 'Date'] = e_date.strftime('%Y-%m-%d')
-                                st.session_state.data.at[orig_idx, 'Size (mm)'] = e_size
-                                st.session_state.data.at[orig_idx, 'Type'] = e_type
-                                st.session_state.data.at[orig_idx, 'Quantity'] = e_qty
-                                st.session_state.data.at[orig_idx, 'Remarks'] = e_remarks
-                                st.session_state.data.at[orig_idx, 'Status'] = e_status
-                                st.session_state.data.at[orig_idx, 'Pending'] = e_pending
-                                st.session_state.editing = None
-                                auto_save_to_gsheet()
-                                st.rerun()
-                        with cancel_col:
-                            if st.form_submit_button("❌", use_container_width=True):
-                                st.session_state.editing = None
-                                st.rerun()
+                    mask = (
+                        (st.session_state.data['Date'] == date) &
+                        (st.session_state.data['Size (mm)'] == size) &
+                        (st.session_state.data['Type'] == typ) &
+                        (st.session_state.data['Quantity'] == qty)
+                    )
+                    matches = st.session_state.data[mask].index
+                    if not matches.empty:
+                        delete_indices.extend(matches.tolist())
+                
+                if delete_indices:
+                    st.session_state.data = st.session_state.data.drop(delete_indices).reset_index(drop=True)
+                    auto_save_to_gsheet()
+                    st.success(f"Deleted {len(delete_indices)} entries")
+                    st.rerun()
             else:
-                # Regular display row
-                cols = st.columns([3, 2, 2, 2, 3, 2, 2, 2])
-                with cols[0]:
-                    st.text(row["Date"])
-                with cols[1]:
-                    st.text(row["Size (mm)"])
-                with cols[2]:
-                    st.text(row["Type"])
-                with cols[3]:
-                    st.text(row["Quantity"])
-                with cols[4]:
-                    st.text(row["Remarks"])
-                with cols[5]:
-                    st.text(row["Status"])
-                with cols[6]:
-                    st.text("Yes" if row["Pending"] else "No")
-                with cols[7]:
-                    edit_col, del_col = st.columns(2)
-                    with edit_col:
-                        if st.button("✏", key=f"edit_{orig_idx}"):
-                            st.session_state.editing = orig_idx
-                            st.rerun()
-                    with del_col:
-                        if st.button("❌", key=f"del_{orig_idx}"):
-                            st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
-                            auto_save_to_gsheet()
-                            st.rerun()
+                st.warning("Please select entries to delete")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
