@@ -125,6 +125,7 @@ df = normalize_pending_column(df)
 # Convert 'Date' to datetime - handle errors and timezone-naive dates
 df["Date"] = pd.to_datetime(df["Date"], errors='coerce', format='%Y-%m-%d')
 
+# First apply all non-date filters
 col1, col2, col3 = st.columns(3)
 with col1:
     status_filter = st.selectbox("📁 Status", ["All", "Current", "Future"])
@@ -139,19 +140,7 @@ with col4:
 with col5:
     remarks_search = st.text_input("🔍 Search Remarks")
 
-# Date filter - handle cases where min/max might be NaT
-valid_dates = df["Date"].dropna()
-min_date = valid_dates.min().to_pydatetime().date() if not valid_dates.empty else datetime.today().date()
-max_date = valid_dates.max().to_pydatetime().date() if not valid_dates.empty else datetime.today().date()
-
-date_range = st.date_input(
-    "📅 Date Range",
-    [min_date, max_date],
-    min_value=min_date,
-    max_value=max_date
-)
-
-# Apply filters
+# Apply non-date filters first
 if status_filter != "All":
     df = df[df["Status"] == status_filter]
 if type_filter != "All":
@@ -165,18 +154,45 @@ if size_filter:
 if remarks_search:
     df = df[df["Remarks"].str.contains(remarks_search, case=False, na=False)]
 
-# Handle date range filter - only if two dates are selected
-if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-    start_date, end_date = date_range
-    # Convert to datetime at midnight for proper comparison
+# Now calculate date range based on filtered data
+valid_dates = df["Date"].dropna()
+if not valid_dates.empty:
+    min_date = valid_dates.min().to_pydatetime().date()
+    max_date = valid_dates.max().to_pydatetime().date()
+else:
+    min_date = datetime.today().date() - timedelta(days=30)
+    max_date = datetime.today().date()
+
+# Use session state to maintain date range selection
+if 'date_range' not in st.session_state:
+    st.session_state.date_range = [min_date, max_date]
+
+# Date range picker - now using session state
+new_date_range = st.date_input(
+    "📅 Date Range",
+    value=st.session_state.date_range,
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Update session state if date range changed
+if new_date_range != st.session_state.date_range:
+    st.session_state.date_range = new_date_range
+    st.rerun()
+
+# Apply date filter if two dates are selected
+if len(st.session_state.date_range) == 2:
+    start_date, end_date = st.session_state.date_range
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
     df = df[df["Date"].between(start_dt, end_dt, inclusive='both')]
 
+# Display results
 if not df.empty:
-    # Format date for display
-    df["Date"] = df["Date"].dt.strftime('%Y-%m-%d')
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Format date for display while keeping original for sorting
+    display_df = df.copy()
+    display_df["Date"] = display_df["Date"].dt.strftime('%Y-%m-%d')
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 else:
     st.warning("No entries match the filters.")
 # ========== SYNC INFO ==========
