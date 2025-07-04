@@ -222,12 +222,12 @@ with st.expander("📋 View Movement Log", expanded=True):
 
             remark_search = st.text_input("📝 Search Remarks")
            # Safely parse any kind of date or datetime string
-df["Parsed_Date"] = pd.to_datetime(df["Date"], errors='coerce')
+            df["Parsed_Date"] = pd.to_datetime(df["Date"], errors='coerce')
 
-date_range = st.date_input("📅 Date Range", value=[
-    df["Parsed_Date"].min().date(),
-    df["Parsed_Date"].max().date()
-])
+            date_range = st.date_input("📅 Date Range", value=[
+            df["Parsed_Date"].min().date(),
+            df["Parsed_Date"].max().date()
+            ])
 
             if status_filter != "All":
                 df = df[df["Status"] == status_filter]
@@ -240,8 +240,8 @@ date_range = st.date_input("📅 Date Range", value=[
             if remark_search:
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
             if isinstance(date_range, list) and len(date_range) == 2:
-    start_date, end_date = date_range
-    df = df[(df["Parsed_Date"] >= pd.to_datetime(start_date)) & 
+            start_date, end_date = date_range
+            df = df[(df["Parsed_Date"] >= pd.to_datetime(start_date)) & 
             (df["Parsed_Date"] <= pd.to_datetime(end_date))]
 
             df = df.reset_index(drop=True)
