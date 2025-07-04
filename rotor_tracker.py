@@ -12,21 +12,13 @@ if 'data' not in st.session_state:
     ])
     st.session_state.last_sync = "Never"
     st.session_state.editing = None  # Track which row is being edited
-    # Auto-load data when first opened
-    load_from_gsheet()
 
-# ====== HELPER FUNCTIONS ======
+# ====== HELPER FUNCTION TO NORMALIZE BOOLEAN ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
         lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
     )
     return df
-
-def convert_to_date(date_str):
-    try:
-        return pd.to_datetime(date_str).date()
-    except:
-        return pd.to_datetime(date_str)
 
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
@@ -59,10 +51,6 @@ def load_from_gsheet():
                 if 'Pending' not in df.columns:
                     df['Pending'] = False
                 df = normalize_pending_column(df)
-                
-                # Ensure Date column is in proper format
-                df['Date'] = pd.to_datetime(df['Date']).dt.date
-                
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.success("Data loaded successfully!")
@@ -70,7 +58,6 @@ def load_from_gsheet():
                 st.info("No data found in Google Sheet")
     except Exception as e:
         st.error(f"Error loading data: {e}")
-
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
@@ -79,21 +66,29 @@ def auto_save_to_gsheet():
 
             if not st.session_state.data.empty:
                 df = st.session_state.data.copy()
+
+                # ✅ Ensure Pending is string format for Google Sheets
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+
+                # ✅ Ensure all columns are present and in order
                 expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
                 for col in expected_cols:
                     if col not in df.columns:
                         df[col] = ""
-                
-                # Convert date back to string for Google Sheets
-                df['Date'] = df['Date'].astype(str)
-                
-                df = df[expected_cols]
+
+                df = df[expected_cols]  # Reorder columns if necessary
+
+                # ✅ Save to main sheet
                 records = [df.columns.tolist()] + df.values.tolist()
                 sheet.update(records)
+
+                # ✅ Backup
+                save_to_backup_sheet(df.copy())
+
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         st.error(f"❌ Auto-save failed: {e}")
+
 
 # ====== SYNC BUTTON ======
 if st.button("🔄 Sync Now", help="Load latest data from Google Sheets"):
@@ -115,7 +110,7 @@ with form_tabs[0]:  # Current Movement
         
         if st.form_submit_button("➕ Add Entry"):
             new_entry = pd.DataFrame([{
-                'Date': date,
+                'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': rotor_size, 
                 'Type': entry_type, 
                 'Quantity': quantity, 
@@ -139,7 +134,7 @@ with form_tabs[1]:  # Coming Rotors
         
         if st.form_submit_button("➕ Add Coming Rotors"):
             new_entry = pd.DataFrame([{
-                'Date': future_date,
+                'Date': future_date.strftime('%Y-%m-%d'),
                 'Size (mm)': future_size, 
                 'Type': 'Inward', 
                 'Quantity': future_qty, 
@@ -163,7 +158,7 @@ with form_tabs[2]:  # Pending Rotors
         
         if st.form_submit_button("➕ Add Pending Rotors"):
             new_entry = pd.DataFrame([{
-                'Date': pending_date,
+                'Date': pending_date.strftime('%Y-%m-%d'),
                 'Size (mm)': pending_size, 
                 'Type': 'Outgoing',
                 'Quantity': pending_qty, 
@@ -176,10 +171,14 @@ with form_tabs[2]:  # Pending Rotors
             st.rerun()
 
 # ====== STOCK SUMMARY ======
+# ====== STOCK SUMMARY ======
 st.subheader("📊 Current Stock Summary")
 if not st.session_state.data.empty:
     try:
+        # ✅ Ensure Pending column is boolean
         st.session_state.data = normalize_pending_column(st.session_state.data)
+
+        # Current inward stock (excluding pending)
         current = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (~st.session_state.data['Pending'])
@@ -188,15 +187,18 @@ if not st.session_state.data.empty:
         stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
         stock = stock[stock['Net'] != 0]
 
+        # Future rotors (coming rotors)
         future = st.session_state.data[st.session_state.data['Status'] == 'Future']
         coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
+        # ✅ Pending rotors (only if marked Pending and Status = Current)
         pending = st.session_state.data[
             (st.session_state.data['Status'] == 'Current') & 
             (st.session_state.data['Pending'])
         ]
         pending_rotors = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
+        # Merge all
         combined = pd.merge(stock, coming, on='Size (mm)', how='outer')
         combined = pd.merge(combined, pending_rotors, on='Size (mm)', how='outer', suffixes=('', '_pending'))
         combined = combined.fillna(0)
@@ -211,14 +213,16 @@ if not st.session_state.data.empty:
         st.error(f"Error generating summary: {e}")
 else:
     st.info("No data available yet")
-
-# ====== MOVEMENT LOG WITH INLINE EDITING ======
+# ====== MOVEMENT LOG WITH EDIT/DELETE ======
+# ====== MOVEMENT LOG WITH TABLE LAYOUT, FILTERS, INLINE EDIT ======
 with st.expander("📋 View Movement Log", expanded=True):
     if not st.session_state.data.empty:
         try:
             df = st.session_state.data.copy()
 
             st.markdown("### 🔍 Filter Movement Log")
+
+            # ==== FILTERS ====
             col1, col2, col3 = st.columns(3)
 
             with col1:
@@ -229,18 +233,12 @@ with st.expander("📋 View Movement Log", expanded=True):
                 pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
             remark_search = st.text_input("📝 Search Remarks")
-            
-            # Date range filter with proper date handling
-            min_date = df['Date'].min()
-            max_date = df['Date'].max()
-            date_range = st.date_input(
-                "📅 Date Range",
-                value=[min_date, max_date],
-                min_value=min_date,
-                max_value=max_date
-            )
+            date_range = st.date_input("📅 Date Range", value=[
+                pd.to_datetime(df['Date']).min(),
+                pd.to_datetime(df['Date']).max()
+            ])
 
-            # Apply filters
+            # ==== APPLY FILTERS ====
             if status_filter != "All":
                 df = df[df["Status"] == status_filter]
             if pending_filter == "Yes":
@@ -251,50 +249,91 @@ with st.expander("📋 View Movement Log", expanded=True):
                 df = df[df["Size (mm)"].isin(size_filter)]
             if remark_search:
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
-            if len(date_range) == 2:
+            if isinstance(date_range, list) and len(date_range) == 2:
                 start_date, end_date = date_range
-                df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
+                df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(start_date)) & 
+                        (pd.to_datetime(df["Date"]) <= pd.to_datetime(end_date))]
 
-            # Display editable table
+            df = df.reset_index(drop=True)
+
+            # ==== DISPLAY TABLE ====
             st.markdown("### 📄 Filtered Entries")
-            
-            # Convert date to string for display and editing
-            display_df = df.copy()
-            display_df['Date'] = display_df['Date'].astype(str)
-            
-            # Create editable dataframe
-            edited_df = st.data_editor(
-                display_df,
-                key="movement_log_editor",
-                hide_index=True,
-                use_container_width=True,
-                column_config={
-                    "Date": st.column_config.DateColumn("Date"),
-                    "Size (mm)": st.column_config.NumberColumn("Size (mm)", format="%d"),
-                    "Quantity": st.column_config.NumberColumn("Quantity", format="%d"),
-                    "Pending": st.column_config.CheckboxColumn("Pending")
-                },
-                disabled=["Status"]  # Make Status non-editable
-            )
-            
-            # Check for changes and update session state
-            if not edited_df.equals(display_df):
-                # Convert date back to date object
-                edited_df['Date'] = pd.to_datetime(edited_df['Date']).dt.date
-                
-                # Update the original dataframe with changes
-                for idx, row in edited_df.iterrows():
-                    original_idx = df.index[idx]
-                    st.session_state.data.loc[original_idx] = row
-                
-                auto_save_to_gsheet()
-                st.rerun()
+            for idx, row in df.iterrows():
+                row_index = st.session_state.data[
+                    (st.session_state.data["Date"] == row["Date"]) &
+                    (st.session_state.data["Size (mm)"] == row["Size (mm)"]) &
+                    (st.session_state.data["Type"] == row["Type"]) &
+                    (st.session_state.data["Quantity"] == row["Quantity"]) &
+                    (st.session_state.data["Remarks"] == row["Remarks"]) &
+                    (st.session_state.data["Status"] == row["Status"]) &
+                    (st.session_state.data["Pending"] == row["Pending"])
+                ].index
+                if len(row_index) == 0:
+                    continue
+                row_index = row_index[0]
 
+                cols = st.columns([10, 1, 1])
+                with cols[0]:
+                    display = {
+                        "Date": row["Date"],
+                        "Size (mm)": row["Size (mm)"],
+                        "Type": row["Type"],
+                        "Quantity": row["Quantity"],
+                        "Remarks": row["Remarks"],
+                        "Status": row["Status"],
+                        "Pending": "Yes" if row["Pending"] else "No"
+                    }
+                    st.dataframe(pd.DataFrame([display]), hide_index=True, use_container_width=True)
+
+                with cols[1]:
+                    if st.button("✏", key=f"edit_{row_index}"):
+                        st.session_state.editing = row_index
+
+                with cols[2]:
+                    if st.button("❌", key=f"del_{row_index}"):
+                        st.session_state.data = st.session_state.data.drop(row_index).reset_index(drop=True)
+                        auto_save_to_gsheet()
+                        st.rerun()
+
+            # ==== EDIT FORM ====
+            if st.session_state.editing is not None:
+                edit_row = st.session_state.data.loc[st.session_state.editing]
+                with st.form("edit_form"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        edit_date = st.date_input("📅 Date", 
+                            value=pd.to_datetime(edit_row["Date"]))
+                        edit_size = st.number_input("📐 Rotor Size (mm)", min_value=1, value=int(edit_row["Size (mm)"]))
+                    with col2:
+                        edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], 
+                            index=0 if edit_row["Type"] == "Inward" else 1)
+                        edit_qty = st.number_input("🔢 Quantity", min_value=1, value=int(edit_row["Quantity"]))
+                    edit_remarks = st.text_input("📝 Remarks", value=edit_row["Remarks"])
+                    edit_status = st.selectbox("📂 Status", ["Current", "Future"], 
+                        index=0 if edit_row["Status"] == "Current" else 1)
+                    edit_pending = st.checkbox("❗ Pending", value=edit_row["Pending"])
+
+                    save_col, cancel_col = st.columns(2)
+                    with save_col:
+                        if st.form_submit_button("💾 Save Changes"):
+                            st.session_state.data.at[st.session_state.editing, "Date"] = edit_date.strftime("%Y-%m-%d")
+                            st.session_state.data.at[st.session_state.editing, "Size (mm)"] = edit_size
+                            st.session_state.data.at[st.session_state.editing, "Type"] = edit_type
+                            st.session_state.data.at[st.session_state.editing, "Quantity"] = edit_qty
+                            st.session_state.data.at[st.session_state.editing, "Remarks"] = edit_remarks
+                            st.session_state.data.at[st.session_state.editing, "Status"] = edit_status
+                            st.session_state.data.at[st.session_state.editing, "Pending"] = edit_pending
+                            st.session_state.editing = None
+                            auto_save_to_gsheet()
+                            st.rerun()
+                    with cancel_col:
+                        if st.form_submit_button("❌ Cancel"):
+                            st.session_state.editing = None
+                            st.rerun()
         except Exception as e:
             st.error(f"❌ Error showing movement log: {e}")
     else:
         st.info("No entries to show yet.")
-
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
