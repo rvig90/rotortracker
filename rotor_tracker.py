@@ -16,7 +16,7 @@ if 'data' not in st.session_state:
     st.session_state.loaded = False
 
 # Refresh every 3 seconds (3000 ms), limit to avoid infinite reloads
-count = st_autorefresh(interval=3000, limit=None, key="autorefresh")
+count = st_autorefresh(interval=30000, limit=None, key="autorefresh")
 
 # Track the last backup snapshot
 if 'last_backup_data' not in st.session_state:
