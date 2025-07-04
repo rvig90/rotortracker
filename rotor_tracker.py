@@ -56,6 +56,33 @@ def load_from_gsheet():
         st.error(f"❌ Failed to load from Google Sheet: {e}")
         return pd.DataFrame(columns=COLUMNS)
 
+def auto_save_to_gsheet():
+    try:
+        sheet = get_gsheet_connection()
+        if sheet:
+            # Save to main sheet
+            sheet.clear()
+            df = st.session_state.data.copy()
+            if not df.empty:
+                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                for col in expected_cols:
+                    if col not in df.columns:
+                        df[col] = ""
+                df = df[expected_cols]
+                records = [df.columns.tolist()] + df.values.tolist()
+                sheet.update('A1', records)
+
+            # Save to backup sheet
+            backup_sheet = get_gsheet_connection().spreadsheet.worksheet("Backup")
+            backup_sheet.clear()
+            if not df.empty:
+                backup_sheet.update('A1', records)
+
+            st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        st.error(f"❌ Auto-save failed: {e}")
+
 # Save data to main sheet and backup sheet
 def save_to_gsheet(data: pd.DataFrame):
     try:
