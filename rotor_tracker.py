@@ -197,7 +197,15 @@ except Exception as e:
 st.subheader("📋 Movement Log")
 if not st.session_state.data.empty:
     df = st.session_state.data.copy()
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+   # Convert 'Date' column to datetime safely
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+# Date filter
+selected_date = st.date_input("📅 Filter by Specific Date (optional)", value=None)
+
+if selected_date:
+    # Ensure comparison is with .date()
+    df = df[df['Date'].dt.date == selected_date]
 
     st.markdown("### 🔍 Filters")
     c1, c2, c3 = st.columns(3)
