@@ -99,6 +99,8 @@ def auto_backup_to_sheet():
                         st.toast("🔁 Auto-backup successful.")
     except Exception as e:
         st.error(f"Auto-backup failed: {e}")
+        # Auto backup on every refresh (if data changed)
+auto_backup_to_sheet()
 # ====== AUTO-SAVE TO GOOGLE SHEETS ======
 def auto_save_to_gsheet():
     try:
