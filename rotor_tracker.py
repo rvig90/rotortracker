@@ -12,6 +12,8 @@ if 'data' not in st.session_state:
     ])
     st.session_state.last_sync = "Never"
     st.session_state.editing = None  # Track which row is being edited
+    # Auto-load data when first opened
+    load_from_gsheet()
 
 # ====== HELPER FUNCTION TO NORMALIZE BOOLEAN ======
 def normalize_pending_column(df):
@@ -51,6 +53,11 @@ def load_from_gsheet():
                 if 'Pending' not in df.columns:
                     df['Pending'] = False
                 df = normalize_pending_column(df)
+                
+                # Convert datetime strings to date-only format if needed
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date']).dt.date.astype(str)
+                
                 st.session_state.data = df
                 st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.success("Data loaded successfully!")
@@ -91,7 +98,6 @@ with form_tabs[0]:  # Current Movement
         col1, col2 = st.columns(2)
         with col1:
             date = st.date_input("📅 Date", value=datetime.today())
-            time = st.time_input("⏰ Time", value=datetime.now().time())
             rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
         with col2:
             entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
@@ -99,9 +105,8 @@ with form_tabs[0]:  # Current Movement
         remarks = st.text_input("📝 Remarks")
         
         if st.form_submit_button("➕ Add Entry"):
-            datetime_combined = datetime.combine(date, time)
             new_entry = pd.DataFrame([{
-                'Date': datetime_combined.strftime('%Y-%m-%d %H:%M:%S'),
+                'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': rotor_size, 
                 'Type': entry_type, 
                 'Quantity': quantity, 
@@ -118,16 +123,14 @@ with form_tabs[1]:  # Coming Rotors
         col1, col2 = st.columns(2)
         with col1:
             future_date = st.date_input("📅 Expected Date", min_value=datetime.today() + timedelta(days=1))
-            future_time = st.time_input("⏰ Expected Time", value=datetime.now().time())
             future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
         with col2:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
             future_remarks = st.text_input("📝 Remarks")
         
         if st.form_submit_button("➕ Add Coming Rotors"):
-            datetime_combined = datetime.combine(future_date, future_time)
             new_entry = pd.DataFrame([{
-                'Date': datetime_combined.strftime('%Y-%m-%d %H:%M:%S'),
+                'Date': future_date.strftime('%Y-%m-%d'),
                 'Size (mm)': future_size, 
                 'Type': 'Inward', 
                 'Quantity': future_qty, 
@@ -144,16 +147,14 @@ with form_tabs[2]:  # Pending Rotors
         col1, col2 = st.columns(2)
         with col1:
             pending_date = st.date_input("📅 Date", value=datetime.today())
-            pending_time = st.time_input("⏰ Time", value=datetime.now().time())
             pending_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1, format="%d")
         with col2:
             pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1, format="%d")
             pending_remarks = st.text_input("📝 Remarks", value="Pending delivery")
         
         if st.form_submit_button("➕ Add Pending Rotors"):
-            datetime_combined = datetime.combine(pending_date, pending_time)
             new_entry = pd.DataFrame([{
-                'Date': datetime_combined.strftime('%Y-%m-%d %H:%M:%S'),
+                'Date': pending_date.strftime('%Y-%m-%d'),
                 'Size (mm)': pending_size, 
                 'Type': 'Outgoing',
                 'Quantity': pending_qty, 
@@ -236,10 +237,8 @@ with st.expander("📋 View Movement Log", expanded=True):
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
             if isinstance(date_range, list) and len(date_range) == 2:
                 start_date, end_date = date_range
-                start_datetime = datetime.combine(start_date, datetime.min.time())
-                end_datetime = datetime.combine(end_date, datetime.max.time())
-                df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(start_datetime)) & 
-                        (pd.to_datetime(df["Date"]) <= pd.to_datetime(end_datetime))]
+                df = df[(pd.to_datetime(df["Date"]) >= pd.to_datetime(start_date)) & 
+                        (pd.to_datetime(df["Date"]) <= pd.to_datetime(end_date))]
 
             df = df.reset_index(drop=True)
 
@@ -283,12 +282,11 @@ with st.expander("📋 View Movement Log", expanded=True):
 
             if st.session_state.editing is not None:
                 edit_row = st.session_state.data.loc[st.session_state.editing]
-                edit_datetime = pd.to_datetime(edit_row["Date"])
+                edit_date = pd.to_datetime(edit_row["Date"]).date()
                 with st.form("edit_form"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        edit_date = st.date_input("📅 Date", value=edit_datetime.date())
-                        edit_time = st.time_input("⏰ Time", value=edit_datetime.time())
+                        new_date = st.date_input("📅 Date", value=edit_date)
                         edit_size = st.number_input("📐 Rotor Size (mm)", min_value=1, value=int(edit_row["Size (mm)"]))
                     with col2:
                         edit_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], 
@@ -302,8 +300,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                     save_col, cancel_col = st.columns(2)
                     with save_col:
                         if st.form_submit_button("💾 Save Changes"):
-                            datetime_combined = datetime.combine(edit_date, edit_time)
-                            st.session_state.data.at[st.session_state.editing, "Date"] = datetime_combined.strftime("%Y-%m-%d %H:%M:%S")
+                            st.session_state.data.at[st.session_state.editing, "Date"] = new_date.strftime("%Y-%m-%d")
                             st.session_state.data.at[st.session_state.editing, "Size (mm)"] = edit_size
                             st.session_state.data.at[st.session_state.editing, "Type"] = edit_type
                             st.session_state.data.at[st.session_state.editing, "Quantity"] = edit_qty
