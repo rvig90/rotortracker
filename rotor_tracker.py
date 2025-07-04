@@ -117,12 +117,13 @@ except Exception as e:
     st.error(f"Stock summary error: {e}")
 
 # ========== MOVEMENT LOG ==========
+# ========== MOVEMENT LOG ==========
 st.subheader("📋 Filter Movement Log")
 df = st.session_state.data.copy()
 df = normalize_pending_column(df)
 
-# Convert 'Date' to datetime safely
-df["Parsed_Date"] = pd.to_datetime(df["Date"], errors='coerce')
+# Convert 'Date' to datetime - handle errors and timezone-naive dates
+df["Date"] = pd.to_datetime(df["Date"], errors='coerce', format='%Y-%m-%d')
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -138,10 +139,17 @@ with col4:
 with col5:
     remarks_search = st.text_input("🔍 Search Remarks")
 
-# Date filter
-min_date = df["Parsed_Date"].min()
-max_date = df["Parsed_Date"].max()
-date_range = st.date_input("📅 Date Range", [min_date.date(), max_date.date()])
+# Date filter - handle cases where min/max might be NaT
+valid_dates = df["Date"].dropna()
+min_date = valid_dates.min().to_pydatetime().date() if not valid_dates.empty else datetime.today().date()
+max_date = valid_dates.max().to_pydatetime().date() if not valid_dates.empty else datetime.today().date()
+
+date_range = st.date_input(
+    "📅 Date Range",
+    [min_date, max_date],
+    min_value=min_date,
+    max_value=max_date
+)
 
 # Apply filters
 if status_filter != "All":
@@ -156,16 +164,20 @@ if size_filter:
     df = df[df["Size (mm)"].isin(size_filter)]
 if remarks_search:
     df = df[df["Remarks"].str.contains(remarks_search, case=False, na=False)]
-if isinstance(date_range, list) and len(date_range) == 2:
-    start, end = date_range
-    df = df[df["Parsed_Date"].between(pd.to_datetime(start), pd.to_datetime(end))]
 
-df = df.drop(columns=["Parsed_Date"])
+# Handle date range filter - only if two dates are selected
+if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+    start_date, end_date = date_range
+    # Convert to datetime at midnight for proper comparison
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.max.time())
+    df = df[df["Date"].between(start_dt, end_dt, inclusive='both')]
 
 if not df.empty:
+    # Format date for display
+    df["Date"] = df["Date"].dt.strftime('%Y-%m-%d')
     st.dataframe(df, use_container_width=True, hide_index=True)
 else:
     st.warning("No entries match the filters.")
-
 # ========== SYNC INFO ==========
 st.caption(f"📤 Last synced: {st.session_state.last_sync}")
