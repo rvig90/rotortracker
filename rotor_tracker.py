@@ -335,6 +335,6 @@ for idx, row in df.iterrows():
                     st.session_state.editing = None
                     st.rerun()
      
-        ====== LAST SYNC STATUS ======
+       # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
