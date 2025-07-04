@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+from streamlit_autorefresh import st_autorefresh
 
 # ====== INITIALIZE SESSION STATE ======
 if 'data' not in st.session_state:
@@ -14,6 +15,12 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.loaded = False
 
+# Refresh every 3 seconds (3000 ms), limit to avoid infinite reloads
+count = st_autorefresh(interval=3000, limit=None, key="autorefresh")
+
+# Track the last backup snapshot
+if 'last_backup_data' not in st.session_state:
+    st.session_state.last_backup_data = None
 # ====== NORMALIZE PENDING COLUMN ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
@@ -61,11 +68,37 @@ def load_from_gsheet():
     except Exception as e:
         st.error(f"Error loading from Google Sheet: {e}")
 
+
 # Auto-load once
 if not st.session_state.loaded:
     load_from_gsheet()
     st.session_state.loaded = True
 
+def auto_backup_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if sheet:
+            df = st.session_state.data.copy()
+            if not df.empty:
+                df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                expected_cols = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
+                for col in expected_cols:
+                    if col not in df.columns:
+                        df[col] = ""
+                df = df[expected_cols]
+
+                # Check if data changed since last backup
+                if st.session_state.last_backup_data is None or not df.equals(st.session_state.last_backup_data):
+                    backup_sheet = get_gsheet_connection()
+                    if backup_sheet:
+                        backup_sheet.clear()
+                        records = [df.columns.tolist()] + df.values.tolist()
+                        backup_sheet.update('A1', records)
+                        st.session_state.last_backup_data = df.copy()
+                        st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        st.toast("🔁 Auto-backup successful.")
+    except Exception as e:
+        st.error(f"Auto-backup failed: {e}")
 # ====== AUTO-SAVE TO GOOGLE SHEETS ======
 def auto_save_to_gsheet():
     try:
