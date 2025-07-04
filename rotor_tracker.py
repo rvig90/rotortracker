@@ -4,8 +4,18 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
-from streamlit_autorefresh import st_autorefresh
 
+def get_gsheet_connection():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = json.loads(st.secrets["gcp_service_account"]) if isinstance(st.secrets["gcp_service_account"], str) else dict(st.secrets["gcp_service_account"])
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        return client.open("Rotor Log")  # return the spreadsheet object
+    except Exception as e:
+        st.error(f"Google Sheets connection failed: {str(e)}")
+        return None
 # Normalize the Pending column to boolean True/False
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
@@ -58,10 +68,9 @@ def load_from_gsheet():
 
 def auto_save_to_gsheet():
     try:
-        sheet = get_gsheet_connection()
-        if sheet:
-            # Save to main sheet
-            sheet.clear()
+        spreadsheet = get_gsheet_connection()
+        if spreadsheet:
+            sheet = spreadsheet.sheet1
             df = st.session_state.data.copy()
             if not df.empty:
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
@@ -71,12 +80,15 @@ def auto_save_to_gsheet():
                         df[col] = ""
                 df = df[expected_cols]
                 records = [df.columns.tolist()] + df.values.tolist()
+                sheet.clear()
                 sheet.update('A1', records)
 
-            # Save to backup sheet
-            backup_sheet = get_gsheet_connection().spreadsheet.worksheet("Backup")
-            backup_sheet.clear()
-            if not df.empty:
+                # Backup to "Backup" sheet
+                try:
+                    backup_sheet = spreadsheet.worksheet("Backup")
+                except gspread.exceptions.WorksheetNotFound:
+                    backup_sheet = spreadsheet.add_worksheet(title="Backup", rows="1000", cols="20")
+                backup_sheet.clear()
                 backup_sheet.update('A1', records)
 
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
