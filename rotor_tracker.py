@@ -205,6 +205,7 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG ======
+# ====== MOVEMENT LOG ======
 with st.expander("📋 View Movement Log", expanded=True):
     if not st.session_state.data.empty:
         try:
@@ -212,23 +213,26 @@ with st.expander("📋 View Movement Log", expanded=True):
 
             st.markdown("### 🔍 Filter Movement Log")
 
+            # Normalize the date column (handles both '2025-07-04' and '2025-07-04 06:24:53')
+            df["Parsed_Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
             col1, col2, col3 = st.columns(3)
             with col1:
                 status_filter = st.selectbox("📂 Status", ["All", "Current", "Future"])
             with col2:
-                size_filter = st.multiselect("📐 Size (mm)", sorted(df['Size (mm)'].unique()))
+                size_filter = st.multiselect("📐 Size (mm)", sorted(df["Size (mm)"].unique()))
             with col3:
                 pending_filter = st.selectbox("❗ Pending", ["All", "Yes", "No"])
 
             remark_search = st.text_input("📝 Search Remarks")
-           # Safely parse any kind of date or datetime string
-            df["Parsed_Date"] = pd.to_datetime(df["Date"], errors='coerce')
 
-            date_range = st.date_input("📅 Date Range", value=[
-            df["Parsed_Date"].min().date(),
-            df["Parsed_Date"].max().date()
-            ])
+            # Safe date range input
+            min_date = df["Parsed_Date"].min().date() if not df["Parsed_Date"].isna().all() else datetime.today().date()
+            max_date = df["Parsed_Date"].max().date() if not df["Parsed_Date"].isna().all() else datetime.today().date()
 
+            date_range = st.date_input("📅 Date Range", value=[min_date, max_date])
+
+            # Apply filters
             if status_filter != "All":
                 df = df[df["Status"] == status_filter]
             if pending_filter == "Yes":
@@ -240,12 +244,12 @@ with st.expander("📋 View Movement Log", expanded=True):
             if remark_search:
                 df = df[df["Remarks"].str.contains(remark_search, case=False, na=False)]
             if isinstance(date_range, list) and len(date_range) == 2:
-            start_date, end_date = date_range
-            df = df[(df["Parsed_Date"] >= pd.to_datetime(start_date)) & 
-            (df["Parsed_Date"] <= pd.to_datetime(end_date))]
+                start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
+                df = df[(df["Parsed_Date"] >= start_date) & (df["Parsed_Date"] <= end_date)]
 
             df = df.reset_index(drop=True)
 
+            # Display movement log entries (as before)
             for idx, row in df.iterrows():
                 actual_idx = st.session_state.data[
                     (st.session_state.data["Date"] == row["Date"]) &
@@ -312,7 +316,6 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.error(f"❌ Error in movement log: {e}")
     else:
         st.info("No entries to show.")
-
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
