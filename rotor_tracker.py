@@ -334,6 +334,7 @@ for idx, row in df.iterrows():
                 if st.form_submit_button("❌ Cancel", key=f"cancel_{orig_idx}"):
                     st.session_state.editing = None
                     st.rerun()
-         ====== LAST SYNC STATUS ======
+     
+        ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
