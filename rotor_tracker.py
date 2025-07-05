@@ -239,21 +239,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             "📅 Date Range",
             value=[pd.to_datetime(df['Date']).min(), pd.to_datetime(df['Date']).max()],
             key="dr"
-        )
-
-        # 👉 Clear Filters button
-           # 👉 Reset Filters Button
-        if st.button("🧹 Clear Filters"):
-            st.session_state["sf"] = "All"
-            st.session_state["pf"] = "All"
-            st.session_state["zf"] = []
-            st.session_state["rs"] = ""
-    # Reset date range to full range of data
-            min_date = pd.to_datetime(st.session_state.data['Date']).min()
-            max_date = pd.to_datetime(st.session_state.data['Date']).max()
-            st.session_state["dr"] = [min_date, max_date]
-            st.rerun() 
-        
+        )        
 # APPLY FILTERS
         if status_f != "All":
             df = df[df['Status']==status_f]
