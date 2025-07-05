@@ -243,7 +243,7 @@ with st.expander("📋 View Movement Log", expanded=True):
 
         # 👉 Clear Filters button
            # 👉 Reset Filters Button
-         if st.button("🧹 Clear Filters"):
+     if st.button("🧹 Clear Filters"):
             st.session_state["sf"] = "All"
             st.session_state["pf"] = "All"
             st.session_state["zf"] = []
