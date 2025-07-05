@@ -12,6 +12,7 @@ if 'data' not in st.session_state:
     ])
     st.session_state.last_sync = "Never"
     st.session_state.editing = None  # Track which row is being edited
+    st.session_state.filter_reset = False  # Track filter reset state
 
 # ====== HELPER FUNCTION TO NORMALIZE BOOLEAN ======
 def normalize_pending_column(df):
@@ -138,7 +139,6 @@ with form_tabs[1]:
         with col1:
             future_date = st.date_input(
                 "📅 Expected Date", min_value=datetime.today() + timedelta(days=1)
-            )
             future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
@@ -219,20 +219,6 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH FILTERS & INLINE EDIT/DELETE ======
-# Initialize session state keys at the top of the app (e.g., after the INITIALIZE DATA section)
-if 'sf' not in st.session_state:
-    st.session_state.sf = "All"
-if 'zf' not in st.session_state:
-    st.session_state.zf = []
-if 'pf' not in st.session_state:
-    st.session_state.pf = "All"
-if 'rs' not in st.session_state:
-    st.session_state.rs = ""
-if 'dr' not in st.session_state:
-    default_dates = [datetime.today() - timedelta(days=30), datetime.today()]
-    st.session_state.dr = default_dates
-
-# Inside the expander
 with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
@@ -240,40 +226,63 @@ with st.expander("📋 View Movement Log", expanded=True):
         df = st.session_state.data.copy()
         st.markdown("### 🔍 Filter Movement Log")
 
+        # Reset filters button
+        if st.button("🔄 Reset All Filters"):
+            st.session_state.filter_reset = True
+            st.rerun()
+
+        # Initialize filter values in session state if they don't exist
+        if 'filter_reset' not in st.session_state:
+            st.session_state.filter_reset = False
+
+        # Reset filter values when reset is triggered
+        if st.session_state.filter_reset:
+            st.session_state.sf = "All"
+            st.session_state.zf = []
+            st.session_state.pf = "All"
+            st.session_state.rs = ""
+            min_date = pd.to_datetime(df['Date']).min().date()
+            max_date = pd.to_datetime(df['Date']).max().date()
+            st.session_state.dr = [min_date, max_date]
+            st.session_state.filter_reset = False
+            st.rerun()
+
         # === FILTER CONTROLS ===
-        c1, c2, c3, c4 = st.columns([3, 3, 3, 1])
+        c1, c2, c3 = st.columns(3)
         with c1:
-            status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
+            status_f = st.selectbox(
+                "📂 Status", 
+                ["All", "Current", "Future"], 
+                key="sf",
+                index=0 if "sf" not in st.session_state else ["All", "Current", "Future"].index(st.session_state.sf)
+            )
         with c2:
             size_f = st.multiselect(
-                "📐 Size (mm)", options=sorted(df['Size (mm)'].unique()), key="zf"
+                "📐 Size (mm)", 
+                options=sorted(df['Size (mm)'].unique()), 
+                key="zf",
+                default=st.session_state.zf if "zf" in st.session_state else []
             )
         with c3:
-            pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
-        with c4:
-            if st.button("🔄 Reset Filters", key="reset_filters"):
-                # Reset filter values in session state
-                st.session_state.sf = "All"
-                st.session_state.zf = []
-                st.session_state.pf = "All"
-                st.session_state.rs = ""
-                default_dates = (
-                    [pd.to_datetime(df['Date']).min(), pd.to_datetime(df['Date']).max()]
-                    if not df.empty
-                    else [datetime.today() - timedelta(days=30), datetime.today()]
-                )
-                st.session_state.dr = default_dates
-                st.rerun()
+            pending_f = st.selectbox(
+                "❗ Pending", 
+                ["All", "Yes", "No"], 
+                key="pf",
+                index=0 if "pf" not in st.session_state else ["All", "Yes", "No"].index(st.session_state.pf)
+            )
 
-        remark_s = st.text_input("📝 Search Remarks", key="rs")
+        remark_s = st.text_input(
+            "📝 Search Remarks", 
+            key="rs",
+            value=st.session_state.rs if "rs" in st.session_state else ""
+        )
+        
+        min_date = pd.to_datetime(df['Date']).min().date()
+        max_date = pd.to_datetime(df['Date']).max().date()
         date_range = st.date_input(
             "📅 Date Range",
             key="dr",
-            value=(
-                [pd.to_datetime(df['Date']).min(), pd.to_datetime(df['Date']).max()]
-                if not df.empty
-                else [datetime.today() - timedelta(days=30), datetime.today()]
-            )
+            value=st.session_state.dr if "dr" in st.session_state else [min_date, max_date]
         )
 
         # === APPLY FILTERS ===
@@ -294,8 +303,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                 (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
             ]
 
-        # Rest of the code remains unchanged...
-        # Rest of the code remains unchanged...
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
 
@@ -381,6 +388,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                     if cancel:
                         st.session_state.editing = None
                         st.rerun()
+
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
