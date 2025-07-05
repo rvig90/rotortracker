@@ -138,7 +138,9 @@ with form_tabs[1]:
         col1, col2 = st.columns(2)
         with col1:
             future_date = st.date_input(
-                "📅 Expected Date", min_value=datetime.today() + timedelta(days=1)
+                "📅 Expected Date", 
+                min_value=datetime.today() + timedelta(days=1)
+            )
             future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
