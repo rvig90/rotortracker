@@ -241,6 +241,17 @@ with st.expander("📋 View Movement Log", expanded=True):
             key="dr"
         )
 
+        # 👉 Clear Filters button
+        if st.button("🧹 Clear Filters"):
+            st.session_state.sf = "All"
+            st.session_state.zf = []
+            st.session_state.pf = "All"
+            st.session_state.rs = ""
+            st.session_state.dr = [
+                pd.to_datetime(df['Date']).min(),
+                pd.to_datetime(df['Date']).max()
+            ]
+            st.rerun()
         # APPLY FILTERS
         if status_f != "All":
             df = df[df['Status']==status_f]
