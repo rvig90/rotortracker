@@ -224,6 +224,20 @@ with st.expander("📋 View Movement Log", expanded=True):
         st.info("No entries to show yet.")
     else:
         df = st.session_state.data.copy()
+
+        # === Initialize session state for filters if not present ===
+        if "sf" not in st.session_state:
+            st.session_state["sf"] = "All"
+        if "zf" not in st.session_state:
+            st.session_state["zf"] = []
+        if "pf" not in st.session_state:
+            st.session_state["pf"] = "All"
+        if "rs" not in st.session_state:
+            st.session_state["rs"] = ""
+        if "dr" not in st.session_state:
+            df_dates = pd.to_datetime(st.session_state.data["Date"])
+            st.session_state["dr"] = [df_dates.min(), df_dates.max()]
+
         st.markdown("### 🔍 Filter Movement Log")
 
         # === FILTER CONTROLS ===
@@ -238,14 +252,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
 
         remark_s = st.text_input("📝 Search Remarks", key="rs")
-        date_range = st.date_input(
-            "📅 Date Range",
-            key="dr",
-            value=[
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ]
-        )
+        date_range = st.date_input("📅 Date Range", key="dr")
 
         # === CLEAR FILTERS BUTTON ===
         if st.button("🧹 Clear Filters"):
@@ -253,10 +260,8 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.session_state["zf"] = []
             st.session_state["pf"] = "All"
             st.session_state["rs"] = ""
-            st.session_state["dr"] = [
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ]
+            df_dates = pd.to_datetime(st.session_state.data["Date"])
+            st.session_state["dr"] = [df_dates.min(), df_dates.max()]
             st.rerun()
 
         # === APPLY FILTERS ===
