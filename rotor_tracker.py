@@ -219,6 +219,20 @@ else:
     st.info("No data available yet")
 
 # ====== MOVEMENT LOG WITH FILTERS & INLINE EDIT/DELETE ======
+# Initialize session state keys at the top of the app (e.g., after the INITIALIZE DATA section)
+if 'sf' not in st.session_state:
+    st.session_state.sf = "All"
+if 'zf' not in st.session_state:
+    st.session_state.zf = []
+if 'pf' not in st.session_state:
+    st.session_state.pf = "All"
+if 'rs' not in st.session_state:
+    st.session_state.rs = ""
+if 'dr' not in st.session_state:
+    default_dates = [datetime.today() - timedelta(days=30), datetime.today()]
+    st.session_state.dr = default_dates
+
+# Inside the expander
 with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
@@ -227,7 +241,7 @@ with st.expander("📋 View Movement Log", expanded=True):
         st.markdown("### 🔍 Filter Movement Log")
 
         # === FILTER CONTROLS ===
-        c1, c2, c3, c4 = st.columns([3, 3, 3, 1])  # Added column for reset button
+        c1, c2, c3, c4 = st.columns([3, 3, 3, 1])
         with c1:
             status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
@@ -243,12 +257,8 @@ with st.expander("📋 View Movement Log", expanded=True):
                 st.session_state.zf = []
                 st.session_state.pf = "All"
                 st.session_state.rs = ""
-                # Reset date range to full range or default
                 default_dates = (
-                    [
-                        pd.to_datetime(df['Date']).min(),
-                        pd.to_datetime(df['Date']).max()
-                    ]
+                    [pd.to_datetime(df['Date']).min(), pd.to_datetime(df['Date']).max()]
                     if not df.empty
                     else [datetime.today() - timedelta(days=30), datetime.today()]
                 )
@@ -284,6 +294,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
             ]
 
+        # Rest of the code remains unchanged...
         # Rest of the code remains unchanged...
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
