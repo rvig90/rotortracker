@@ -382,7 +382,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             # Delete button
             with cols[2]:
                 if st.button("❌", key=f"del_{orig_idx}"):
-                safe_delete_entry(orig_idx)
+                    safe_delete_entry(orig_idx)
                     auto_save_to_gsheet()
                     st.rerun()
 
