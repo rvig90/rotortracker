@@ -380,7 +380,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 st.button("✏", key=f"edit_{orig_idx}", on_click=start_edit)
 
             # Delete button
-           with cols[2]:
+            with cols[2]:
                 if st.button("❌", key=f"del_{orig_idx}"):
                 safe_delete_entry(orig_idx)
                     auto_save_to_gsheet()
