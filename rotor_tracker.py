@@ -298,7 +298,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 "📐 Size (mm)", 
                 options=sorted(df['Size (mm)'].unique()), 
                 key="zf",
-                default=st.session_state.zf if "zf" in st.session_state else []
+                default=st.session_state.zf if "zf" in st.session_state else []  # Fixed this line
             )
         with c3:
             pending_f = st.selectbox(
@@ -307,12 +307,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                 key="pf",
                 index=0 if "pf" not in st.session_state else ["All", "Yes", "No"].index(st.session_state.pf)
             )
-
-        remark_s = st.text_input(
-            "📝 Search Remarks", 
-            key="rs",
-            value=st.session_state.rs if "rs" in st.session_state else ""
-        )
         
         min_date = pd.to_datetime(df['Date']).min().date()
         max_date = pd.to_datetime(df['Date']).max().date()
