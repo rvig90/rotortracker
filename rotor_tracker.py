@@ -264,9 +264,9 @@ with st.expander("📋 View Movement Log", expanded=True):
         st.markdown("### 🔍 Filter Movement Log")
 
         # Reset filters button
-        if st.button("🔄 Reset All Filters"):
-            st.session_state.filter_reset = True
-            st.rerun()
+       if st.button("🔄 Reset All Filters"):
+           st.session_state.filter_reset = True
+           st.rerun()
 
         # Initialize filter values in session state if they don't exist
         if 'filter_reset' not in st.session_state:
