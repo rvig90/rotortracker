@@ -277,6 +277,17 @@ for idx, row in df.iterrows():
         continue
     orig_idx = orig_idx[0]
 
+    # 👉 Reset Filters Button
+if st.button("🧹 Clear Filters"):
+    st.session_state["sf"] = "All"
+    st.session_state["pf"] = "All"
+    st.session_state["zf"] = []
+    st.session_state["rs"] = ""
+    # Reset date range to full range of data
+    min_date = pd.to_datetime(st.session_state.data['Date']).min()
+    max_date = pd.to_datetime(st.session_state.data['Date']).max()
+    st.session_state["dr"] = [min_date, max_date]
+    st.rerun()
     # DISPLAY ENTRY ROW
     cols = st.columns([10, 1, 1])
     with cols[0]:
