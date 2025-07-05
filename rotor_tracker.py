@@ -225,7 +225,12 @@ with st.expander("📋 View Movement Log", expanded=True):
     else:
         df = st.session_state.data.copy()
 
-        # === Initialize session state for filters if not present ===
+        # === Preprocess date range before using in state ===
+        df['Date'] = pd.to_datetime(df['Date'])  # ensure datetime
+        min_date = df['Date'].min()
+        max_date = df['Date'].max()
+
+        # === Initialize session_state filter keys safely ===
         if "sf" not in st.session_state:
             st.session_state["sf"] = "All"
         if "zf" not in st.session_state:
@@ -235,12 +240,10 @@ with st.expander("📋 View Movement Log", expanded=True):
         if "rs" not in st.session_state:
             st.session_state["rs"] = ""
         if "dr" not in st.session_state:
-            df_dates = pd.to_datetime(st.session_state.data["Date"])
-            st.session_state["dr"] = [df_dates.min(), df_dates.max()]
-
-        st.markdown("### 🔍 Filter Movement Log")
+            st.session_state["dr"] = [min_date, max_date]
 
         # === FILTER CONTROLS ===
+        st.markdown("### 🔍 Filter Movement Log")
         c1, c2, c3 = st.columns(3)
         with c1:
             status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
@@ -260,35 +263,35 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.session_state["zf"] = []
             st.session_state["pf"] = "All"
             st.session_state["rs"] = ""
-            df_dates = pd.to_datetime(st.session_state.data["Date"])
-            st.session_state["dr"] = [df_dates.min(), df_dates.max()]
+            st.session_state["dr"] = [min_date, max_date]
             st.rerun()
 
         # === APPLY FILTERS ===
-        if status_f != "All":
-            df = df[df['Status'] == status_f]
-        if pending_f == "Yes":
-            df = df[df['Pending'] == True]
-        elif pending_f == "No":
-            df = df[df['Pending'] == False]
-        if size_f:
-            df = df[df['Size (mm)'].isin(size_f)]
-        if remark_s:
-            df = df[df['Remarks'].str.contains(remark_s, case=False, na=False)]
-        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-            start, end = date_range
-            df = df[
-                (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
-                (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
-            ]
+        df_filtered = df.copy()
+        if st.session_state["sf"] != "All":
+            df_filtered = df_filtered[df_filtered['Status'] == st.session_state["sf"]]
+        if st.session_state["pf"] == "Yes":
+            df_filtered = df_filtered[df_filtered['Pending'] == True]
+        elif st.session_state["pf"] == "No":
+            df_filtered = df_filtered[df_filtered['Pending'] == False]
+        if st.session_state["zf"]:
+            df_filtered = df_filtered[df_filtered['Size (mm)'].isin(st.session_state["zf"])]
+        if st.session_state["rs"]:
+            df_filtered = df_filtered[df_filtered['Remarks'].str.contains(
+                st.session_state["rs"], case=False, na=False
+            )]
+        start, end = st.session_state["dr"]
+        df_filtered = df_filtered[
+            (df_filtered['Date'] >= pd.to_datetime(start)) &
+            (df_filtered['Date'] <= pd.to_datetime(end))
+        ]
 
-        df = df.reset_index(drop=True)
+        df_filtered = df_filtered.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
 
-        for idx, row in df.iterrows():
-            # Find original index in session_state.data
+        for idx, row in df_filtered.iterrows():
             mask = (
-                (st.session_state.data['Date'] == row['Date']) &
+                (st.session_state.data['Date'] == row['Date'].strftime("%Y-%m-%d")) &
                 (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
                 (st.session_state.data['Type'] == row['Type']) &
                 (st.session_state.data['Quantity'] == row['Quantity']) &
@@ -301,11 +304,11 @@ with st.expander("📋 View Movement Log", expanded=True):
                 continue
             orig_idx = orig_idx[0]
 
-            # Display entry row
+            # Display row
             cols = st.columns([10, 1, 1])
             with cols[0]:
-                disp = {
-                    "Date": row["Date"],
+                display_row = {
+                    "Date": row["Date"].strftime("%Y-%m-%d"),
                     "Size (mm)": row["Size (mm)"],
                     "Type": row["Type"],
                     "Quantity": row["Quantity"],
@@ -313,22 +316,22 @@ with st.expander("📋 View Movement Log", expanded=True):
                     "Status": row["Status"],
                     "Pending": "Yes" if row["Pending"] else "No"
                 }
-                st.dataframe(pd.DataFrame([disp]), hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
 
-            # Edit button
+            # Edit
             with cols[1]:
                 def start_edit(idx=orig_idx):
                     st.session_state.editing = idx
                 st.button("✏", key=f"edit_{orig_idx}", on_click=start_edit)
 
-            # Delete button
+            # Delete
             with cols[2]:
                 if st.button("❌", key=f"del_{orig_idx}"):
                     st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
                     auto_save_to_gsheet()
                     st.rerun()
 
-            # Inline edit form
+            # Inline edit
             if st.session_state.editing == orig_idx:
                 er = st.session_state.data.loc[orig_idx]
                 with st.form(f"edit_form_{orig_idx}"):
