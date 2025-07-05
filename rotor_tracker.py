@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+from PIL import Image
+import io
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
@@ -11,15 +13,49 @@ if 'data' not in st.session_state:
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending'
     ])
     st.session_state.last_sync = "Never"
-    st.session_state.editing = None  # Track which row is being edited
+    st.session_state.editing = None
+    st.session_state.filter_reset = False
 
-# ====== HELPER FUNCTION TO NORMALIZE BOOLEAN ======
+# ====== APP LOGO ======
+def display_logo():
+    # Replace this with your actual logo image file or URL
+    logo_url = "https://via.placeholder.com/200x100?text=Your+Logo"  # Placeholder - replace with your logo
+    
+    try:
+        # Try to load from URL
+        logo = Image.open(io.BytesIO(requests.get(logo_url).content))
+    except:
+        try:
+            # Fallback to local file
+            logo = Image.open("logo.png")
+        except:
+            # Final fallback - simple text header
+            st.title("Rotor Tracker")
+            return
+    
+    st.image(logo, width=200)  # Adjust width as needed
+
+# Display logo at the top
+display_logo()
+
+# ====== HELPER FUNCTIONS ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
         lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
     )
     return df
 
+def safe_delete_entry(orig_idx):
+    try:
+        if not st.session_state.data.empty and orig_idx in st.session_state.data.index:
+            st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
+            auto_save_to_gsheet()
+            st.success("Entry deleted successfully")
+        else:
+            st.warning("Entry not found or already deleted")
+    except Exception as e:
+        st.error(f"Error deleting entry: {e}")
+    st.rerun()
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
     try:
@@ -137,7 +173,8 @@ with form_tabs[1]:
         col1, col2 = st.columns(2)
         with col1:
             future_date = st.date_input(
-                "📅 Expected Date", min_value=datetime.today() + timedelta(days=1)
+                "📅 Expected Date", 
+                min_value=datetime.today() + timedelta(days=1)
             )
             future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
@@ -226,26 +263,65 @@ with st.expander("📋 View Movement Log", expanded=True):
         df = st.session_state.data.copy()
         st.markdown("### 🔍 Filter Movement Log")
 
+        # Reset filters button
+        if st.button("🔄 Reset All Filters"):
+            st.session_state.filter_reset = True
+            st.rerun()
+
+        # Initialize filter values in session state if they don't exist
+        if 'filter_reset' not in st.session_state:
+            st.session_state.filter_reset = False
+
+        # Reset filter values when reset is triggered
+        if st.session_state.filter_reset:
+            st.session_state.sf = "All"
+            st.session_state.zf = []
+            st.session_state.pf = "All"
+            st.session_state.rs = ""
+            min_date = pd.to_datetime(df['Date']).min().date()
+            max_date = pd.to_datetime(df['Date']).max().date()
+            st.session_state.dr = [min_date, max_date]
+            st.session_state.filter_reset = False
+            st.rerun()
+
         # === FILTER CONTROLS ===
         c1, c2, c3 = st.columns(3)
         with c1:
-            status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
+            status_f = st.selectbox(
+                "📂 Status", 
+                ["All", "Current", "Future"], 
+                key="sf",
+                index=0 if "sf" not in st.session_state else ["All", "Current", "Future"].index(st.session_state.sf)
+            )
         with c2:
             size_f = st.multiselect(
-                "📐 Size (mm)", options=sorted(df['Size (mm)'].unique()), key="zf"
+                "📐 Size (mm)", 
+                options=sorted(df['Size (mm)'].unique()), 
+                key="zf",
+                default=st.session_state.zf if "zf" in st.session_state else []
             )
         with c3:
-            pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
+            pending_f = st.selectbox(
+                "❗ Pending", 
+                ["All", "Yes", "No"], 
+                key="pf",
+                index=0 if "pf" not in st.session_state else ["All", "Yes", "No"].index(st.session_state.pf)
+            )
 
-        remark_s = st.text_input("📝 Search Remarks", key="rs")
+        remark_s = st.text_input(
+            "📝 Search Remarks", 
+            key="rs",
+            value=st.session_state.rs if "rs" in st.session_state else ""
+        )
+        
+        min_date = pd.to_datetime(df['Date']).min().date()
+        max_date = pd.to_datetime(df['Date']).max().date()
         date_range = st.date_input(
             "📅 Date Range",
             key="dr",
-            value=[
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ]
+            value=st.session_state.dr if "dr" in st.session_state else [min_date, max_date]
         )
+
         # === APPLY FILTERS ===
         if status_f != "All":
             df = df[df['Status'] == status_f]
@@ -304,9 +380,9 @@ with st.expander("📋 View Movement Log", expanded=True):
                 st.button("✏", key=f"edit_{orig_idx}", on_click=start_edit)
 
             # Delete button
-            with cols[2]:
-                if st.button("❌", key=f"del_{orig_idx}"):
-                    st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
+           with cols[2]:
+            if st.button("❌", key=f"del_{orig_idx}"):
+                safe_delete_entry(orig_idx)
                     auto_save_to_gsheet()
                     st.rerun()
 
@@ -349,6 +425,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                     if cancel:
                         st.session_state.editing = None
                         st.rerun()
+
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
