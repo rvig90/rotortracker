@@ -227,7 +227,7 @@ with st.expander("📋 View Movement Log", expanded=True):
         st.markdown("### 🔍 Filter Movement Log")
 
         # === FILTER CONTROLS ===
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns([3, 3, 3, 1])  # Added column for reset button
         with c1:
             status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
@@ -236,16 +236,36 @@ with st.expander("📋 View Movement Log", expanded=True):
             )
         with c3:
             pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
+        with c4:
+            if st.button("🔄 Reset Filters", key="reset_filters"):
+                # Reset filter values in session state
+                st.session_state.sf = "All"
+                st.session_state.zf = []
+                st.session_state.pf = "All"
+                st.session_state.rs = ""
+                # Reset date range to full range or default
+                default_dates = (
+                    [
+                        pd.to_datetime(df['Date']).min(),
+                        pd.to_datetime(df['Date']).max()
+                    ]
+                    if not df.empty
+                    else [datetime.today() - timedelta(days=30), datetime.today()]
+                )
+                st.session_state.dr = default_dates
+                st.rerun()
 
         remark_s = st.text_input("📝 Search Remarks", key="rs")
         date_range = st.date_input(
             "📅 Date Range",
             key="dr",
-            value=[
-                pd.to_datetime(df['Date']).min(),
-                pd.to_datetime(df['Date']).max()
-            ]
+            value=(
+                [pd.to_datetime(df['Date']).min(), pd.to_datetime(df['Date']).max()]
+                if not df.empty
+                else [datetime.today() - timedelta(days=30), datetime.today()]
+            )
         )
+
         # === APPLY FILTERS ===
         if status_f != "All":
             df = df[df['Status'] == status_f]
@@ -264,6 +284,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
             ]
 
+        # Rest of the code remains unchanged...
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
 
