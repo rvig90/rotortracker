@@ -6,6 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 from PIL import Image
 import io
+import requests
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
@@ -18,24 +19,14 @@ if 'data' not in st.session_state:
 
 # ====== APP LOGO ======
 def display_logo():
-    # Replace this with your actual logo image file or URL
-    logo_url = "https://via.placeholder.com/200x100?text=Your+Logo"  # Placeholder - replace with your logo
-    
     try:
-        # Try to load from URL
+        # Replace with your actual logo URL or path
+        logo_url = "https://via.placeholder.com/200x100?text=Rotor+Tracker"
         logo = Image.open(io.BytesIO(requests.get(logo_url).content))
+        st.image(logo, width=200)
     except:
-        try:
-            # Fallback to local file
-            logo = Image.open("logo.png")
-        except:
-            # Final fallback - simple text header
-            st.title("Rotor Tracker")
-            return
-    
-    st.image(logo, width=200)  # Adjust width as needed
+        st.title("Rotor Tracker")
 
-# Display logo at the top
 display_logo()
 
 # ====== HELPER FUNCTIONS ======
@@ -56,6 +47,7 @@ def safe_delete_entry(orig_idx):
     except Exception as e:
         st.error(f"Error deleting entry: {e}")
     st.rerun()
+
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
     try:
@@ -76,7 +68,6 @@ def get_gsheet_connection():
         return None
 
 def save_to_backup_sheet(df):
-    """Save a full copy of df into (or create) the 'Backup' worksheet."""
     try:
         sheet = get_gsheet_connection()
         if not sheet:
@@ -99,7 +90,6 @@ def load_from_gsheet():
             records = sheet.get_all_records()
             if records:
                 df = pd.DataFrame(records)
-                # ensure required columns exist
                 for col, default in [('Status', 'Current'), ('Pending', False)]:
                     if col not in df.columns:
                         df[col] = default
@@ -116,17 +106,13 @@ def auto_save_to_gsheet():
             sheet.clear()
             if not st.session_state.data.empty:
                 df = st.session_state.data.copy()
-                # convert Pending → "TRUE"/"FALSE"
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
-                # ensure all columns in order
                 expected = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending']
                 for c in expected:
                     if c not in df.columns:
                         df[c] = ""
                 df = df[expected]
                 sheet.update([df.columns.tolist()] + df.values.tolist())
-                # now backup
-                # pass a copy with Pending boolean
                 backup_df = st.session_state.data.copy()
                 save_to_backup_sheet(backup_df)
         st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -255,7 +241,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG WITH FILTERS & INLINE EDIT/DELETE ======
+# ====== MOVEMENT LOG WITH FILTERS ======
 with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
@@ -268,7 +254,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.session_state.filter_reset = True
             st.rerun()
 
-        # Initialize filter values in session state if they don't exist
+        # Initialize filter values
         if 'filter_reset' not in st.session_state:
             st.session_state.filter_reset = False
 
@@ -284,7 +270,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.session_state.filter_reset = False
             st.rerun()
 
-        # === FILTER CONTROLS ===
+        # Filter controls
         c1, c2, c3 = st.columns(3)
         with c1:
             status_f = st.selectbox(
@@ -298,7 +284,7 @@ with st.expander("📋 View Movement Log", expanded=True):
                 "📐 Size (mm)", 
                 options=sorted(df['Size (mm)'].unique()), 
                 key="zf",
-                default=st.session_state.zf if "zf" in st.session_state else []  # Fixed this line
+                default=st.session_state.zf if "zf" in st.session_state else []
             )
         with c3:
             pending_f = st.selectbox(
@@ -307,6 +293,12 @@ with st.expander("📋 View Movement Log", expanded=True):
                 key="pf",
                 index=0 if "pf" not in st.session_state else ["All", "Yes", "No"].index(st.session_state.pf)
             )
+
+        remark_s = st.text_input(
+            "📝 Search Remarks", 
+            key="rs",
+            value=st.session_state.rs if "rs" in st.session_state else ""
+        )
         
         min_date = pd.to_datetime(df['Date']).min().date()
         max_date = pd.to_datetime(df['Date']).max().date()
@@ -316,29 +308,32 @@ with st.expander("📋 View Movement Log", expanded=True):
             value=st.session_state.dr if "dr" in st.session_state else [min_date, max_date]
         )
 
-        # === APPLY FILTERS ===
-        if status_f != "All":
-            df = df[df['Status'] == status_f]
-        if pending_f == "Yes":
-            df = df[df['Pending'] == True]
-        elif pending_f == "No":
-            df = df[df['Pending'] == False]
-        if size_f:
-            df = df[df['Size (mm)'].isin(size_f)]
-        if remark_s:
-            df = df[df['Remarks'].str.contains(remark_s, case=False, na=False)]
-        if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-            start, end = date_range
-            df = df[
-                (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
-                (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
-            ]
+        # Apply filters with error handling
+        try:
+            if status_f != "All":
+                df = df[df['Status'] == status_f]
+            if pending_f == "Yes":
+                df = df[df['Pending'] == True]
+            elif pending_f == "No":
+                df = df[df['Pending'] == False]
+            if size_f:
+                df = df[df['Size (mm)'].isin(size_f)]
+            if remark_s:
+                df = df[df['Remarks'].astype(str).str.contains(remark_s, case=False, na=False)]
+            if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
+                start, end = date_range
+                df = df[
+                    (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
+                    (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
+                ]
+        except Exception as e:
+            st.error(f"Error applying filters: {str(e)}")
+            df = st.session_state.data.copy()
 
         df = df.reset_index(drop=True)
         st.markdown("### 📄 Filtered Entries")
 
         for idx, row in df.iterrows():
-            # Find original index in session_state.data
             mask = (
                 (st.session_state.data['Date'] == row['Date']) &
                 (st.session_state.data['Size (mm)'] == row['Size (mm)']) &
@@ -353,7 +348,6 @@ with st.expander("📋 View Movement Log", expanded=True):
                 continue
             orig_idx = orig_idx[0]
 
-            # Display entry row
             cols = st.columns([10, 1, 1])
             with cols[0]:
                 disp = {
@@ -367,20 +361,15 @@ with st.expander("📋 View Movement Log", expanded=True):
                 }
                 st.dataframe(pd.DataFrame([disp]), hide_index=True, use_container_width=True)
 
-            # Edit button
             with cols[1]:
                 def start_edit(idx=orig_idx):
                     st.session_state.editing = idx
                 st.button("✏", key=f"edit_{orig_idx}", on_click=start_edit)
 
-            # Delete button
             with cols[2]:
                 if st.button("❌", key=f"del_{orig_idx}"):
                     safe_delete_entry(orig_idx)
-                    auto_save_to_gsheet()
-                    st.rerun()
 
-            # Inline edit form
             if st.session_state.editing == orig_idx:
                 er = st.session_state.data.loc[orig_idx]
                 with st.form(f"edit_form_{orig_idx}"):
