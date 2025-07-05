@@ -42,11 +42,11 @@ def safe_delete_entry(orig_idx):
             st.session_state.data = st.session_state.data.drop(orig_idx).reset_index(drop=True)
             auto_save_to_gsheet()
             st.success("Entry deleted successfully")
+            st.rerun()
         else:
             st.warning("Entry not found or already deleted")
     except Exception as e:
         st.error(f"Error deleting entry: {e}")
-    st.rerun()
 
 # ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
@@ -119,11 +119,10 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 
-# ====== AUTO-LOAD ON STARTUP ======
+# ====== MAIN APP ======
 if st.session_state.last_sync == "Never":
     load_from_gsheet()
 
-# ====== SYNC BUTTON ======
 if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
@@ -161,7 +160,6 @@ with form_tabs[1]:
             future_date = st.date_input(
                 "📅 Expected Date", 
                 min_value=datetime.today() + timedelta(days=1)
-            )
             future_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
@@ -241,7 +239,7 @@ if not st.session_state.data.empty:
 else:
     st.info("No data available yet")
 
-# ====== MOVEMENT LOG WITH FILTERS ======
+# ====== MOVEMENT LOG WITH FIXED DELETION ======
 with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
@@ -249,16 +247,13 @@ with st.expander("📋 View Movement Log", expanded=True):
         df = st.session_state.data.copy()
         st.markdown("### 🔍 Filter Movement Log")
 
-        # Reset filters button
         if st.button("🔄 Reset All Filters"):
             st.session_state.filter_reset = True
             st.rerun()
 
-        # Initialize filter values
         if 'filter_reset' not in st.session_state:
             st.session_state.filter_reset = False
 
-        # Reset filter values when reset is triggered
         if st.session_state.filter_reset:
             st.session_state.sf = "All"
             st.session_state.zf = []
@@ -270,7 +265,6 @@ with st.expander("📋 View Movement Log", expanded=True):
             st.session_state.filter_reset = False
             st.rerun()
 
-        # Filter controls
         c1, c2, c3 = st.columns(3)
         with c1:
             status_f = st.selectbox(
@@ -308,7 +302,6 @@ with st.expander("📋 View Movement Log", expanded=True):
             value=st.session_state.dr if "dr" in st.session_state else [min_date, max_date]
         )
 
-        # Apply filters with error handling
         try:
             if status_f != "All":
                 df = df[df['Status'] == status_f]
@@ -343,10 +336,12 @@ with st.expander("📋 View Movement Log", expanded=True):
                 (st.session_state.data['Status'] == row['Status']) &
                 (st.session_state.data['Pending'] == row['Pending'])
             )
-            orig_idx = st.session_state.data[mask].index
-            if orig_idx.empty:
+            matching_indices = st.session_state.data[mask].index
+            
+            if len(matching_indices) == 0:
                 continue
-            orig_idx = orig_idx[0]
+                
+            orig_idx = matching_indices[0]
 
             cols = st.columns([10, 1, 1])
             with cols[0]:
