@@ -314,7 +314,7 @@ with st.expander("📋 View Movement Log", expanded=True):
             entry_id = row['ID']
             match = st.session_state.data[st.session_state.data['ID'] == entry_id]
             if match.empty:
-            continue  # Skip rendering this row
+                continue  # Skip rendering this row
             match_idx = match.index[0]            
             cols = st.columns([10, 1, 1])
             with cols[0]:
