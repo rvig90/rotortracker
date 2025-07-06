@@ -312,8 +312,10 @@ with st.expander("📋 View Movement Log", expanded=True):
 
         for idx, row in df.iterrows():
             entry_id = row['ID']
-            match_idx = st.session_state.data[st.session_state.data['ID'] == entry_id].index[0]
-
+            match = st.session_state.data[st.session_state.data['ID'] == entry_id]
+            if match.empty:
+            continue  # Skip rendering this row
+            match_idx = match.index[0]            
             cols = st.columns([10, 1, 1])
             with cols[0]:
                 disp = row.drop(labels="ID").to_dict()
