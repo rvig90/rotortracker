@@ -247,7 +247,7 @@ with tabs[0]:
         st.info("No data available yet.")
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
-with tab[2]:
+with tab[1]:
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
     else:
