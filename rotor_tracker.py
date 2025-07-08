@@ -248,7 +248,6 @@ with tabs[0]:
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tab[2]:
-with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
     else:
