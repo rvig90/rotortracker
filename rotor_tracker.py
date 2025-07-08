@@ -10,6 +10,7 @@ from PIL import Image
 import io
 import requests
 from uuid import uuid4
+import altair as alt
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
@@ -204,45 +205,49 @@ with form_tabs[2]:
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-st.subheader("📊 Current Stock Summary")
-if not st.session_state.data.empty:
-    try:
-        st.session_state.data = normalize_pending_column(st.session_state.data)
-        current = st.session_state.data[
-            (st.session_state.data['Status'] == 'Current') &
-            (~st.session_state.data['Pending'])
-        ].copy()
-        current['Net'] = current.apply(
-            lambda x: x['Quantity'] if x['Type']=='Inward' else -x['Quantity'], axis=1
-        )
-        stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
-        stock = stock[stock['Net'] != 0]
+tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend"])
 
-        future = st.session_state.data[st.session_state.data['Status']=='Future']
-        coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
+# === TAB 1: Stock Summary ===
+with tabs[0]:
+    st.subheader("📊 Current Stock Summary")
+    if not st.session_state.data.empty:
+        try:
+            st.session_state.data = normalize_pending_column(st.session_state.data)
+            current = st.session_state.data[
+                (st.session_state.data['Status'] == 'Current') &
+                (~st.session_state.data['Pending'])
+            ].copy()
+            current['Net'] = current.apply(
+                lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+            )
+            stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
+            stock = stock[stock['Net'] != 0]
 
-        pending = st.session_state.data[
-            (st.session_state.data['Status']=='Current') &
-            (st.session_state.data['Pending'])
-        ]
-        pending_rotors = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
+            future = st.session_state.data[st.session_state.data['Status'] == 'Future']
+            coming = future.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
-        combined = pd.merge(stock, coming, on='Size (mm)', how='outer')
-        combined = pd.merge(
-            combined, pending_rotors,
-            on='Size (mm)', how='outer', suffixes=('','_pending')
-        ).fillna(0)
-        combined.columns = [
-            'Size (mm)', 'Current Stock', 'Coming Rotors', 'Pending Rotors'
-        ]
-        st.dataframe(combined, use_container_width=True, hide_index=True)
-    except Exception as e:
-        st.error(f"Error generating summary: {e}")
-else:
-    st.info("No data available yet")
+            pending = st.session_state.data[
+                (st.session_state.data['Status'] == 'Current') &
+                (st.session_state.data['Pending'])
+            ]
+            pending_rotors = pending.groupby('Size (mm)')['Quantity'].sum().reset_index()
 
+            combined = pd.merge(stock, coming, on='Size (mm)', how='outer')
+            combined = pd.merge(
+                combined, pending_rotors,
+                on='Size (mm)', how='outer', suffixes=('', '_pending')
+            ).fillna(0)
+            combined.columns = [
+                'Size (mm)', 'Current Stock', 'Coming Rotors', 'Pending Rotors'
+            ]
+            st.dataframe(combined, use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.error(f"Error generating summary: {e}")
+    else:
+        st.info("No data available yet.")
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
+with tab[2]:
 with st.expander("📋 View Movement Log", expanded=True):
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
@@ -369,6 +374,73 @@ with st.expander("📋 View Movement Log", expanded=True):
                     if cancel:
                         st.session_state.editing = None
                         st.rerun()
+# === TAB 3: Rotor Trend ===
+with tabs[2]:
+    try:
+        df = st.session_state.data.copy()
+        df["Date"] = pd.to_datetime(df["Date"])
+
+        trend_df = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
+        trend_df["Net"] = trend_df.apply(
+            lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
+        )
+
+        min_date = trend_df["Date"].min()
+        max_date = trend_df["Date"].max()
+
+        st.subheader("📅 Select Date Range & Rotor Sizes")
+        col1, col2 = st.columns(2)
+        with col1:
+            trend_range = st.date_input(
+                "Filter by Date",
+                value=[min_date, max_date],
+                min_value=min_date,
+                max_value=max_date,
+                key="trend_date_range"
+            )
+        with col2:
+            size_options = sorted(trend_df["Size (mm)"].unique())
+            selected_sizes = st.multiselect(
+                "Filter by Rotor Size", options=size_options, default=size_options, key="trend_sizes"
+            )
+
+        filtered = trend_df[
+            (trend_df["Date"] >= pd.to_datetime(trend_range[0])) &
+            (trend_df["Date"] <= pd.to_datetime(trend_range[1])) &
+            (trend_df["Size (mm)"].isin(selected_sizes))
+        ]
+
+        if filtered.empty:
+            st.warning("No data available for selected filters.")
+        else:
+            grouped = (
+                filtered.groupby(["Date", "Size (mm)"])["Net"]
+                .sum()
+                .reset_index()
+                .sort_values("Date")
+            )
+            grouped["Cumulative Stock"] = grouped.groupby("Size (mm)")["Net"].cumsum()
+
+            import altair as alt
+            chart = alt.Chart(grouped).mark_line(point=True).encode(
+                x=alt.X("Date:T", title="Date"),
+                y=alt.Y("Cumulative Stock:Q", title="Net Stock Level"),
+                color=alt.Color("Size (mm):N", title="Rotor Size"),
+                tooltip=[
+                    alt.Tooltip("Date:T"),
+                    alt.Tooltip("Size (mm):N"),
+                    alt.Tooltip("Cumulative Stock:Q")
+                ]
+            ).properties(
+                width="container",
+                height=400,
+                title="Rotor Stock Trend Over Time"
+            ).interactive()
+
+            st.altair_chart(chart, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Failed to generate rotor trend chart: {e}")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
