@@ -211,7 +211,6 @@ tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend"])
 with tabs[0]:
     st.subheader("🔔 Stock Alerts")
 
-# Get summary data
     current = st.session_state.data[
         (st.session_state.data['Status'] == 'Current') &
         (~st.session_state.data['Pending'])
@@ -222,43 +221,26 @@ with tabs[0]:
     stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
     stock.columns = ['Size (mm)', 'Current Stock']
 
-# Alert: Low stock threshold
-    low_stock = stock[stock['Current Stock'] < 5]  # Set threshold as needed
+    # Alert: Low stock
+    low_stock = stock[stock['Current Stock'] < 5]
     if not low_stock.empty:
         st.warning("⚠️ Low Stock Rotor Sizes (Below 5 units):")
         st.dataframe(low_stock, use_container_width=True, hide_index=True)
 
-# Alert: Pending for > X days
+    # Alert: Pending > 7 days
     pending = st.session_state.data[
         (st.session_state.data['Status'] == 'Current') &
         (st.session_state.data['Pending'])
     ].copy()
     pending['Days Pending'] = (pd.Timestamp.today() - pd.to_datetime(pending['Date'])).dt.days
-    overdue = pending[pending['Days Pending'] > 7]  # Over 7 days pending
+    overdue = pending[pending['Days Pending'] > 7]
 
     if not overdue.empty:
         st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
         st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)
-        st.subheader("🏆 Top Moved Rotor Sizes")
 
-    df = st.session_state.data.copy()
-    top_moved = df.groupby(['Size (mm)', 'Type'])['Quantity'].sum().reset_index()
-
-    chart = alt.Chart(top_moved).mark_bar().encode(
-        x=alt.X('Quantity:Q', title="Total Quantity"),
-        y=alt.Y('Size (mm):N', sort='-x', title="Rotor Size"),
-        color=alt.Color('Type:N'),
-        tooltip=['Size (mm)', 'Type', 'Quantity']
-    ).properties(
-        width="container",
-        height=400,
-        title="Most Moved Rotor Sizes (Inward & Outgoing)"
-    )
-
-    st.altair_chart(chart, use_container_width=True)
-   
+    # Top Moved Rotor Sizes
     st.subheader("🏆 Top Moved Rotor Sizes")
-
     df = st.session_state.data.copy()
     top_moved = df.groupby(['Size (mm)', 'Type'])['Quantity'].sum().reset_index()
 
@@ -272,9 +254,29 @@ with tabs[0]:
         height=400,
         title="Most Moved Rotor Sizes (Inward & Outgoing)"
     )
+    st.altair_chart(chart, use_container_width=True)
 
-st.altair_chart(chart, use_container_width=True)
-st.subheader("📊 Current Stock Summary")
+    # Forecast
+    st.subheader("📈 Forecast: Next Month Rotor Demand")
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
+    df["Net"] = df.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
+    df["Month"] = df["Date"].dt.to_period("M")
+
+    monthly = df.groupby(["Month", "Size (mm)"])["Net"].sum().reset_index()
+    monthly["Month"] = monthly["Month"].dt.to_timestamp()
+
+    # Forecast using last 3 months average
+    latest_month = monthly["Month"].max()
+    recent = monthly[monthly["Month"] >= latest_month - pd.DateOffset(months=2)]
+    forecast = recent.groupby("Size (mm)")["Net"].mean().reset_index()
+    forecast.columns = ["Size (mm)", "Forecast Quantity"]
+
+    st.dataframe(forecast, use_container_width=True, hide_index=True)
+
+    # Stock Summary
+    st.subheader("📊 Current Stock Summary")
     if not st.session_state.data.empty:
         try:
             st.session_state.data = normalize_pending_column(st.session_state.data)
@@ -309,8 +311,7 @@ st.subheader("📊 Current Stock Summary")
         except Exception as e:
             st.error(f"Error generating summary: {e}")
     else:
-        st.info("No data available yet.")
-# ====== MOVEMENT LOG WITH FIXED FILTERS ======
+        st.info("No data available yet.")# ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
     st.subheader("📋 Movement Log")
