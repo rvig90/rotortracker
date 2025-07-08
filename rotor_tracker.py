@@ -222,9 +222,9 @@ with tabs[0]:
     stock.columns = ['Size (mm)', 'Current Stock']
 
     # Alert: Low stock
-    low_stock = stock[stock['Current Stock'] < 5]
+    low_stock = stock[stock['Current Stock'] < 100]
     if not low_stock.empty:
-        st.warning("⚠️ Low Stock Rotor Sizes (Below 5 units):")
+        st.warning("⚠️ Low Stock Rotor Sizes (Below 100 units):")
         st.dataframe(low_stock, use_container_width=True, hide_index=True)
 
     # Alert: Pending > 7 days
