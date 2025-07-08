@@ -209,7 +209,7 @@ tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
-    st.subheader("🔔 Stock Alerts")
+        st.subheader("🔔 Stock Alerts")
 
 # Get summary data
 current = st.session_state.data[
