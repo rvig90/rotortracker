@@ -209,7 +209,72 @@ tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
-    st.subheader("📊 Current Stock Summary")
+    st.subheader("🔔 Stock Alerts")
+
+# Get summary data
+current = st.session_state.data[
+    (st.session_state.data['Status'] == 'Current') &
+    (~st.session_state.data['Pending'])
+].copy()
+current['Net'] = current.apply(
+    lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+)
+stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
+stock.columns = ['Size (mm)', 'Current Stock']
+
+# Alert: Low stock threshold
+low_stock = stock[stock['Current Stock'] < 5]  # Set threshold as needed
+if not low_stock.empty:
+    st.warning("⚠️ Low Stock Rotor Sizes (Below 5 units):")
+    st.dataframe(low_stock, use_container_width=True, hide_index=True)
+
+# Alert: Pending for > X days
+pending = st.session_state.data[
+    (st.session_state.data['Status'] == 'Current') &
+    (st.session_state.data['Pending'])
+].copy()
+pending['Days Pending'] = (pd.Timestamp.today() - pd.to_datetime(pending['Date'])).dt.days
+overdue = pending[pending['Days Pending'] > 7]  # Over 7 days pending
+
+if not overdue.empty:
+    st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
+    st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)
+    st.subheader("🏆 Top Moved Rotor Sizes")
+
+df = st.session_state.data.copy()
+top_moved = df.groupby(['Size (mm)', 'Type'])['Quantity'].sum().reset_index()
+
+chart = alt.Chart(top_moved).mark_bar().encode(
+    x=alt.X('Quantity:Q', title="Total Quantity"),
+    y=alt.Y('Size (mm):N', sort='-x', title="Rotor Size"),
+    color=alt.Color('Type:N'),
+    tooltip=['Size (mm)', 'Type', 'Quantity']
+).properties(
+    width="container",
+    height=400,
+    title="Most Moved Rotor Sizes (Inward & Outgoing)"
+)
+
+st.altair_chart(chart, use_container_width=True)
+   
+st.subheader("🏆 Top Moved Rotor Sizes")
+
+df = st.session_state.data.copy()
+top_moved = df.groupby(['Size (mm)', 'Type'])['Quantity'].sum().reset_index()
+
+chart = alt.Chart(top_moved).mark_bar().encode(
+    x=alt.X('Quantity:Q', title="Total Quantity"),
+    y=alt.Y('Size (mm):N', sort='-x', title="Rotor Size"),
+    color=alt.Color('Type:N'),
+    tooltip=['Size (mm)', 'Type', 'Quantity']
+).properties(
+    width="container",
+    height=400,
+    title="Most Moved Rotor Sizes (Inward & Outgoing)"
+)
+
+st.altair_chart(chart, use_container_width=True)
+st.subheader("📊 Current Stock Summary")
     if not st.session_state.data.empty:
         try:
             st.session_state.data = normalize_pending_column(st.session_state.data)
