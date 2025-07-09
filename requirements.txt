@@ -6,3 +6,5 @@ oauth2client
 streamlit-autorefresh
 altair
 prophet
+xgboost
+scikit-learn
