@@ -257,37 +257,53 @@ with tabs[0]:
     st.altair_chart(chart, use_container_width=True)
 
     # Forecast
-    st.subheader("📈 Forecast: Next Month Rotor Demand")
+    st.subheader("📅 Seasonal Forecast by Month")
 
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-
-# Only use outgoing rotors as 'demand'
+    
+    # Use only outgoing, non-pending data
     outgoing = df[
         (df["Status"] == "Current") &
         (~df["Pending"]) &
         (df["Type"] == "Outgoing")
     ].copy()
-
-# Add 'Month' column
-    outgoing["Month"] = outgoing["Date"].dt.to_period("M")
-
-# Group by month and rotor size
-    monthly_demand = outgoing.groupby(["Month", "Size (mm)"])["Quantity"].sum().reset_index()
-    monthly_demand["Month"] = monthly_demand["Month"].dt.to_timestamp()
     
-    # Get average over last 3 months
-    latest_month = monthly_demand["Month"].max()
-    recent_months = monthly_demand[monthly_demand["Month"] >= latest_month - pd.DateOffset(months=2)]
+    # Extract month name for seasonality
+    outgoing["Month"] = outgoing["Date"].dt.month
+    outgoing["Month Name"] = outgoing["Date"].dt.strftime('%b')
     
-    forecast = recent_months.groupby("Size (mm)")["Quantity"].mean().reset_index()
-    forecast.columns = ["Size (mm)", "Forecast Quantity"]
+    # Group by rotor size and month
+    seasonal = outgoing.groupby(["Size (mm)", "Month", "Month Name"])["Quantity"].mean().reset_index()
+    seasonal = seasonal.sort_values(["Size (mm)", "Month"])
     
-    if forecast.empty:
-        st.info("Not enough outgoing data to generate forecast.")
+    # Show seasonal trend per rotor size
+    if seasonal.empty:
+        st.info("Not enough outgoing data for seasonal analysis.")
     else:
-        st.dataframe(forecast, use_container_width=True, hide_index=True)
-
+        st.dataframe(seasonal[["Size (mm)", "Month Name", "Quantity"]].rename(columns={
+            "Quantity": "Average Outgoing Quantity"
+        }), use_container_width=True, hide_index=True)
+    
+        # Optional: Chart of seasonal trend
+       
+        seasonal["Month Name"] = pd.Categorical(seasonal["Month Name"],
+                                                categories=["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                                                ordered=True)
+    
+        chart = alt.Chart(seasonal).mark_line(point=True).encode(
+            x=alt.X("Month Name:N", title="Month"),
+            y=alt.Y("Quantity:Q", title="Avg Outgoing Quantity"),
+            color=alt.Color("Size (mm):N", title="Rotor Size"),
+            tooltip=["Size (mm)", "Month Name", "Quantity"]
+        ).properties(
+            width="container",
+            height=400,
+            title="Seasonal Rotor Demand (Monthly Average)"
+        )
+    
+        st.altair_chart(chart, use_container_width=True)
     # Stock Summary
     st.subheader("📊 Current Stock Summary")
     if not st.session_state.data.empty:
