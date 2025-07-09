@@ -555,11 +555,7 @@ with tabs[2]:
 
     except Exception as e:
         st.error(f"Failed to generate rotor trend chart: {e}")
-
-from prophet import Prophet
-from prophet import Prophet
-import altair as alt
-
+        
 st.subheader("📉 Actual vs Forecasted Rotor Demand with Confidence Band")
 
 df = st.session_state.data.copy()
