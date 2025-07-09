@@ -304,6 +304,24 @@ with tabs[0]:
         )
     
         st.altair_chart(chart, use_container_width=True)
+        
+    st.subheader("🔮 Forecast for Next Month Based on Seasonality")
+    
+    # Get next month number
+    today = datetime.today()
+    next_month_num = (today.month % 12) + 1  # handles Dec → Jan
+    
+    # Filter seasonal averages for next month
+    next_month_forecast = seasonal[seasonal["Month"] == next_month_num].copy()
+    
+    # Clean display
+    next_month_forecast = next_month_forecast[["Size (mm)", "Quantity"]]
+    next_month_forecast.columns = ["Size (mm)", f"Forecast for {datetime(1900, next_month_num, 1).strftime('%B')}"]
+    
+    if next_month_forecast.empty:
+        st.info("No seasonal data available to forecast next month.")
+    else:
+        st.dataframe(next_month_forecast, use_container_width=True, hide_index=True)
     # Stock Summary
     st.subheader("📊 Current Stock Summary")
     if not st.session_state.data.empty:
