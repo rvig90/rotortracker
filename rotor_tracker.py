@@ -662,7 +662,8 @@ for size in sorted(df["Size (mm)"].unique()):
     ][["Date", "Quantity"]].copy()
 
     if len(df_outgoing) < 20:
-        continue  # not enough data
+    st.info(f"📉 Not enough data to forecast {size}mm (only {len(df_outgoing)} rows)")
+    continue
 
     try:
         forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
