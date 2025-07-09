@@ -667,14 +667,14 @@ for size in sorted(df["Size (mm)"].unique()):
    try:
     forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
 
-    if forecast_df.empty:
-        st.info(f"🕳️ Forecast returned no data for {size}mm rotor.")
-    else:
-        st.markdown(f"### 📦 XGBoost Forecast for {size}mm Rotor")
-        st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
-        st.dataframe(forecast_df, use_container_width=True, hide_index=True)
-except Exception as e:
-    st.error(f"❌ Forecast failed for {size}mm rotor: {e}")
+        if forecast_df.empty:
+            st.info(f"🕳️ Forecast returned no data for {size}mm rotor.")
+        else:
+            st.markdown(f"### 📦 XGBoost Forecast for {size}mm Rotor")
+            st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
+            st.dataframe(forecast_df, use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.error(f"❌ Forecast failed for {size}mm rotor: {e}")
 
     except Exception as e:
         st.warning(f"XGBoost forecast failed for {size}: {e}")
