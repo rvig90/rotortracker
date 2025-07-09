@@ -557,13 +557,15 @@ with tabs[2]:
         st.error(f"Failed to generate rotor trend chart: {e}")
 
 from prophet import Prophet
+from prophet import Prophet
+import altair as alt
 
-st.subheader("🔮 Forecast Per Rotor Size (Next 30 Days)")
+st.subheader("📉 Actual vs Forecasted Rotor Demand with Confidence Band")
 
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
 
-# Filter for outgoing, current, non-pending
+# Filter for valid entries
 df = df[
     (df["Type"] == "Outgoing") &
     (df["Status"] == "Current") &
@@ -571,62 +573,85 @@ df = df[
 ]
 
 if df.empty:
-    st.info("Not enough outgoing data to generate forecasts.")
+    st.info("Not enough data to forecast.")
 else:
-    results = []
+    # === SIZE FILTER ===
+    available_sizes = sorted(df["Size (mm)"].unique())
+    selected_sizes = st.multiselect(
+        "📐 Select Rotor Sizes to Forecast",
+        options=available_sizes,
+        default=available_sizes
+    )
 
-    # Loop through each rotor size
-    for size in sorted(df["Size (mm)"].unique()):
-        df_size = df[df["Size (mm)"] == size]
-        dfp = df_size.groupby("Date")["Quantity"].sum().reset_index()
-        dfp.columns = ["ds", "y"]
+    if not selected_sizes:
+        st.warning("Please select at least one rotor size.")
+    else:
+        combined_data = []
+        confidence_data = []
 
-        if len(dfp) < 3:
-            continue  # skip if not enough data points
+        for size in selected_sizes:
+            df_size = df[df["Size (mm)"] == size]
+            actual = df_size.groupby("Date")["Quantity"].sum().reset_index()
+            actual.columns = ["Date", "Quantity"]
+            actual["Size (mm)"] = size
+            actual["Type"] = "Actual"
 
-        try:
-            model = Prophet()
-            model.fit(dfp)
+            if len(actual) < 3:
+                continue
 
-            future = model.make_future_dataframe(periods=30)
-            forecast = model.predict(future)
-            forecast["Size (mm)"] = size
+            try:
+                prophet_df = actual[["Date", "Quantity"]].copy()
+                prophet_df.columns = ["ds", "y"]
 
-            # Append last 30 days
-            results.append(
-                forecast[["ds", "yhat", "Size (mm)"]].tail(30)
+                model = Prophet()
+                model.fit(prophet_df)
+
+                future = model.make_future_dataframe(periods=30)
+                forecast = model.predict(future)
+
+                # Forecast points
+                forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
+                forecast_df.columns = ["Date", "Quantity", "Lower", "Upper"]
+                forecast_df["Size (mm)"] = size
+                forecast_df["Type"] = "Forecast"
+
+                combined = pd.concat([
+                    actual,
+                    forecast_df[["Date", "Quantity", "Size (mm)", "Type"]]
+                ])
+                combined_data.append(combined)
+                confidence_data.append(forecast_df)
+
+            except Exception as e:
+                st.warning(f"Forecast failed for size {size}: {e}")
+
+        if combined_data:
+            full_df = pd.concat(combined_data)
+            full_df["Quantity"] = full_df["Quantity"].round(2)
+
+            band_df = pd.concat(confidence_data)
+
+            line_chart = alt.Chart(full_df).mark_line(point=True).encode(
+                x="Date:T",
+                y="Quantity:Q",
+                color="Size (mm):N",
+                strokeDash="Type:N",
+                tooltip=["Date", "Size (mm)", "Quantity", "Type"]
             )
 
-        except Exception as e:
-            st.warning(f"Forecast failed for size {size}: {e}")
+            band_chart = alt.Chart(band_df).mark_area(opacity=0.2).encode(
+                x="Date:T",
+                y="Lower:Q",
+                y2="Upper:Q",
+                color=alt.Color("Size (mm):N", legend=None)
+            )
 
-    if results:
-        forecast_all = pd.concat(results)
-        forecast_all.columns = ["Date", "Forecast Qty", "Size (mm)"]
-        forecast_all["Forecast Qty"] = forecast_all["Forecast Qty"].round(1)
+            st.altair_chart((band_chart + line_chart).properties(height=400), use_container_width=True)
 
-        st.dataframe(
-            forecast_all,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # Optional: Plot
-        import altair as alt
-        chart = alt.Chart(forecast_all).mark_line(point=True).encode(
-            x="Date:T",
-            y="Forecast Qty:Q",
-            color="Size (mm):N",
-            tooltip=["Date", "Size (mm)", "Forecast Qty"]
-        ).properties(
-            title="Forecasted Outgoing Quantity per Rotor Size",
-            width="container",
-            height=400
-        )
-        st.altair_chart(chart, use_container_width=True)
-
-    else:
-        st.info("No rotor sizes had enough data to forecast.")
+            st.markdown("### 📄 Combined Forecast Data")
+            st.dataframe(full_df.sort_values(["Size (mm)", "Date"]), use_container_width=True, hide_index=True)
+        else:
+            st.info("No sizes had enough data to forecast.")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
