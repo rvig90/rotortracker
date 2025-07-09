@@ -14,6 +14,7 @@ import altair as alt
 from prophet import Prophet
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
+from forecast_utils import forecast_with_xgboost
 
 def create_features(df, n_lags=7):
     """Create lag features for supervised learning"""
@@ -699,8 +700,6 @@ else:
             st.dataframe(full_df.sort_values(["Size (mm)", "Date"]), use_container_width=True, hide_index=True)
         else:
             st.info("No sizes had enough data to forecast.")
-
-from forecast_utils import forecast_with_xgboost
 
 st.subheader("📦 XGBoost Forecast")
 
