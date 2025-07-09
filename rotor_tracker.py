@@ -258,22 +258,35 @@ with tabs[0]:
 
     # Forecast
     st.subheader("📈 Forecast: Next Month Rotor Demand")
+
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-    df = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
-    df["Net"] = df.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
-    df["Month"] = df["Date"].dt.to_period("M")
 
-    monthly = df.groupby(["Month", "Size (mm)"])["Net"].sum().reset_index()
-    monthly["Month"] = monthly["Month"].dt.to_timestamp()
+# Only use outgoing rotors as 'demand'
+    outgoing = df[
+        (df["Status"] == "Current") &
+        (~df["Pending"]) &
+        (df["Type"] == "Outgoing")
+    ].copy()
 
-    # Forecast using last 3 months average
-    latest_month = monthly["Month"].max()
-    recent = monthly[monthly["Month"] >= latest_month - pd.DateOffset(months=2)]
-    forecast = recent.groupby("Size (mm)")["Net"].mean().reset_index()
+# Add 'Month' column
+    outgoing["Month"] = outgoing["Date"].dt.to_period("M")
+
+# Group by month and rotor size
+    monthly_demand = outgoing.groupby(["Month", "Size (mm)"])["Quantity"].sum().reset_index()
+    monthly_demand["Month"] = monthly_demand["Month"].dt.to_timestamp()
+    
+    # Get average over last 3 months
+    latest_month = monthly_demand["Month"].max()
+    recent_months = monthly_demand[monthly_demand["Month"] >= latest_month - pd.DateOffset(months=2)]
+    
+    forecast = recent_months.groupby("Size (mm)")["Quantity"].mean().reset_index()
     forecast.columns = ["Size (mm)", "Forecast Quantity"]
-
-    st.dataframe(forecast, use_container_width=True, hide_index=True)
+    
+    if forecast.empty:
+        st.info("Not enough outgoing data to generate forecast.")
+    else:
+        st.dataframe(forecast, use_container_width=True, hide_index=True)
 
     # Stock Summary
     st.subheader("📊 Current Stock Summary")
