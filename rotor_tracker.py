@@ -11,6 +11,7 @@ import io
 import requests
 from uuid import uuid4
 import altair as alt
+from prophet import Prophet
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
@@ -554,6 +555,47 @@ with tabs[2]:
 
     except Exception as e:
         st.error(f"Failed to generate rotor trend chart: {e}")
+
+st.subheader("🔮 Prophet Forecast (30-day Prediction)")
+
+# Prepare data
+dfp = st.session_state.data.copy()
+dfp = dfp[(dfp["Status"] == "Current") & 
+          (dfp["Type"] == "Outgoing") & 
+          (~dfp["Pending"])].copy()
+
+if dfp.empty:
+    st.info("Not enough outgoing data for forecasting.")
+else:
+    dfp["Date"] = pd.to_datetime(dfp["Date"])
+    dfp = dfp.groupby("Date")["Quantity"].sum().reset_index()
+    dfp.columns = ["ds", "y"]
+
+    try:
+        model = Prophet()
+        model.fit(dfp)
+
+        future = model.make_future_dataframe(periods=30)
+        forecast = model.predict(future)
+
+        # Display forecast plot
+        fig = model.plot(forecast)
+        st.pyplot(fig)
+
+        # Optional: show forecasted values
+        st.markdown("### 📈 Forecast Table (Next 30 Days)")
+        st.dataframe(
+            forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(30).rename(columns={
+                "ds": "Date",
+                "yhat": "Forecast Qty",
+                "yhat_lower": "Lower Bound",
+                "yhat_upper": "Upper Bound"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+    except Exception as e:
+        st.error(f"Forecast failed: {e}")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
