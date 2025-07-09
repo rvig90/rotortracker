@@ -556,46 +556,77 @@ with tabs[2]:
     except Exception as e:
         st.error(f"Failed to generate rotor trend chart: {e}")
 
-st.subheader("🔮 Prophet Forecast (30-day Prediction)")
+from prophet import Prophet
 
-# Prepare data
-dfp = st.session_state.data.copy()
-dfp = dfp[(dfp["Status"] == "Current") & 
-          (dfp["Type"] == "Outgoing") & 
-          (~dfp["Pending"])].copy()
+st.subheader("🔮 Forecast Per Rotor Size (Next 30 Days)")
 
-if dfp.empty:
-    st.info("Not enough outgoing data for forecasting.")
+df = st.session_state.data.copy()
+df["Date"] = pd.to_datetime(df["Date"])
+
+# Filter for outgoing, current, non-pending
+df = df[
+    (df["Type"] == "Outgoing") &
+    (df["Status"] == "Current") &
+    (~df["Pending"])
+]
+
+if df.empty:
+    st.info("Not enough outgoing data to generate forecasts.")
 else:
-    dfp["Date"] = pd.to_datetime(dfp["Date"])
-    dfp = dfp.groupby("Date")["Quantity"].sum().reset_index()
-    dfp.columns = ["ds", "y"]
+    results = []
 
-    try:
-        model = Prophet()
-        model.fit(dfp)
+    # Loop through each rotor size
+    for size in sorted(df["Size (mm)"].unique()):
+        df_size = df[df["Size (mm)"] == size]
+        dfp = df_size.groupby("Date")["Quantity"].sum().reset_index()
+        dfp.columns = ["ds", "y"]
 
-        future = model.make_future_dataframe(periods=30)
-        forecast = model.predict(future)
+        if len(dfp) < 3:
+            continue  # skip if not enough data points
 
-        # Display forecast plot
-        fig = model.plot(forecast)
-        st.pyplot(fig)
+        try:
+            model = Prophet()
+            model.fit(dfp)
 
-        # Optional: show forecasted values
-        st.markdown("### 📈 Forecast Table (Next 30 Days)")
+            future = model.make_future_dataframe(periods=30)
+            forecast = model.predict(future)
+            forecast["Size (mm)"] = size
+
+            # Append last 30 days
+            results.append(
+                forecast[["ds", "yhat", "Size (mm)"]].tail(30)
+            )
+
+        except Exception as e:
+            st.warning(f"Forecast failed for size {size}: {e}")
+
+    if results:
+        forecast_all = pd.concat(results)
+        forecast_all.columns = ["Date", "Forecast Qty", "Size (mm)"]
+        forecast_all["Forecast Qty"] = forecast_all["Forecast Qty"].round(1)
+
         st.dataframe(
-            forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(30).rename(columns={
-                "ds": "Date",
-                "yhat": "Forecast Qty",
-                "yhat_lower": "Lower Bound",
-                "yhat_upper": "Upper Bound"
-            }),
+            forecast_all,
             use_container_width=True,
             hide_index=True
         )
-    except Exception as e:
-        st.error(f"Forecast failed: {e}")
+
+        # Optional: Plot
+        import altair as alt
+        chart = alt.Chart(forecast_all).mark_line(point=True).encode(
+            x="Date:T",
+            y="Forecast Qty:Q",
+            color="Size (mm):N",
+            tooltip=["Date", "Size (mm)", "Forecast Qty"]
+        ).properties(
+            title="Forecasted Outgoing Quantity per Rotor Size",
+            width="container",
+            height=400
+        )
+        st.altair_chart(chart, use_container_width=True)
+
+    else:
+        st.info("No rotor sizes had enough data to forecast.")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
