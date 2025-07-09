@@ -661,7 +661,7 @@ for size in sorted(df["Size (mm)"].unique()):
         (~df_size["Pending"])
     ][["Date", "Quantity"]].copy()
 
-     if len(df_outgoing) < 20:
+    if len(df_outgoing) < 20:
      st.info(f"📉 Not enough data to forecast {size}mm (only {len(df_outgoing)} rows)")
      continue
 
