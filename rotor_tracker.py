@@ -14,6 +14,7 @@ import altair as alt
 from prophet import Prophet
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
+from forecast_utils import forecast_with_xgboost
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
