@@ -653,27 +653,27 @@ else:
 
 st.subheader("📦 XGBoost Forecast")
 
-    for size in sorted(df["Size (mm)"].unique()):
-        df_size = df[df["Size (mm)"] == size]
-        df_outgoing = df_size[
-            (df_size["Type"] == "Outgoing") &
-            (df_size["Status"] == "Current") &
-            (~df_size["Pending"])
-        ][["Date", "Quantity"]].copy()
-    
-        if len(df_outgoing) < 20:
-            continue  # not enough data
-    
-        try:
-            forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
-    
-            forecast_df["Size (mm)"] = size
-            st.markdown(f"#### 📦 Forecast for {size}mm Rotor")
-            st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
-            st.dataframe(forecast_df, use_container_width=True, hide_index=True)
-    
-        except Exception as e:
-            st.warning(f"XGBoost forecast failed for {size}: {e}")
+        for size in sorted(df["Size (mm)"].unique()):
+            df_size = df[df["Size (mm)"] == size]
+            df_outgoing = df_size[
+                (df_size["Type"] == "Outgoing") &
+                (df_size["Status"] == "Current") &
+                (~df_size["Pending"])
+            ][["Date", "Quantity"]].copy()
+        
+            if len(df_outgoing) < 20:
+                continue  # not enough data
+        
+            try:
+                forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
+        
+                forecast_df["Size (mm)"] = size
+                st.markdown(f"#### 📦 Forecast for {size}mm Rotor")
+                st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
+                st.dataframe(forecast_df, use_container_width=True, hide_index=True)
+        
+            except Exception as e:
+                st.warning(f"XGBoost forecast failed for {size}: {e}")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
