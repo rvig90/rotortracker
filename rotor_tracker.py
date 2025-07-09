@@ -664,8 +664,8 @@ for size in sorted(df["Size (mm)"].unique()):
     if len(df_outgoing) < 20:
         continue  # not enough data
 
-   try:
-    forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
+       try:
+        forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=30)
 
         if forecast_df.empty:
             st.info(f"🕳️ Forecast returned no data for {size}mm rotor.")
