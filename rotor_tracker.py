@@ -15,6 +15,9 @@ from prophet import Prophet
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from forecast_utils import forecast_with_xgboost
+from langchain.llms import OpenAI
+from langchain.agents import create_pandas_dataframe_agent
+import openai
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
@@ -208,7 +211,7 @@ with form_tabs[2]:
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend"])
+tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
@@ -752,6 +755,31 @@ for size in sorted(df["Size (mm)"].unique()):
 
     except Exception as e:
         st.warning(f"XGBoost forecast failed for {size}: {e}")
+with tabs[3]:
+    
+
+    st.session_state.data["Date"] = pd.to_datetime(st.session_state.data["Date"])  # Ensure date is parsed
+    
+    with st.expander("🤖 Rotor Chatbot", expanded=True):
+        st.subheader("Ask Your Rotor Assistant")
+    
+        # Load OpenAI
+        openai.api_key = st.secrets["openai"][""]
+        llm = OpenAI(temperature=0)
+    
+        # Create chatbot agent with your rotor data
+        agent = create_pandas_dataframe_agent(llm, st.session_state.data, verbose=False)
+    
+        # Input box
+        user_input = st.text_input("🔍 Ask something like:", "What rotor size had the highest usage last month?")
+    
+        if user_input:
+            with st.spinner("Thinking..."):
+                try:
+                    response = agent.run(user_input)
+                    st.success(response)
+                except Exception as e:
+                    st.error(f"Error: {e}")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
