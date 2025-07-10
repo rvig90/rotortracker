@@ -16,7 +16,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from forecast_utils import forecast_with_xgboost
 from langchain.llms import OpenAI
-from langchain.agents import create_pandas_dataframe_agent
+from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
