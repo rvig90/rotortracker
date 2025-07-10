@@ -766,7 +766,9 @@ with tabs[3]:
         # Load OpenAI
         openai.api_key = st.secrets["openai"]["api_key"]
         st.write(" api key loaded successfully.")
-        llm = OpenAI(temperature=0)
+        llm = OpenAI(temperature=0,
+        openai.api_key = st.secrets["openai"]["api_key"]
+        )
     
         # Create chatbot agent with your rotor data
         agent = create_pandas_dataframe_agent(llm, st.session_state.data, verbose=False)
