@@ -766,25 +766,28 @@ with tabs[3]:
     else:
         try:
             # ✅ Build LLM with explicit key
-            llm = OpenAI(
-                temperature=0,
-                openai_api_key=st.secrets["openai"]["api_key"]
-            )
     
-            # ✅ Build agent
-            agent = create_pandas_dataframe_agent(llm, df, verbose=False)
     
-            # Input box
-            user_q = st.text_input("Ask a question about rotor data:")
-    
-            if user_q:
-                with st.spinner("Thinking..."):
-                    result = agent.run(user_q)
-                    st.success(result)
-    
-        except Exception as e:
-            st.error(f"Chatbot error: {e}")
-
+        llm = OpenAI(
+            temperature=0,
+            openai_api_key=st.secrets["openai"]["api_key"]
+        )
+        
+        agent = create_pandas_dataframe_agent(
+            llm,
+            st.session_state.data,
+            verbose=False,
+            allow_dangerous_code=True
+        )
+        
+        user_q = st.text_input("Ask about rotor data:")
+        if user_q:
+            with st.spinner("Thinking..."):
+                try:
+                    response = agent.run(user_q)
+                    st.success(response)
+                except Exception as e:
+                    st.error(f"Chatbot error: {e}")
    # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
