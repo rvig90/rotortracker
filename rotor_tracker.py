@@ -760,29 +760,29 @@ with tabs[3]:
 
     st.session_state.data["Date"] = pd.to_datetime(st.session_state.data["Date"])  # Ensure date is parsed
     
-    with st.expander("🤖 Rotor Chatbot", expanded=True):
-        st.subheader("Ask Your Rotor Assistant")
-    
-        # Load OpenAI
-        openai.api_key = st.secrets["openai"]["api_key"]
-        st.write(" api key loaded successfully.")
-        llm = OpenAI(temperature=0,
-        openai.api_key = st.secrets["openai"]["api_key"]
-        )
-    
-        # Create chatbot agent with your rotor data
-        agent = create_pandas_dataframe_agent(llm, st.session_state.data, verbose=False)
-    
-        # Input box
-        user_input = st.text_input("🔍 Ask something like:", "What rotor size had the highest usage last month?")
-    
-        if user_input:
-            with st.spinner("Thinking..."):
-                try:
-                    response = agent.run(user_input)
-                    st.success(response)
-                except Exception as e:
-                    st.error(f"Error: {e}")
+        with st.expander("🤖 Rotor Chatbot", expanded=True):
+            st.subheader("Ask Your Rotor Assistant")
+        
+            # Load OpenAI
+            openai.api_key = st.secrets["openai"]["api_key"]
+            st.write(" api key loaded successfully.")
+            llm = OpenAI(temperature=0,
+            openai.api_key = st.secrets["openai"]["api_key"]
+            )
+        
+            # Create chatbot agent with your rotor data
+            agent = create_pandas_dataframe_agent(llm, st.session_state.data, verbose=False)
+        
+            # Input box
+            user_input = st.text_input("🔍 Ask something like:", "What rotor size had the highest usage last month?")
+        
+            if user_input:
+                with st.spinner("Thinking..."):
+                    try:
+                        response = agent.run(user_input)
+                        st.success(response)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
