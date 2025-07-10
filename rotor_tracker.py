@@ -801,6 +801,7 @@ with tabs[4]:
         "Pending outgoing rotors",
         "Incoming future rotors",
         "Average daily outgoing usage",
+        "pending rotors by vendors"
     ])
     
     df = st.session_state.data.copy()
