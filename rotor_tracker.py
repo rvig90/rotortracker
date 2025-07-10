@@ -756,33 +756,35 @@ for size in sorted(df["Size (mm)"].unique()):
     except Exception as e:
         st.warning(f"XGBoost forecast failed for {size}: {e}")
 with tabs[3]:
+    # Sample dataframe (you can use st.session_state.data instead)
+    df = st.session_state.data.copy()
     
-
-    st.session_state.data["Date"] = pd.to_datetime(st.session_state.data["Date"])  # Ensure date is parsed
+    st.subheader("🧠 Ask Your Rotor Assistant")
     
-        with st.expander("🤖 Rotor Chatbot", expanded=True):
-            st.subheader("Ask Your Rotor Assistant")
-        
-            # Load OpenAI
-            openai.api_key = st.secrets["openai"]["api_key"]
-            st.write(" api key loaded successfully.")
-            llm = OpenAI(temperature=0,
-            openai.api_key = st.secrets["openai"]["api_key"]
+    if "openai" not in st.secrets:
+        st.error("❌ OpenAI key missing from secrets.toml")
+    else:
+        try:
+            # ✅ Build LLM with explicit key
+            llm = OpenAI(
+                temperature=0,
+                openai_api_key=st.secrets["openai"]["api_key"]
             )
-        
-            # Create chatbot agent with your rotor data
-            agent = create_pandas_dataframe_agent(llm, st.session_state.data, verbose=False)
-        
+    
+            # ✅ Build agent
+            agent = create_pandas_dataframe_agent(llm, df, verbose=False)
+    
             # Input box
-            user_input = st.text_input("🔍 Ask something like:", "What rotor size had the highest usage last month?")
-        
-            if user_input:
+            user_q = st.text_input("Ask a question about rotor data:")
+    
+            if user_q:
                 with st.spinner("Thinking..."):
-                    try:
-                        response = agent.run(user_input)
-                        st.success(response)
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-# ====== LAST SYNC STATUS ======
+                    result = agent.run(user_q)
+                    st.success(result)
+    
+        except Exception as e:
+            st.error(f"Chatbot error: {e}")
+
+   # ====== LAST SYNC STATUS ======
 if st.session_state.last_sync != "Never":
     st.caption(f"Last synced: {st.session_state.last_sync}")
