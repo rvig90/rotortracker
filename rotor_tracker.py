@@ -854,32 +854,32 @@ with tabs[4]:
         st.dataframe(usage)
     
     elif query == "Pending rotors by vendor":
-    pending = df[
-        (df["Pending"]) & 
-        (df["Status"] == "Current")
-    ].copy()
-
-    # Auto-extract vendors from Remarks
-    vendors = pending["Remarks"].dropna().unique().tolist()
-    vendors.sort()
-
-    if not vendors:
-        st.info("No vendor names found in remarks.")
-    else:
-        selected_vendor = st.selectbox("Choose a vendor:", vendors)
-        filtered = pending[
-            pending["Remarks"].str.contains(selected_vendor, case=False, na=False)
-        ]
-
-        if filtered.empty:
-            st.success(f"No pending rotors for vendor: {selected_vendor}")
+        pending = df[
+            (df["Pending"]) & 
+            (df["Status"] == "Current")
+        ].copy()
+    
+        # Auto-extract vendors from Remarks
+        vendors = pending["Remarks"].dropna().unique().tolist()
+        vendors.sort()
+    
+        if not vendors:
+            st.info("No vendor names found in remarks.")
         else:
-            summary = (
-                filtered.groupby("Size (mm)")["Quantity"]
-                .sum().reset_index().sort_values("Size (mm)")
-            )
-            st.success(f"📦 Pending Rotors from **{selected_vendor}**")
-            st.dataframe(summary, use_container_width=True)
+            selected_vendor = st.selectbox("Choose a vendor:", vendors)
+            filtered = pending[
+                pending["Remarks"].str.contains(selected_vendor, case=False, na=False)
+            ]
+    
+            if filtered.empty:
+                st.success(f"No pending rotors for vendor: {selected_vendor}")
+            else:
+                summary = (
+                    filtered.groupby("Size (mm)")["Quantity"]
+                    .sum().reset_index().sort_values("Size (mm)")
+                )
+                st.success(f"📦 Pending Rotors from **{selected_vendor}**")
+                st.dataframe(summary, use_container_width=True)
 # ====== LAST SYNC STATUS ======
    # just do this directly
 
