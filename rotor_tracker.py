@@ -211,7 +211,7 @@ with form_tabs[2]:
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot"])
+tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot", "Rotor Assistant lite"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
@@ -791,7 +791,68 @@ with tabs[3]:
     
         except Exception as e:
             st.error(f"Failed to initialize chatbot: {e}")
-    # ====== LAST SYNC STATUS ======
+  
+with tabs[4]:
+    st.subheader("🧠 Rotor Assistant (Smart Buttons)")
+
+    query = st.selectbox("📌 Ask a rotor question:", [
+        "Most used rotor size",
+        "Sizes running low",
+        "Pending outgoing rotors",
+        "Incoming future rotors",
+        "Average daily outgoing usage",
+    ])
+    
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    
+    if query == "Most used rotor size":
+        result = (
+            df[df["Type"] == "Outgoing"]
+            .groupby("Size (mm)")["Quantity"]
+            .sum()
+            .sort_values(ascending=False)
+            .reset_index()
+        )
+        st.write("📦 Most used rotor sizes:")
+        st.dataframe(result)
+    
+    elif query == "Sizes running low":
+        current = df[
+            (df["Status"] == "Current") & (~df["Pending"])
+        ].copy()
+        current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
+        stock = current.groupby("Size (mm)")["Net"].sum().reset_index()
+        low = stock[stock["Net"] < 5]
+        st.warning("🚨 Low stock rotors (below 5 units):")
+        st.dataframe(low)
+    
+    elif query == "Pending outgoing rotors":
+        pending = df[
+            (df["Pending"]) & (df["Status"] == "Current") & (df["Type"] == "Outgoing")
+        ]
+        st.info("📤 Pending outgoing rotors:")
+        st.dataframe(pending)
+    
+    elif query == "Incoming future rotors":
+        future = df[
+            (df["Status"] == "Future") & (df["Type"] == "Inward")
+        ]
+        st.success("📥 Incoming future rotors:")
+        st.dataframe(future)
+    
+    elif query == "Average daily outgoing usage":
+        last_60 = df[
+            (df["Type"] == "Outgoing") &
+            (df["Status"] == "Current") &
+            (~df["Pending"]) &
+            (df["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=60))
+        ]
+        usage = last_60.groupby(["Date", "Size (mm)"])["Quantity"].sum().groupby("Size (mm)").mean().reset_index()
+        usage.columns = ["Size (mm)", "Avg Daily Outgoing"]
+        usage["Avg Daily Outgoing"] = usage["Avg Daily Outgoing"].round(0).astype(int)
+        st.dataframe(usage)
+# ====== LAST SYNC STATUS ======
    # just do this directly
 
     
