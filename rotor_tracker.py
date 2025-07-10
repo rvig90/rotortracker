@@ -793,6 +793,5 @@ with tabs[3]:
             st.error(f"Failed to initialize chatbot: {e}")
     # ====== LAST SYNC STATUS ======
    # just do this directly
-if st.session_state.last_sync != "Never":
-    st.caption(f"Last synced:{st.session_state.last_sync})
+
     
