@@ -793,8 +793,8 @@ with tabs[3]:
             st.error(f"Failed to initialize chatbot: {e}")
   
 with tabs[4]:
+    
     st.subheader("🧠 Rotor Assistant (Smart Buttons)")
-
     query = st.selectbox("📌 Ask a rotor question:", [
         "Most used rotor size",
         "Sizes running low",
