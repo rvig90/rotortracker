@@ -790,4 +790,6 @@ with tabs[3]:
                     except Exception as e:
                         st.error(f"Chatbot error: {e}")
    # ====== LAST SYNC STATUS ======
-   
+   # just do this directly
+if st.session_state.last_sync != "Never":
+    
