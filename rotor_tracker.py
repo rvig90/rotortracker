@@ -361,7 +361,84 @@ with tabs[0]:
         except Exception as e:
             st.error(f"Error generating summary: {e}")
     else:
-        st.info("No data available yet.")# ====== MOVEMENT LOG WITH FIXED FILTERS ======
+        st.info("No data available yet.")
+        
+st.subheader("🧠 AI-Powered Reorder Suggestions (with Pending & Future Awareness)")
+
+df = st.session_state.data.copy()
+df["Date"] = pd.to_datetime(df["Date"])
+
+# === 1. Recent Outgoing Usage ===
+cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
+outgoing = df[
+    (df["Type"] == "Outgoing") &
+    (df["Status"] == "Current") &
+    (~df["Pending"]) &
+    (df["Date"] >= cutoff)
+].copy()
+
+usage = (
+    outgoing.groupby(["Date", "Size (mm)"])["Quantity"]
+    .sum()
+    .groupby("Size (mm)").mean()
+    .reset_index()
+    .rename(columns={"Quantity": "Avg Daily Usage"})
+)
+
+# === 2. Current Stock (Inward - Outgoing, not pending) ===
+current = df[
+    (df["Status"] == "Current") & (~df["Pending"])
+].copy()
+current["Net"] = current.apply(
+    lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
+)
+stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock Now"})
+
+# === 3. Pending Outgoing Rotors ===
+pending = df[(df["Status"] == "Current") & (df["Pending"])].copy()
+pending_sum = pending.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
+
+# === 4. Future Inward Rotors ===
+future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")].copy()
+future_sum = future.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
+
+# === 5. Merge All Sources ===
+df_all = usage.merge(stock_now, on="Size (mm)", how="outer") \
+              .merge(pending_sum, on="Size (mm)", how="outer") \
+              .merge(future_sum, on="Size (mm)", how="outer") \
+              .fillna(0)
+
+# === 6. Calculations ===
+df_all["Projected Stock"] = df_all["Stock Now"] - df_all["Pending Out"] + df_all["Coming In"]
+df_all["Forecast (30d)"] = df_all["Avg Daily Usage"] * 30
+df_all["Safety Buffer"] = df_all["Avg Daily Usage"] * 7
+df_all["Target Stock"] = df_all["Forecast (30d)"] + df_all["Safety Buffer"]
+df_all["Suggested Reorder"] = (df_all["Target Stock"] - df_all["Projected Stock"]).clip(lower=0)
+
+# === 7. Round All Quantities to Int ===
+cols_to_round = [
+    "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
+    "Projected Stock", "Forecast (30d)", "Suggested Reorder"
+]
+for col in cols_to_round:
+    df_all[col] = df_all[col].round(0).astype(int)
+
+# === 8. Filter and Show Reorder List ===
+reorder = df_all[df_all["Suggested Reorder"] > 0]
+
+if reorder.empty:
+    st.success("✅ All rotor sizes are sufficiently stocked with pending and future accounted for.")
+else:
+    st.warning("🔄 The following rotor sizes may run short in the next 30 days:")
+    st.dataframe(
+        reorder[[
+            "Size (mm)", "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
+            "Projected Stock", "Forecast (30d)", "Suggested Reorder"
+        ]].sort_values("Suggested Reorder", ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
+# ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
     st.subheader("📋 Movement Log")
