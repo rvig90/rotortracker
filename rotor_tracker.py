@@ -823,8 +823,8 @@ with tabs[4]:
         ].copy()
         current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
         stock = current.groupby("Size (mm)")["Net"].sum().reset_index()
-        low = stock[stock["Net"] < 5]
-        st.warning("🚨 Low stock rotors (below 5 units):")
+        low = stock[stock["Net"] < 100]
+        st.warning("🚨 Low stock rotors (below 100 units):")
         st.dataframe(low)
     
     elif query == "Pending outgoing rotors":
