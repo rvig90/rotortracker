@@ -852,6 +852,8 @@ with tabs[4]:
         usage.columns = ["Size (mm)", "Avg Daily Outgoing"]
         usage["Avg Daily Outgoing"] = usage["Avg Daily Outgoing"].round(0).astype(int)
         st.dataframe(usage)
+    
+    
     elif query == "Pending rotors by vendor":
         pending = df[
             (df["Pending"]) & 
