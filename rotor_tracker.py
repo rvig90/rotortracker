@@ -765,22 +765,21 @@ with tabs[3]:
         st.error("❌ OpenAI key missing from secrets.toml")
     else:
         try:
-            
             # ✅ Build LLM with explicit key
-    
-    
             llm = OpenAI(
                 temperature=0,
                 openai_api_key=st.secrets["openai"]["api_key"]
             )
-            
+    
+            # ✅ Create agent
             agent = create_pandas_dataframe_agent(
                 llm,
-                st.session_state.data,
+                df,
                 verbose=False,
                 allow_dangerous_code=True
             )
-            
+    
+            # ✅ User input
             user_q = st.text_input("Ask about rotor data:")
             if user_q:
                 with st.spinner("Thinking..."):
@@ -789,7 +788,11 @@ with tabs[3]:
                         st.success(response)
                     except Exception as e:
                         st.error(f"Chatbot error: {e}")
-   # ====== LAST SYNC STATUS ======
+    
+        except Exception as e:
+            st.error(f"Failed to initialize chatbot: {e}")
+    # ====== LAST SYNC STATUS ======
    # just do this directly
 if st.session_state.last_sync != "Never":
+    st.caption(f"Last synced:{st.session_state.last_sync})
     
