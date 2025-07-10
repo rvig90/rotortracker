@@ -8,3 +8,6 @@ altair
 prophet
 xgboost
 scikit-learn
+openai
+langchain
+langchain-community
