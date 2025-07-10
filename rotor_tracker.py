@@ -764,7 +764,7 @@ with tabs[3]:
         st.subheader("Ask Your Rotor Assistant")
     
         # Load OpenAI
-        openai.api_key = st.secrets["openai"][""]
+        openai.api_key = st.secrets["openai"]["api_key"]
         llm = OpenAI(temperature=0)
     
         # Create chatbot agent with your rotor data
