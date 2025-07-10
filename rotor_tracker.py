@@ -765,6 +765,7 @@ with tabs[3]:
     
         # Load OpenAI
         openai.api_key = st.secrets["openai"]["api_key"]
+        st.write(" api key loaded successfully.")
         llm = OpenAI(temperature=0)
     
         # Create chatbot agent with your rotor data
