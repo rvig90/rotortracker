@@ -211,7 +211,7 @@ with form_tabs[2]:
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot", "Rotor Assistant lite"])
+tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
@@ -882,6 +882,71 @@ with tabs[4]:
                 )
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
+
+with tabs[5]:
+    st.title("📅 Interactive Rotor Planning Dashboard")
+
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    
+    # === Usage (last 60 days)
+    cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
+    usage_df = df[
+        (df["Type"] == "Outgoing") &
+        (df["Status"] == "Current") &
+        (~df["Pending"]) &
+        (df["Date"] >= cutoff)
+    ]
+    avg_use = usage_df.groupby("Size (mm)")["Quantity"].mean().reset_index()
+    avg_use.columns = ["Size (mm)", "Avg Daily Usage"]
+    
+    # === Current stock (non-pending)
+    current = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
+    current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
+    stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Current Stock"})
+    
+    # === Pending
+    pending = df[df["Pending"]].groupby("Size (mm)")["Quantity"].sum().reset_index()
+    pending.columns = ["Size (mm)", "Pending Out"]
+    
+    # === Future inward
+    future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")].groupby("Size (mm)")["Quantity"].sum().reset_index()
+    future.columns = ["Size (mm)", "Future In"]
+    
+    # === Merge
+    plan = avg_use.merge(stock_now, on="Size (mm)", how="outer") \
+                  .merge(pending, on="Size (mm)", how="outer") \
+                  .merge(future, on="Size (mm)", how="outer") \
+                  .fillna(0)
+    
+    plan["Forecast (30d)"] = plan["Avg Daily Usage"] * 30
+    plan["Projected Stock"] = plan["Current Stock"] - plan["Pending Out"] + plan["Future In"]
+    plan["Suggested Reorder"] = (plan["Forecast (30d)"] - plan["Projected Stock"]).clip(lower=0).round(0).astype(int)
+    plan["Days Left"] = (plan["Projected Stock"] / plan["Avg Daily Usage"]).replace([float('inf'), -float('inf')], 0).fillna(0).round(0).astype(int)
+    
+    # Cast types for display
+    for col in ["Avg Daily Usage", "Current Stock", "Pending Out", "Future In", "Forecast (30d)", "Projected Stock", "Suggested Reorder", "Days Left"]:
+        plan[col] = plan[col].round(0).astype(int)
+    
+    # === UI
+    st.subheader("📦 Rotor Reorder Overview")
+    st.dataframe(plan[[
+        "Size (mm)", "Avg Daily Usage", "Current Stock", "Pending Out", "Future In",
+        "Projected Stock", "Forecast (30d)", "Suggested Reorder", "Days Left"
+    ]].sort_values("Suggested Reorder", ascending=False), use_container_width=True)
+    
+    # === Reorder Alert
+    st.subheader("🚨 Urgent Restock Alert")
+    urgent = plan[plan["Days Left"] < 10]
+    if urgent.empty:
+        st.success("✅ No rotor sizes projected to run out soon.")
+    else:
+        st.warning("⚠️ The following rotors may run out in under 10 days:")
+        st.dataframe(urgent[["Size (mm)", "Days Left", "Suggested Reorder"]], use_container_width=True)
+    
+    # === Export
+    csv = plan.to_csv(index=False).encode("utf-8")
+    st.download_button("⬇ Download Full Planning Table", data=csv, file_name="rotor_planning.csv", mime="text/csv")
 # ====== LAST SYNC STATUS ======
    # just do this directly
 
