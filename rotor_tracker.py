@@ -885,39 +885,62 @@ with tabs[4]:
                 st.dataframe(summary, use_container_width=True)
 from nlp_utils import extract_intent_entities
 
-query = st.text_input("Ask about a rotor or vendor")
+query = st.text_input("Ask your assistant:")
 
 if query:
     parsed = extract_intent_entities(query)
     intent = parsed["intent"]
     size = parsed["size"]
     vendor = parsed["vendor"]
+    entry_idx = parsed["index"]
 
-    st.markdown(f"🧠 Detected intent: `{intent}`, Size: `{size}`, Vendor: `{vendor}`")
-
-    # === Route to proper logic ===
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
 
-    if intent == "rotor_info" and size:
-        size_df = df[df["Size (mm)"] == size]
-        st.success(f"📋 Biodata for rotor size {size}")
-        st.dataframe(size_df)
-
-    elif intent == "vendor_pending" and vendor:
-        pending_df = df[
+    if intent == "edit_entry":
+        editable_df = df[
             (df["Pending"]) &
-            (df["Status"] == "Current") &
-            (df["Remarks"].str.contains(vendor, case=False, na=False))
-        ]
-        if not pending_df.empty:
-            st.success(f"📦 Pending orders for {vendor}")
-            st.dataframe(pending_df[["Date", "Size (mm)", "Quantity", "Remarks"]])
-        else:
-            st.info(f"No pending orders found for {vendor}.")
+            ((df["Remarks"].str.contains(vendor, case=False, na=False)) if vendor else True) &
+            ((df["Size (mm)"] == size) if size else True)
+        ].reset_index(drop=False)
 
-    elif not intent:
-        st.info("🤖 Sorry, I couldn't understand your question.")
+        if editable_df.empty:
+            st.warning("🤖 No matching entries found to edit.")
+        elif entry_idx is not None and entry_idx < len(editable_df):
+            row = editable_df.iloc[entry_idx]
+            real_index = row["index"]
+            st.markdown(f"### ✏️ Editing Entry #{entry_idx + 1} for {vendor or size}mm")
+            
+            with st.form("edit_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    new_date = st.date_input("📅 Date", pd.to_datetime(row["Date"]))
+                    new_size = st.number_input("📐 Size (mm)", min_value=1, value=int(row["Size (mm)"]))
+                    new_qty = st.number_input("🔢 Quantity", min_value=1, value=int(row["Quantity"]))
+                with c2:
+                    new_type = st.selectbox("🔁 Type", ["Inward", "Outgoing"], index=0 if row["Type"] == "Inward" else 1)
+                    new_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if row["Status"] == "Current" else 1)
+                    new_pending = st.checkbox("❗ Pending", value=bool(row["Pending"]))
+                new_remarks = st.text_input("📝 Remarks", value=row["Remarks"])
+
+                if st.form_submit_button("💾 Save Changes"):
+                    st.session_state.data.at[real_index, "Date"] = new_date.strftime("%Y-%m-%d")
+                    st.session_state.data.at[real_index, "Size (mm)"] = new_size
+                    st.session_state.data.at[real_index, "Quantity"] = new_qty
+                    st.session_state.data.at[real_index, "Type"] = new_type
+                    st.session_state.data.at[real_index, "Status"] = new_status
+                    st.session_state.data.at[real_index, "Pending"] = new_pending
+                    st.session_state.data.at[real_index, "Remarks"] = new_remarks
+
+                    if "auto_save_to_gsheet" in globals():
+                        auto_save_to_gsheet()
+
+                    st.success("✅ Entry updated.")
+                    st.rerun()
+        else:
+            st.info(f"🔍 Found {len(editable_df)} matching entries:")
+            st.dataframe(editable_df[["Date", "Size (mm)", "Quantity", "Remarks"]].reset_index(drop=True))
+            st.info("👆 Now try: `Edit entry 1 for Vendor A` or `Update entry 2`")
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
