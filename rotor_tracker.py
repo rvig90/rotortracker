@@ -884,6 +884,7 @@ with tabs[4]:
                 st.dataframe(summary, use_container_width=True)
 
 with tabs[5]:
+    
     st.title("📅 Interactive Rotor Planning Dashboard")
 
     df = st.session_state.data.copy()
