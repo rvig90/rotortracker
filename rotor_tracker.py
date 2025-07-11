@@ -885,45 +885,37 @@ with tabs[4]:
                 st.dataframe(summary, use_container_width=True)
 st.subheader("💬 Ask about a rotor size or vendor")
 
-chat_query = st.text_input("Example: 'Pending from Vendor A' or 'Tell me about 250mm'")
+chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me about 250mm'")
 
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
-
-# Prepare vendor-aware pending dataset
 pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
 pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
 
-# Extract rotor size if present
 import re
+
+# Check for rotor size
 size_match = re.search(r"(\d{2,4})", chat_query)
 matched_size = int(size_match.group(1)) if size_match else None
 
-# If vendor-like query
-if "pending" in chat_query.lower() or "from" in chat_query.lower():
-    vendor_match = re.search(r"from\s+(.+)", chat_query, re.IGNORECASE)
-    vendor_name = vendor_match.group(1).strip() if vendor_match else chat_query.strip()
+# === 1. VENDOR MATCH CHECK (even if user typed just "Vendor ABC")
+# Try to match vendor name in any case
+matched_vendors = pending_df[
+    pending_df["Vendor Name"].str.contains(chat_query.strip(), case=False, na=False)
+]
 
-    # Fuzzy match vendor from remarks
-    matched_vendor_df = pending_df[
-        pending_df["Vendor Name"].str.contains(vendor_name, case=False, na=False)
-    ]
+# === 2. Handle vendor-based query
+if matched_vendors.shape[0] > 0:
+    vendor_name_guess = matched_vendors["Vendor Name"].iloc[0]
+    st.success(f"📬 Showing pending orders for vendor: *{vendor_name_guess}*")
 
-    if not matched_vendor_df.empty:
-        st.success(f"📦 Pending rotor orders from *{vendor_name}* (Remarks-based):")
+    result = matched_vendors[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
+    result["Days Pending"] = (pd.Timestamp.today() - result["Date"]).dt.days
+    st.dataframe(result.sort_values("Date"), use_container_width=True)
 
-        view = matched_vendor_df[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
-        view["Days Pending"] = (pd.Timestamp.today() - view["Date"]).dt.days
-
-        st.dataframe(view.sort_values("Date"), use_container_width=True)
-
-    else:
-        st.info(f"✅ No pending rotors found for vendor *{vendor_name}* in Remarks.")
-
-# If rotor size match
+# === 3. If rotor size is provided
 elif matched_size:
     data = df[df["Size (mm)"] == matched_size]
-
     inward = data[data["Type"] == "Inward"]["Quantity"].sum()
     outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
     current_stock = inward - outgoing
@@ -959,15 +951,14 @@ elif matched_size:
 - 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
 """)
 
-    # Optional mini chart
     chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
     if not chart_data.empty:
-        st.markdown("#### 🔄 Usage Trend (Last 60 Days)")
+        st.markdown("#### 📊 Usage Trend (Last 60 Days)")
         st.line_chart(chart_data.set_index("Date"))
 
-else:
-    if chat_query:
-        st.info("❓ Try: 'Pending from [Vendor]' or 'Tell me about [Rotor Size]'")
+# === 4. No match at all
+elif chat_query:
+    st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
