@@ -883,82 +883,41 @@ with tabs[4]:
                 )
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
-st.subheader("💬 Ask about a rotor size or vendor")
+from nlp_utils import extract_intent_entities
 
-chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me about 250mm'")
+query = st.text_input("Ask about a rotor or vendor")
 
-df = st.session_state.data.copy()
-df["Date"] = pd.to_datetime(df["Date"])
-pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
-pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
+if query:
+    parsed = extract_intent_entities(query)
+    intent = parsed["intent"]
+    size = parsed["size"]
+    vendor = parsed["vendor"]
 
-import re
+    st.markdown(f"🧠 Detected intent: `{intent}`, Size: `{size}`, Vendor: `{vendor}`")
 
-# Check for rotor size
-size_match = re.search(r"(\d{2,4})", chat_query)
-matched_size = int(size_match.group(1)) if size_match else None
+    # === Route to proper logic ===
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
 
-# === 1. VENDOR MATCH CHECK (even if user typed just "Vendor ABC")
-# Try to match vendor name in any case
-matched_vendors = pending_df[
-    pending_df["Vendor Name"].str.contains(chat_query.strip(), case=False, na=False)
-]
+    if intent == "rotor_info" and size:
+        size_df = df[df["Size (mm)"] == size]
+        st.success(f"📋 Biodata for rotor size {size}")
+        st.dataframe(size_df)
 
-# === 2. Handle vendor-based query
-if matched_vendors.shape[0] > 0:
-    vendor_name_guess = matched_vendors["Vendor Name"].iloc[0]
-    st.success(f"📬 Showing pending orders for vendor: *{vendor_name_guess}*")
+    elif intent == "vendor_pending" and vendor:
+        pending_df = df[
+            (df["Pending"]) &
+            (df["Status"] == "Current") &
+            (df["Remarks"].str.contains(vendor, case=False, na=False))
+        ]
+        if not pending_df.empty:
+            st.success(f"📦 Pending orders for {vendor}")
+            st.dataframe(pending_df[["Date", "Size (mm)", "Quantity", "Remarks"]])
+        else:
+            st.info(f"No pending orders found for {vendor}.")
 
-    result = matched_vendors[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
-    result["Days Pending"] = (pd.Timestamp.today() - result["Date"]).dt.days
-    st.dataframe(result.sort_values("Date"), use_container_width=True)
-
-# === 3. If rotor size is provided
-elif matched_size:
-    data = df[df["Size (mm)"] == matched_size]
-    inward = data[data["Type"] == "Inward"]["Quantity"].sum()
-    outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
-    current_stock = inward - outgoing
-
-    usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
-    recent_out = data[
-        (data["Type"] == "Outgoing") &
-        (data["Date"] >= usage_window) &
-        (~data["Pending"])
-    ]
-    avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
-    days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
-
-    pending_qty = data[data["Pending"]]["Quantity"].sum()
-    future_qty = data[
-        (data["Status"] == "Future") & (data["Type"] == "Inward")
-    ]["Quantity"].sum()
-
-    vendors = data["Remarks"].dropna().unique().tolist()
-    recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
-    last_out = data[data["Type"] == "Outgoing"]["Date"].max()
-
-    st.success(f"📋 Biodata for Rotor Size *{matched_size} mm*:")
-    st.markdown(f"""
-- 📥 *Total Inward*: {int(inward)}
-- 📤 *Total Outgoing*: {int(outgoing)}
-- 📦 *Current Stock*: {int(current_stock)}
-- ❗ *Pending Orders*: {int(pending_qty)}
-- 📥 *Future Inward*: {int(future_qty)}
-- 📆 *Last Outgoing*: {last_out.date() if pd.notnull(last_out) else "N/A"}
-- 📈 *Avg Daily Usage*: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
-- ⏳ *Days of Stock Left*: {int(days_left) if days_left else 'N/A'}
-- 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
-""")
-
-    chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
-    if not chart_data.empty:
-        st.markdown("#### 📊 Usage Trend (Last 60 Days)")
-        st.line_chart(chart_data.set_index("Date"))
-
-# === 4. No match at all
-elif chat_query:
-    st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
+    elif not intent:
+        st.info("🤖 Sorry, I couldn't understand your question.")
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
