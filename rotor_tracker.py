@@ -883,52 +883,91 @@ with tabs[4]:
                 )
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
-st.subheader("💬 Rotor Chat Lookup")
-import re
+st.subheader("💬 Ask about a rotor size or vendor")
 
-chat_query = st.text_input("Ask about a rotor size or vendor (e.g. 'Pending from Vendor X')")
+chat_query = st.text_input("Example: 'Pending from Vendor A' or 'Tell me about 250mm'")
 
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
-available_sizes = sorted(df["Size (mm)"].dropna().unique())
 
-# === Check if it's a vendor query
-if chat_query:
-    is_vendor_query = "pending" in chat_query.lower() and "vendor" in chat_query.lower() or "from" in chat_query.lower()
+# Prepare vendor-aware pending dataset
+pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
+pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
 
-    # Try to match rotor size (e.g. '300mm', 'Rotor 250')
-    size_match = re.search(r"(\d{2,4})", chat_query)
-    matched_size = int(size_match.group(1)) if size_match else None
+# Extract rotor size if present
+import re
+size_match = re.search(r"(\d{2,4})", chat_query)
+matched_size = int(size_match.group(1)) if size_match else None
 
-    if is_vendor_query:
-        # Extract possible vendor name (after "from" or at the end)
-        vendor_match = re.search(r"from (.+)", chat_query, re.IGNORECASE)
-        vendor_name = vendor_match.group(1).strip() if vendor_match else chat_query.strip()
+# If vendor-like query
+if "pending" in chat_query.lower() or "from" in chat_query.lower():
+    vendor_match = re.search(r"from\s+(.+)", chat_query, re.IGNORECASE)
+    vendor_name = vendor_match.group(1).strip() if vendor_match else chat_query.strip()
 
-        pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
-        if "Vendor" in pending_df.columns:
-            pending_df["Vendor Name"] = pending_df["Vendor"]
-        else:
-            pending_df["Vendor Name"] = pending_df["Remarks"].fillna("")
+    # Fuzzy match vendor from remarks
+    matched_vendor_df = pending_df[
+        pending_df["Vendor Name"].str.contains(vendor_name, case=False, na=False)
+    ]
 
-        matching_rows = pending_df[pending_df["Vendor Name"].str.contains(vendor_name, case=False, na=False)]
+    if not matched_vendor_df.empty:
+        st.success(f"📦 Pending rotor orders from *{vendor_name}* (Remarks-based):")
 
-        if not matching_rows.empty:
-            st.success(f"📬 Pending rotor orders from *{vendor_name}*:")
-            display = matching_rows[["Date", "Size (mm)", "Quantity", "Remarks"]]
-            display["Days Pending"] = (pd.Timestamp.today() - display["Date"]).dt.days
-            st.dataframe(display.sort_values("Date"), use_container_width=True)
-        else:
-            st.info(f"✅ No pending rotors found for *{vendor_name}*.")
-    
-    elif matched_size:
-        # Rotor size biodata block (same as before)
-        # [ ... existing rotor biodata code ... ]
-        st.success(f"📋 Showing biodata for rotor size *{matched_size} mm*")
-        # [ biodata details here ... ]
+        view = matched_vendor_df[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
+        view["Days Pending"] = (pd.Timestamp.today() - view["Date"]).dt.days
+
+        st.dataframe(view.sort_values("Date"), use_container_width=True)
+
     else:
-        st.warning("❓ Couldn’t understand. Ask about a rotor size or pending from a vendor.")
+        st.info(f"✅ No pending rotors found for vendor *{vendor_name}* in Remarks.")
 
+# If rotor size match
+elif matched_size:
+    data = df[df["Size (mm)"] == matched_size]
+
+    inward = data[data["Type"] == "Inward"]["Quantity"].sum()
+    outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
+    current_stock = inward - outgoing
+
+    usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
+    recent_out = data[
+        (data["Type"] == "Outgoing") &
+        (data["Date"] >= usage_window) &
+        (~data["Pending"])
+    ]
+    avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
+    days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
+
+    pending_qty = data[data["Pending"]]["Quantity"].sum()
+    future_qty = data[
+        (data["Status"] == "Future") & (data["Type"] == "Inward")
+    ]["Quantity"].sum()
+
+    vendors = data["Remarks"].dropna().unique().tolist()
+    recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
+    last_out = data[data["Type"] == "Outgoing"]["Date"].max()
+
+    st.success(f"📋 Biodata for Rotor Size *{matched_size} mm*:")
+    st.markdown(f"""
+- 📥 *Total Inward*: {int(inward)}
+- 📤 *Total Outgoing*: {int(outgoing)}
+- 📦 *Current Stock*: {int(current_stock)}
+- ❗ *Pending Orders*: {int(pending_qty)}
+- 📥 *Future Inward*: {int(future_qty)}
+- 📆 *Last Outgoing*: {last_out.date() if pd.notnull(last_out) else "N/A"}
+- 📈 *Avg Daily Usage*: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
+- ⏳ *Days of Stock Left*: {int(days_left) if days_left else 'N/A'}
+- 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
+""")
+
+    # Optional mini chart
+    chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
+    if not chart_data.empty:
+        st.markdown("#### 🔄 Usage Trend (Last 60 Days)")
+        st.line_chart(chart_data.set_index("Date"))
+
+else:
+    if chat_query:
+        st.info("❓ Try: 'Pending from [Vendor]' or 'Tell me about [Rotor Size]'")
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
