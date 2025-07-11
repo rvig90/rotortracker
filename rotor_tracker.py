@@ -891,43 +891,43 @@ df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
 available_sizes = sorted(df["Size (mm)"].dropna().unique())
 
-
+import re
 matched_size = None
 
 if chat_query:
-# Look for a number pattern in the query (e.g. "250", "300mm")
-match = re.search(r"(\d{2,4})", chat_query)
-if match:
-    matched_size = int(match.group(1))
-    if matched_size not in available_sizes:
-        st.error(f"❌ Rotor size {matched_size} not found in data.")
-        matched_size = None
-else:
-    st.warning("❓ Couldn’t find a rotor size in your message.")
+    # Look for a number pattern in the query (e.g. "250", "300mm")
+    match = re.search(r"(\d{2,4})", chat_query)
+    if match:
+        matched_size = int(match.group(1))
+        if matched_size not in available_sizes:
+            st.error(f"❌ Rotor size {matched_size} not found in data.")
+            matched_size = None
+    else:
+        st.warning("❓ Couldn’t find a rotor size in your message.")
 
 # === If valid rotor size found:
 if matched_size:
-data = df[df["Size (mm)"] == matched_size]
-inward = data[data["Type"] == "Inward"]["Quantity"].sum()
-outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
-current_stock = inward - outgoing
-usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
-recent_out = data[
-    (data["Type"] == "Outgoing") &
-    (data["Date"] >= usage_window) &
-    (~data["Pending"])
-]
-avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
-days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
-pending_qty = data[data["Pending"]]["Quantity"].sum()
-future_qty = data[(data["Status"] == "Future") & (data["Type"] == "Inward")]["Quantity"].sum()
-vendors = data["Remarks"].dropna().unique().tolist()
-recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
-last_out = data[data["Type"] == "Outgoing"]["Date"].max()
+    data = df[df["Size (mm)"] == matched_size]
+    inward = data[data["Type"] == "Inward"]["Quantity"].sum()
+    outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
+    current_stock = inward - outgoing
+    usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
+    recent_out = data[
+        (data["Type"] == "Outgoing") &
+        (data["Date"] >= usage_window) &
+        (~data["Pending"])
+    ]
+    avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
+    days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
+    pending_qty = data[data["Pending"]]["Quantity"].sum()
+    future_qty = data[(data["Status"] == "Future") & (data["Type"] == "Inward")]["Quantity"].sum()
+    vendors = data["Remarks"].dropna().unique().tolist()
+    recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
+    last_out = data[data["Type"] == "Outgoing"]["Date"].max()
 
-# === Friendly summary response
-st.success(f"📋 Here's what I found for *{matched_size} mm rotor*:")
-st.markdown(f"""
+    # === Friendly summary response
+    st.success(f"📋 Here's what I found for *{matched_size} mm rotor*:")
+    st.markdown(f"""
 - 📥 *Total Inward*: {int(inward)}
 - 📤 *Total Outgoing*: {int(outgoing)}
 - 📦 *Current Stock*: {int(current_stock)}
@@ -939,12 +939,11 @@ st.markdown(f"""
 - 🧑‍💼 *Vendors*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
 """)
 
-# Optional: Mini trend chart
-chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
-if not chart_data.empty:
-    st.markdown("#### 🔄 Usage Trend (Last 60 Days)")
-    st.line_chart(chart_data.set_index("Date"))
-
+    # Optional: Mini trend chart
+    chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
+    if not chart_data.empty:
+        st.markdown("#### 🔄 Usage Trend (Last 60 Days)")
+        st.line_chart(chart_data.set_index("Date"))
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
