@@ -883,37 +883,104 @@ with tabs[4]:
                 )
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
+import re
+
 st.subheader("💬 Ask about a rotor size or vendor")
 
 chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me about 250mm'")
 
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
+
 pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
 pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
 
-import re
-
-# Check for rotor size
+# === Rotor size match
 size_match = re.search(r"(\d{2,4})", chat_query)
 matched_size = int(size_match.group(1)) if size_match else None
 
-# === 1. VENDOR MATCH CHECK (even if user typed just "Vendor ABC")
-# Try to match vendor name in any case
+# === Vendor match check
 matched_vendors = pending_df[
     pending_df["Vendor Name"].str.contains(chat_query.strip(), case=False, na=False)
 ]
 
-# === 2. Handle vendor-based query
 if matched_vendors.shape[0] > 0:
     vendor_name_guess = matched_vendors["Vendor Name"].iloc[0]
-    st.success(f"📬 Showing pending orders for vendor: *{vendor_name_guess}*")
+    st.success(f"📬 Pending orders for vendor: **{vendor_name_guess}**")
 
     result = matched_vendors[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
     result["Days Pending"] = (pd.Timestamp.today() - result["Date"]).dt.days
     st.dataframe(result.sort_values("Date"), use_container_width=True)
 
-# === 3. If rotor size is provided
+    # === 🔁 Edit a specific entry
+    edit_query = st.text_input("✏️ To edit, type: 'Edit entry 2'")
+    edit_match = re.search(r"edit entry\s*(\d+)", edit_query.lower()) if edit_query else None
+    if edit_match:
+        entry_num = int(edit_match.group(1)) - 1
+        if matched_vendors.shape[0] > entry_num:
+            entry_to_edit = matched_vendors.iloc[entry_num]
+            row_index = entry_to_edit.name
+            st.markdown(f"### ✏️ Editing Entry #{entry_num + 1} for **{vendor_name_guess}**")
+
+            with st.form("edit_vendor_entry"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    e_date = st.date_input("📅 Date", pd.to_datetime(entry_to_edit["Date"]))
+                    e_size = st.number_input("📐 Size (mm)", value=int(entry_to_edit["Size (mm)"]), min_value=1)
+                    e_qty = st.number_input("🔢 Quantity", value=int(entry_to_edit["Quantity"]), min_value=1)
+                with c2:
+                    e_type = st.selectbox("🔁 Type", ["Inward", "Outgoing"], index=0 if entry_to_edit["Type"] == "Inward" else 1)
+                    e_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if entry_to_edit["Status"] == "Current" else 1)
+                    e_pending = st.checkbox("❗ Pending", value=bool(entry_to_edit["Pending"]))
+                e_remarks = st.text_input("📝 Remarks", value=entry_to_edit["Remarks"])
+
+                if st.form_submit_button("💾 Save Changes"):
+                    st.session_state.data.at[row_index, "Date"] = e_date.strftime("%Y-%m-%d")
+                    st.session_state.data.at[row_index, "Size (mm)"] = e_size
+                    st.session_state.data.at[row_index, "Quantity"] = e_qty
+                    st.session_state.data.at[row_index, "Type"] = e_type
+                    st.session_state.data.at[row_index, "Status"] = e_status
+                    st.session_state.data.at[row_index, "Pending"] = e_pending
+                    st.session_state.data.at[row_index, "Remarks"] = e_remarks
+
+                    if "auto_save_to_gsheet" in globals():
+                        auto_save_to_gsheet()
+                    st.success("✅ Entry updated.")
+                    st.rerun()
+
+    # === 📤 Recent outgoings
+    recent_out = df[
+        (df["Type"] == "Outgoing") &
+        (~df["Pending"]) &
+        (df["Remarks"].str.contains(vendor_name_guess, case=False, na=False))
+    ].copy()
+
+    if not recent_out.empty:
+        st.markdown(f"### 📤 Recent Outgoings for **{vendor_name_guess}**")
+
+        st.dataframe(
+            recent_out.sort_values("Date", ascending=False).head(5)[
+                ["Date", "Size (mm)", "Quantity", "Remarks"]
+            ],
+            use_container_width=True
+        )
+
+        # === Grouped summary by rotor size
+        grouped = recent_out.groupby("Size (mm)")["Quantity"].sum().reset_index()
+        grouped.columns = ["Rotor Size (mm)", "Total Outgoing"]
+        st.markdown("#### 📊 Total Outgoing Quantity by Rotor Size")
+        st.dataframe(grouped, use_container_width=True, hide_index=True)
+
+        # === Outgoing quantity trend
+        st.markdown("#### 📈 Outgoing Trend (Last 60 Days)")
+        trend = recent_out[recent_out["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=60)]
+        if not trend.empty:
+            trend_data = trend.groupby("Date")["Quantity"].sum().reset_index()
+            st.line_chart(trend_data.set_index("Date"))
+    else:
+        st.info(f"No recent outgoings recorded for **{vendor_name_guess}**.")
+
+# === Rotor size biodata block
 elif matched_size:
     data = df[df["Size (mm)"] == matched_size]
     inward = data[data["Type"] == "Inward"]["Quantity"].sum()
@@ -938,17 +1005,17 @@ elif matched_size:
     recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
     last_out = data[data["Type"] == "Outgoing"]["Date"].max()
 
-    st.success(f"📋 Biodata for Rotor Size *{matched_size} mm*:")
+    st.success(f"📋 Biodata for Rotor Size **{matched_size} mm**:")
     st.markdown(f"""
-- 📥 *Total Inward*: {int(inward)}
-- 📤 *Total Outgoing*: {int(outgoing)}
-- 📦 *Current Stock*: {int(current_stock)}
-- ❗ *Pending Orders*: {int(pending_qty)}
-- 📥 *Future Inward*: {int(future_qty)}
-- 📆 *Last Outgoing*: {last_out.date() if pd.notnull(last_out) else "N/A"}
-- 📈 *Avg Daily Usage*: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
-- ⏳ *Days of Stock Left*: {int(days_left) if days_left else 'N/A'}
-- 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
+- 📥 **Total Inward**: {int(inward)}
+- 📤 **Total Outgoing**: {int(outgoing)}
+- 📦 **Current Stock**: {int(current_stock)}
+- ❗ **Pending Orders**: {int(pending_qty)}
+- 📥 **Future Inward**: {int(future_qty)}
+- 📆 **Last Outgoing**: {last_out.date() if pd.notnull(last_out) else "N/A"}
+- 📈 **Avg Daily Usage**: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
+- ⏳ **Days of Stock Left**: {int(days_left) if days_left else 'N/A'}
+- 🧑‍💼 **Vendors (from Remarks)**: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
 """)
 
     chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
@@ -956,9 +1023,10 @@ elif matched_size:
         st.markdown("#### 📊 Usage Trend (Last 60 Days)")
         st.line_chart(chart_data.set_index("Date"))
 
-# === 4. No match at all
+# === Fallback
 elif chat_query:
     st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
+
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
