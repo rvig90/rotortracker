@@ -883,7 +883,6 @@ with tabs[4]:
                 )
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
-import re
 
 st.subheader("💬 Ask about a rotor size or vendor")
 
