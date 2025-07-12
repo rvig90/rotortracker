@@ -1023,7 +1023,7 @@ elif matched_size:
             st.line_chart(chart_data.set_index("Date"))
     
     # === Fallback
-    elif chat_query:
+elif chat_query:
         st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
 
 with tabs[5]:
