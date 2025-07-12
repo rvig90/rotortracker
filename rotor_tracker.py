@@ -981,50 +981,50 @@ if matched_vendors.shape[0] > 0:
 
     # === Rotor size biodata block
 elif matched_size:
-        data = df[df["Size (mm)"] == matched_size]
-        inward = data[data["Type"] == "Inward"]["Quantity"].sum()
-        outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
-        current_stock = inward - outgoing
-    
-        usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
-        recent_out = data[
-            (data["Type"] == "Outgoing") &
-            (data["Date"] >= usage_window) &
-            (~data["Pending"])
-        ]
-        avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
-        days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
-    
-        pending_qty = data[data["Pending"]]["Quantity"].sum()
-        future_qty = data[
-            (data["Status"] == "Future") & (data["Type"] == "Inward")
-        ]["Quantity"].sum()
-    
-        vendors = data["Remarks"].dropna().unique().tolist()
-        recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
-        last_out = data[data["Type"] == "Outgoing"]["Date"].max()
-    
-        st.success(f"📋 Biodata for Rotor Size **{matched_size} mm**:")
-        st.markdown(f"""
-    - 📥 **Total Inward**: {int(inward)}
-    - 📤 **Total Outgoing**: {int(outgoing)}
-    - 📦 **Current Stock**: {int(current_stock)}
-    - ❗ **Pending Orders**: {int(pending_qty)}
-    - 📥 **Future Inward**: {int(future_qty)}
-    - 📆 **Last Outgoing**: {last_out.date() if pd.notnull(last_out) else "N/A"}
-    - 📈 **Avg Daily Usage**: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
-    - ⏳ **Days of Stock Left**: {int(days_left) if days_left else 'N/A'}
-    - 🧑‍💼 **Vendors (from Remarks)**: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
-    """)
-    
-        chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
-        if not chart_data.empty:
-            st.markdown("#### 📊 Usage Trend (Last 60 Days)")
-            st.line_chart(chart_data.set_index("Date"))
-    
+    data = df[df["Size (mm)"] == matched_size]
+    inward = data[data["Type"] == "Inward"]["Quantity"].sum()
+    outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
+    current_stock = inward - outgoing
+
+    usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
+    recent_out = data[
+        (data["Type"] == "Outgoing") &
+        (data["Date"] >= usage_window) &
+        (~data["Pending"])
+    ]
+    avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
+    days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
+
+    pending_qty = data[data["Pending"]]["Quantity"].sum()
+    future_qty = data[
+        (data["Status"] == "Future") & (data["Type"] == "Inward")
+    ]["Quantity"].sum()
+
+    vendors = data["Remarks"].dropna().unique().tolist()
+    recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
+    last_out = data[data["Type"] == "Outgoing"]["Date"].max()
+
+    st.success(f"📋 Biodata for Rotor Size **{matched_size} mm**:")
+    st.markdown(f"""
+- 📥 **Total Inward**: {int(inward)}
+- 📤 **Total Outgoing**: {int(outgoing)}
+- 📦 **Current Stock**: {int(current_stock)}
+- ❗ **Pending Orders**: {int(pending_qty)}
+- 📥 **Future Inward**: {int(future_qty)}
+- 📆 **Last Outgoing**: {last_out.date() if pd.notnull(last_out) else "N/A"}
+- 📈 **Avg Daily Usage**: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
+- ⏳ **Days of Stock Left**: {int(days_left) if days_left else 'N/A'}
+- 🧑‍💼 **Vendors (from Remarks)**: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
+""")
+
+    chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
+    if not chart_data.empty:
+        st.markdown("#### 📊 Usage Trend (Last 60 Days)")
+        st.line_chart(chart_data.set_index("Date"))
+
     # === Fallback
 elif chat_query:
-        st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
+    st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
 
 with tabs[5]:
     
