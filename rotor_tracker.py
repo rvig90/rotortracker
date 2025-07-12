@@ -980,7 +980,7 @@ if matched_vendors.shape[0] > 0:
         st.info(f"No recent outgoings recorded for **{vendor_name_guess}**.")
 
     # === Rotor size biodata block
-    elif matched_size:
+elif matched_size:
         data = df[df["Size (mm)"] == matched_size]
         inward = data[data["Type"] == "Inward"]["Quantity"].sum()
         outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
