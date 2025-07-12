@@ -1010,50 +1010,76 @@ elif not matched_size:
 
     # === Rotor size biodata block
 elif matched_size:
+    st.success(f"📋 Biodata for Rotor Size *{matched_size} mm*")
+
+    # Filter for this rotor size
     data = df[df["Size (mm)"] == matched_size]
+
+    # Total Inward / Outgoing (regardless of pending)
     inward = data[data["Type"] == "Inward"]["Quantity"].sum()
     outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
-    current_stock = inward - outgoing
 
+    # ✅ Current Stock = only non-pending current movements
+    actual_current = data[
+        (data["Status"] == "Current") &
+        (~data["Pending"])
+    ].copy()
+
+    actual_current['Net'] = actual_current.apply(
+        lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+    )
+    current_stock = actual_current['Net'].sum()
+
+    # Pending outgoing (i.e. marked pending)
+    pending_qty = data[
+        (data["Pending"]) &
+        (data["Status"] == "Current") &
+        (data["Type"] == "Outgoing")
+    ]["Quantity"].sum()
+
+    # Future rotors coming in
+    future_qty = data[
+        (data["Status"] == "Future") &
+        (data["Type"] == "Inward")
+    ]["Quantity"].sum()
+
+    # Usage in last 60 days
     usage_window = pd.Timestamp.today() - pd.Timedelta(days=60)
     recent_out = data[
         (data["Type"] == "Outgoing") &
-        (data["Date"] >= usage_window) &
-        (~data["Pending"])
+        (~data["Pending"]) &
+        (data["Date"] >= usage_window)
     ]
     avg_daily_usage = recent_out.groupby("Date")["Quantity"].sum().mean()
     days_left = (current_stock / avg_daily_usage) if avg_daily_usage else None
 
-    pending_qty = data[data["Pending"]]["Quantity"].sum()
-    future_qty = data[
-        (data["Status"] == "Future") & (data["Type"] == "Inward")
-    ]["Quantity"].sum()
-
-    vendors = data["Remarks"].dropna().unique().tolist()
-    recent_vendors = sorted(set(v for v in vendors if len(v) > 2))
+    # Last outgoing date
     last_out = data[data["Type"] == "Outgoing"]["Date"].max()
 
-    st.success(f"📋 Biodata for Rotor Size **{matched_size} mm**:")
+    # Recent vendors from Remarks
+    vendors = data["Remarks"].dropna().unique().tolist()
+    recent_vendors = sorted(set(v for v in vendors if len(v.strip()) > 2))
+
+    # 🧾 Show Summary
     st.markdown(f"""
-- 📥 **Total Inward**: {int(inward)}
-- 📤 **Total Outgoing**: {int(outgoing)}
-- 📦 **Current Stock**: {int(current_stock)}
-- ❗ **Pending Orders**: {int(pending_qty)}
-- 📥 **Future Inward**: {int(future_qty)}
-- 📆 **Last Outgoing**: {last_out.date() if pd.notnull(last_out) else "N/A"}
-- 📈 **Avg Daily Usage**: {round(avg_daily_usage,2) if avg_daily_usage else 'N/A'}
-- ⏳ **Days of Stock Left**: {int(days_left) if days_left else 'N/A'}
-- 🧑‍💼 **Vendors (from Remarks)**: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
+- 📥 *Total Inward*: {int(inward)}
+- 📤 *Total Outgoing*: {int(outgoing)}
+- 📦 *Current Stock* (actual): *{int(current_stock)}*
+- ❗ *Pending Orders* (outgoing marked pending): {int(pending_qty)}
+- 📥 *Future Inward* (expected): {int(future_qty)}
+- 📆 *Last Outgoing*: {last_out.date() if pd.notnull(last_out) else "N/A"}
+- 📈 *Avg Daily Usage (60d)*: {round(avg_daily_usage, 2) if avg_daily_usage else "N/A"}
+- ⏳ *Estimated Days Left*: {int(days_left) if days_left else "N/A"}
+- 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
 """)
 
+    # 📊 Usage Trend Chart (last 60 days)
     chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
     if not chart_data.empty:
         st.markdown("#### 📊 Usage Trend (Last 60 Days)")
         st.line_chart(chart_data.set_index("Date"))
-
-    # === Fallback
-elif chat_query:
-    st.info("❓ No rotor or vendor match found. Try a rotor size like '250', or a vendor name from your remarks.")
+    else:
+        st.info("No outgoing movement in the past 60 days.")
 
 with tabs[5]:
     
