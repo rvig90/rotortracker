@@ -884,6 +884,8 @@ with tabs[4]:
                 st.success(f"📦 Pending Rotors from **{selected_vendor}**")
                 st.dataframe(summary, use_container_width=True)
 
+import re
+
 st.subheader("💬 Ask about a rotor size or vendor")
 
 chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me about 250mm'")
@@ -891,25 +893,52 @@ chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me abo
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
 
-pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
-pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
-
 # === Rotor size match
 size_match = re.search(r"(\d{2,4})", chat_query)
 matched_size = int(size_match.group(1)) if size_match else None
 
-# === Vendor match check
-matched_vendors = pending_df[
-    pending_df["Vendor Name"].str.contains(chat_query.strip(), case=False, na=False)
-]
+# === Extract possible vendor name
+vendor_match = re.search(r"from\s+(.+)", chat_query, re.IGNORECASE)
+possible_vendor = vendor_match.group(1).strip() if vendor_match else chat_query.strip()
 
-if matched_vendors.shape[0] > 0:
-    vendor_name_guess = matched_vendors["Vendor Name"].iloc[0]
-    st.success(f"📬 Pending orders for vendor: **{vendor_name_guess}**")
+# === Is this a pending query?
+is_pending_query = "pending" in chat_query.lower()
 
-    result = matched_vendors[["Date", "Size (mm)", "Quantity", "Remarks"]].copy()
-    result["Days Pending"] = (pd.Timestamp.today() - result["Date"]).dt.days
-    st.dataframe(result.sort_values("Date"), use_container_width=True)
+# === Vendor-based pending logic
+if is_pending_query:
+    matched_pending = df[
+        (df["Pending"]) &
+        (df["Status"] == "Current") &
+        (df["Remarks"].str.contains(possible_vendor, case=False, na=False))
+    ].copy()
+
+    if not matched_pending.empty:
+        st.success(f"📬 Pending entries for **{possible_vendor}**")
+        st.dataframe(matched_pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
+
+        # Store for editing
+        vendor_name_guess = possible_vendor
+        matched_vendors = matched_pending.copy()
+    else:
+        st.info(f"No pending entries found for **{possible_vendor}**.")
+        matched_vendors = pd.DataFrame()
+        vendor_name_guess = None
+
+# === If vendor-only query (not using 'pending' but still valid)
+elif not matched_size:
+    matched_vendors = df[
+        (df["Remarks"].str.contains(possible_vendor, case=False, na=False))
+    ].copy()
+
+    if not matched_vendors.empty:
+        vendor_name_guess = possible_vendor
+        st.success(f"🔍 Showing entries related to vendor: **{vendor_name_guess}**")
+    else:
+        matched_vendors = pd.DataFrame()
+        vendor_name_guess = None
+
+# === The rest of the logic continues
+# ... (recent outgoings, trend, edit support, etc. follows here)
 
     # === 🔁 Edit a specific entry
     edit_query = st.text_input("✏️ To edit, type: 'Edit entry 2'")
