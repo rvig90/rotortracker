@@ -905,18 +905,22 @@ buyer_match = re.search(r"(?:from|for)?\s*([a-zA-Z0-9\s]+)", chat_query)
 possible_buyer = buyer_match.group(1).strip() if buyer_match else chat_query.strip()
 
 # === CASE 1: Match Pending Orders from a Buyer
+# === CASE 1: Match Pending Orders from a Buyer
 if is_pending_query:
+    # Remove the word "pending(s)" from query to isolate buyer name
+    buyer_name = re.sub(r"pending[s]?", "", chat_query, flags=re.IGNORECASE).strip()
+
     pending = df[
         (df["Type"] == "Outgoing") &
         (df["Pending"]) &
-        (df["Remarks"].str.contains(possible_buyer, case=False, na=False))
+        (df["Remarks"].str.contains(buyer_name, case=False, na=False))
     ].copy()
 
     if not pending.empty:
-        st.success(f"📬 Pending Outgoing Orders for *{possible_buyer}*")
+        st.success(f"📬 Pending Outgoing Orders for *{buyer_name}*")
         st.dataframe(pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
     else:
-        st.info(f"No pending orders found for *{possible_buyer}*.")
+        st.info(f"No pending orders found for *{buyer_name}*.")
 
 # === CASE 2: Show All Entries for Rotor Size
 elif matched_size:
