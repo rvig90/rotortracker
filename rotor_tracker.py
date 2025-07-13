@@ -1015,7 +1015,7 @@ else:
         st.info(f"No recent outgoings recorded for **{vendor_name_guess}**.")
 
     # === Rotor size biodata block
-elif matched_size:
+    elif matched_size:
     st.success(f"📋 Biodata for Rotor Size *{matched_size} mm*")
 
     # Filter for this rotor size
