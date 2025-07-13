@@ -885,7 +885,56 @@ with tabs[4]:
                 st.dataframe(summary, use_container_width=True)
 
 import re
+import re
 
+# === LAYERED: "100mm last 5 entries for Buyer A pending"
+last_n_pattern = re.search(r"(?:last\s*(\d+))", chat_query.lower())
+size_pattern = re.search(r"(\d{2,4})", chat_query)
+type_pattern = re.search(r"\b(inward|outgoing)\b", chat_query.lower())
+is_pending = "pending" in chat_query.lower()
+
+entry_count = int(last_n_pattern.group(1)) if last_n_pattern else None
+rotor_size = int(size_pattern.group(1)) if size_pattern else None
+movement_type = type_pattern.group(1).capitalize() if type_pattern else None
+
+# Extract possible buyer (anything else that's not captured)
+query_cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,4})", "", chat_query, flags=re.IGNORECASE).strip()
+buyer_name = query_cleaned if query_cleaned else None
+
+if entry_count and rotor_size:
+    filtered = df.copy()
+
+    # Apply size filter
+    filtered = filtered[filtered["Size (mm)"] == rotor_size]
+
+    # Apply type filter
+    if movement_type:
+        filtered = filtered[filtered["Type"] == movement_type]
+
+    # Apply pending filter
+    if is_pending:
+        filtered = filtered[filtered["Pending"] == True]
+
+    # Apply buyer filter
+    if buyer_name:
+        filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
+
+    # Sort and limit
+    filtered = filtered.sort_values("Date", ascending=False).head(entry_count)
+
+    if not filtered.empty:
+        title = f"📋 Last {entry_count} entries for {rotor_size}mm"
+        if movement_type:
+            title += f" ({movement_type})"
+        if is_pending:
+            title += " [Pending]"
+        if buyer_name:
+            title += f" from **{buyer_name}**"
+
+        st.success(title)
+        st.dataframe(filtered[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+    else:
+        st.info("No matching entries found.")
 st.subheader("💬 Ask about a rotor size or buyer")
 
 chat_query = st.text_input("Try: 'Buyer A', '100mm entries', or 'Buyer B pendings'")
@@ -922,8 +971,6 @@ if is_pending_query:
     else:
         st.info(f"No pending orders found for *{buyer_name}*.")
 
-# === CASE: "100mm last N entries"
-
 # === CASE 2: Show All Entries for Rotor Size
 elif matched_size:
     size_entries = df[df["Size (mm)"] == matched_size].copy()
@@ -932,21 +979,6 @@ elif matched_size:
         st.dataframe(size_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
     else:
         st.info(f"No entries found for {matched_size}mm rotors.")
-        last_n_match = re.search(r"(\d{2,4}).last\s(\d+)", chat_query.lower())
-    if last_n_match:
-        size = int(last_n_match.group(1))
-        count = int(last_n_match.group(2))
-    
-        last_entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(count)
-    
-        if not last_entries.empty:
-            st.success(f"📋 Last {count} entries for *{size}mm* rotor")
-            st.dataframe(last_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-        else:
-            st.info(f"No entries found for {size}mm rotors.")
-
-
-
 # === CASE 3: Show all orders (Pending + Delivered) for a Buyer
 elif possible_buyer:
     buyer_data = df[
