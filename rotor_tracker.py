@@ -922,15 +922,6 @@ if is_pending_query:
     else:
         st.info(f"No pending orders found for *{buyer_name}*.")
 
-# === CASE 2: Show All Entries for Rotor Size
-elif matched_size:
-    size_entries = df[df["Size (mm)"] == matched_size].copy()
-    if not size_entries.empty:
-        st.success(f"📄 All entries for *{matched_size}mm rotors*")
-        st.dataframe(size_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-    else:
-        st.info(f"No entries found for {matched_size}mm rotors.")
-
 # === CASE: "100mm last N entries"
 last_n_match = re.search(r"(\d{2,4}).last\s(\d+)", chat_query.lower())
 if last_n_match:
@@ -944,6 +935,16 @@ if last_n_match:
         st.dataframe(last_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
     else:
         st.info(f"No entries found for {size}mm rotors.")
+# === CASE 2: Show All Entries for Rotor Size
+elif matched_size:
+    size_entries = df[df["Size (mm)"] == matched_size].copy()
+    if not size_entries.empty:
+        st.success(f"📄 All entries for *{matched_size}mm rotors*")
+        st.dataframe(size_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+    else:
+        st.info(f"No entries found for {matched_size}mm rotors.")
+
+
 
 # === CASE 3: Show all orders (Pending + Delivered) for a Buyer
 elif possible_buyer:
