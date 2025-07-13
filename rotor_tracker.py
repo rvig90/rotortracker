@@ -732,30 +732,30 @@ else:
         else:
             st.info("No sizes had enough data to forecast.")
 
-st.subheader("📦 XGBoost Forecast")
-
-for size in sorted(df["Size (mm)"].unique()):
-    df_size = df[df["Size (mm)"] == size]
-    df_outgoing = df_size[
-        (df_size["Type"] == "Outgoing") &
-        (df_size["Status"] == "Current") &
-        (~df_size["Pending"])
-    ][["Date", "Quantity"]].copy()
-
-    if len(df_outgoing) < 10:
-     st.info(f"📉 Not enough data to forecast {size}mm (only {len(df_outgoing)} rows)")
-     continue
-
-    try:
-        forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=7)
-
-        forecast_df["Size (mm)"] = size
-        st.markdown(f"#### 📦 Forecast for {size}mm Rotor")
-        st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
-        st.dataframe(forecast_df, use_container_width=True, hide_index=True)
-
-    except Exception as e:
-        st.warning(f"XGBoost forecast failed for {size}: {e}")
+        st.subheader("📦 XGBoost Forecast")
+        
+        for size in sorted(df["Size (mm)"].unique()):
+            df_size = df[df["Size (mm)"] == size]
+            df_outgoing = df_size[
+                (df_size["Type"] == "Outgoing") &
+                (df_size["Status"] == "Current") &
+                (~df_size["Pending"])
+            ][["Date", "Quantity"]].copy()
+        
+            if len(df_outgoing) < 10:
+             st.info(f"📉 Not enough data to forecast {size}mm (only {len(df_outgoing)} rows)")
+             continue
+        
+            try:
+                forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=7)
+        
+                forecast_df["Size (mm)"] = size
+                st.markdown(f"#### 📦 Forecast for {size}mm Rotor")
+                st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
+                st.dataframe(forecast_df, use_container_width=True, hide_index=True)
+        
+            except Exception as e:
+                st.warning(f"XGBoost forecast failed for {size}: {e}")
 with tabs[3]:
     # Sample dataframe (you can use st.session_state.data instead)
     df = st.session_state.data.copy()
