@@ -931,6 +931,20 @@ elif matched_size:
     else:
         st.info(f"No entries found for {matched_size}mm rotors.")
 
+# === CASE: "100mm last N entries"
+last_n_match = re.search(r"(\d{2,4}).last\s(\d+)", chat_query.lower())
+if last_n_match:
+    size = int(last_n_match.group(1))
+    count = int(last_n_match.group(2))
+
+    last_entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(count)
+
+    if not last_entries.empty:
+        st.success(f"📋 Last {count} entries for *{size}mm* rotor")
+        st.dataframe(last_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+    else:
+        st.info(f"No entries found for {size}mm rotors.")
+
 # === CASE 3: Show all orders (Pending + Delivered) for a Buyer
 elif possible_buyer:
     buyer_data = df[
