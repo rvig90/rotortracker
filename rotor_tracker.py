@@ -581,6 +581,29 @@ with tabs[2]:
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
     df = df[df["Status"] != "Future"]  # ✅ Exclude Future entries
+    # === CASE: "pendings" or "pending orders" (no size/buyer mentioned)
+    if re.search(r"\b(pendings|pending orders?)\b", chat_query.lower()):
+        pending_df = df[
+            (df["Type"] == "Outgoing") &
+            (df["Pending"] == True) &
+            (df["Status"] == "Current")
+        ].copy()
+    
+        if not pending_df.empty:
+            st.success("📬 Pending Outgoing Orders (Grouped by Buyer)")
+    
+            # Group by Remarks (Buyer)
+            buyer_grouped = (
+                pending_df.groupby("Remarks")
+                .agg({"Quantity": "sum", "Date": "count"})
+                .reset_index()
+                .rename(columns={"Remarks": "Buyer", "Quantity": "Total Pending", "Date": "Orders"})
+                .sort_values("Total Pending", ascending=False)
+            )
+    
+            st.dataframe(buyer_grouped, use_container_width=True, hide_index=True)
+        else:
+            st.info("✅ No pending orders found.")
     
     # === Extract all possible filters ===
     last_n_match = re.search(r"last\s*(\d+)", chat_query.lower())
