@@ -573,189 +573,102 @@ with tabs[1]:
                         st.rerun()
 # === TAB 3: Rotor Trend ===
 with tabs[2]:
-    try:
-        df = st.session_state.data.copy()
-        df["Date"] = pd.to_datetime(df["Date"])
+    import re
 
-        trend_df = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
-        trend_df["Net"] = trend_df.apply(
-            lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
-        )
-
-        min_date = trend_df["Date"].min()
-        max_date = trend_df["Date"].max()
-
-        st.subheader("📅 Select Date Range & Rotor Sizes")
-        col1, col2 = st.columns(2)
-        with col1:
-            trend_range = st.date_input(
-                "Filter by Date",
-                value=[min_date, max_date],
-                min_value=min_date,
-                max_value=max_date,
-                key="trend_date_range"
-            )
-        with col2:
-            size_options = sorted(trend_df["Size (mm)"].unique())
-            selected_sizes = st.multiselect(
-                "Filter by Rotor Size", options=size_options, default=size_options, key="trend_sizes"
-            )
-
-        filtered = trend_df[
-            (trend_df["Date"] >= pd.to_datetime(trend_range[0])) &
-            (trend_df["Date"] <= pd.to_datetime(trend_range[1])) &
-            (trend_df["Size (mm)"].isin(selected_sizes))
+    st.subheader("💬 Ask about a rotor size or buyer")
+    
+    chat_query = st.text_input("Try: 'Buyer A', '100mm last 5', 'Buyer B pending', or 'MegaTech last 3 outgoing pending'")
+    
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df[df["Status"] != "Future"]  # ✅ Exclude Future entries
+    
+    # === Extract all possible filters ===
+    last_n_match = re.search(r"last\s*(\d+)", chat_query.lower())
+    size_match = re.search(r"(\d{2,4})", chat_query)
+    type_match = re.search(r"\b(inward|outgoing)\b", chat_query.lower())
+    is_pending = "pending" in chat_query.lower()
+    
+    entry_count = int(last_n_match.group(1)) if last_n_match else None
+    rotor_size = int(size_match.group(1)) if size_match else None
+    movement_type = type_match.group(1).capitalize() if type_match else None
+    
+    # Remove known keywords to isolate possible buyer name
+    query_cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,4})", "", chat_query, flags=re.IGNORECASE).strip()
+    buyer_name = query_cleaned if query_cleaned else None
+    
+    # === CASE 1: "last N" entries (with optional rotor, type, buyer, pending)
+    if entry_count:
+        filtered = df.copy()
+    
+        if rotor_size:
+            filtered = filtered[filtered["Size (mm)"] == rotor_size]
+    
+        if movement_type:
+            filtered = filtered[filtered["Type"] == movement_type]
+    
+        if is_pending:
+            filtered = filtered[filtered["Pending"] == True]
+    
+        if buyer_name:
+            filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
+    
+        filtered = filtered.sort_values("Date", ascending=False).head(entry_count)
+    
+        if not filtered.empty:
+            title = f"📋 Last {entry_count} entries"
+            if rotor_size:
+                title += f" for **{rotor_size}mm**"
+            if movement_type:
+                title += f" ({movement_type})"
+            if is_pending:
+                title += " [Pending]"
+            if buyer_name:
+                title += f" from **{buyer_name}**"
+    
+            st.success(title)
+            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+        else:
+            st.info("No matching entries found.")
+    
+    # === CASE 2: Just rotor size
+    elif rotor_size:
+        size_df = df[df["Size (mm)"] == rotor_size]
+        if not size_df.empty:
+            st.success(f"📄 All entries for **{rotor_size}mm** rotor")
+            st.dataframe(size_df[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+        else:
+            st.info(f"No entries found for {rotor_size}mm.")
+    
+    # === CASE 3: Buyer with 'pending'
+    elif is_pending and buyer_name:
+        buyer_pending = df[
+            (df["Type"] == "Outgoing") &
+            (df["Pending"] == True) &
+            (df["Remarks"].str.contains(buyer_name, case=False, na=False))
         ]
-
-        if filtered.empty:
-            st.warning("No data available for selected filters.")
+        if not buyer_pending.empty:
+            st.success(f"📬 Pending orders for **{buyer_name}**")
+            st.dataframe(buyer_pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
         else:
-            grouped = (
-                filtered.groupby(["Date", "Size (mm)"])["Net"]
-                .sum()
-                .reset_index()
-                .sort_values("Date")
-            )
-            grouped["Cumulative Stock"] = grouped.groupby("Size (mm)")["Net"].cumsum()
-
-            import altair as alt
-            chart = alt.Chart(grouped).mark_line(point=True).encode(
-                x=alt.X("Date:T", title="Date"),
-                y=alt.Y("Cumulative Stock:Q", title="Net Stock Level"),
-                color=alt.Color("Size (mm):N", title="Rotor Size"),
-                tooltip=[
-                    alt.Tooltip("Date:T"),
-                    alt.Tooltip("Size (mm):N"),
-                    alt.Tooltip("Cumulative Stock:Q")
-                ]
-            ).properties(
-                width="container",
-                height=400,
-                title="Rotor Stock Trend Over Time"
-            ).interactive()
-
-            st.altair_chart(chart, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"Failed to generate rotor trend chart: {e}")
-        
-st.subheader("📉 Actual vs Forecasted Rotor Demand with Confidence Band")
-
-df = st.session_state.data.copy()
-df["Date"] = pd.to_datetime(df["Date"])
-
-# Filter for valid entries
-df = df[
-    (df["Type"] == "Outgoing") &
-    (df["Status"] == "Current") &
-    (~df["Pending"])
-]
-
-if df.empty:
-    st.info("Not enough data to forecast.")
-else:
-    # === SIZE FILTER ===
-    available_sizes = sorted(df["Size (mm)"].unique())
-    selected_sizes = st.multiselect(
-        "📐 Select Rotor Sizes to Forecast",
-        options=available_sizes,
-        default=available_sizes
-    )
-
-    if not selected_sizes:
-        st.warning("Please select at least one rotor size.")
-    else:
-        combined_data = []
-        confidence_data = []
-
-        for size in selected_sizes:
-            df_size = df[df["Size (mm)"] == size]
-            actual = df_size.groupby("Date")["Quantity"].sum().reset_index()
-            actual.columns = ["Date", "Quantity"]
-            actual["Size (mm)"] = size
-            actual["Type"] = "Actual"
-
-            if len(actual) < 3:
-                continue
-
-            try:
-                prophet_df = actual[["Date", "Quantity"]].copy()
-                prophet_df.columns = ["ds", "y"]
-
-                model = Prophet()
-                model.fit(prophet_df)
-
-                future = model.make_future_dataframe(periods=30)
-                forecast = model.predict(future)
-
-                # Forecast points
-                forecast_df = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
-                forecast_df.columns = ["Date", "Quantity", "Lower", "Upper"]
-                forecast_df["Size (mm)"] = size
-                forecast_df["Type"] = "Forecast"
-
-                combined = pd.concat([
-                    actual,
-                    forecast_df[["Date", "Quantity", "Size (mm)", "Type"]]
-                ])
-                combined_data.append(combined)
-                confidence_data.append(forecast_df)
-
-            except Exception as e:
-                st.warning(f"Forecast failed for size {size}: {e}")
-
-        if combined_data:
-            full_df = pd.concat(combined_data)
-            full_df["Quantity"] = full_df["Quantity"].round(2)
-
-            band_df = pd.concat(confidence_data)
-
-            line_chart = alt.Chart(full_df).mark_line(point=True).encode(
-                x="Date:T",
-                y="Quantity:Q",
-                color="Size (mm):N",
-                strokeDash="Type:N",
-                tooltip=["Date", "Size (mm)", "Quantity", "Type"]
-            )
-
-            band_chart = alt.Chart(band_df).mark_area(opacity=0.2).encode(
-                x="Date:T",
-                y="Lower:Q",
-                y2="Upper:Q",
-                color=alt.Color("Size (mm):N", legend=None)
-            )
-
-            st.altair_chart((band_chart + line_chart).properties(height=400), use_container_width=True)
-
-            st.markdown("### 📄 Combined Forecast Data")
-            st.dataframe(full_df.sort_values(["Size (mm)", "Date"]), use_container_width=True, hide_index=True)
+            st.info(f"No pending orders found for {buyer_name}.")
+    
+    # === CASE 4: Buyer name only
+    elif buyer_name:
+        buyer_data = df[
+            (df["Type"] == "Outgoing") &
+            (df["Remarks"].str.contains(buyer_name, case=False, na=False))
+        ]
+        if not buyer_data.empty:
+            st.success(f"📤 All orders for **{buyer_name}**")
+            st.dataframe(buyer_data[["Date", "Size (mm)", "Quantity", "Remarks", "Pending"]], use_container_width=True)
         else:
-            st.info("No sizes had enough data to forecast.")
-
-        st.subheader("📦 XGBoost Forecast")
-        
-        for size in sorted(df["Size (mm)"].unique()):
-            df_size = df[df["Size (mm)"] == size]
-            df_outgoing = df_size[
-                (df_size["Type"] == "Outgoing") &
-                (df_size["Status"] == "Current") &
-                (~df_size["Pending"])
-            ][["Date", "Quantity"]].copy()
-        
-            if len(df_outgoing) < 10:
-             st.info(f"📉 Not enough data to forecast {size}mm (only {len(df_outgoing)} rows)")
-             continue
-        
-            try:
-                forecast_df = forecast_with_xgboost(df_outgoing, forecast_days=7)
-        
-                forecast_df["Size (mm)"] = size
-                st.markdown(f"#### 📦 Forecast for {size}mm Rotor")
-                st.line_chart(forecast_df.set_index("Date")["Forecast Qty"])
-                st.dataframe(forecast_df, use_container_width=True, hide_index=True)
-        
-            except Exception as e:
-                st.warning(f"XGBoost forecast failed for {size}: {e}")
+            st.info(f"No entries found for buyer: **{buyer_name}**.")
+    
+    # === CASE 5: Nothing matched
+    elif chat_query:
+        st.info("❓ No match found. Try: 'Buyer A last 3', '300mm', or 'Buyer B pending'.")
+    
 with tabs[3]:
     # Sample dataframe (you can use st.session_state.data instead)
     df = st.session_state.data.copy()
