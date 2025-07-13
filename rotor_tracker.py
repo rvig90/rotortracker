@@ -212,7 +212,7 @@ with form_tabs[2]:
             st.rerun()
 
 # ====== STOCK SUMMARY ======
-tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "📈 Rotor Trend", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
+tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
