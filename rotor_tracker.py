@@ -943,29 +943,6 @@ elif possible_buyer:
 else:
     st.info("❓ Please enter a valid rotor size or buyer name.")
 
-
-
-    # 🧾 Show Summary
-    st.markdown(f"""
-- 📥 *Total Inward*: {int(inward)}
-- 📤 *Total Outgoing*: {int(outgoing)}
-- 📦 *Current Stock* (actual): *{int(current_stock)}*
-- ❗ *Pending Orders* (outgoing marked pending): {int(pending_qty)}
-- 📥 *Future Inward* (expected): {int(future_qty)}
-- 📆 *Last Outgoing*: {last_out.date() if pd.notnull(last_out) else "N/A"}
-- 📈 *Avg Daily Usage (60d)*: {round(avg_daily_usage, 2) if avg_daily_usage else "N/A"}
-- ⏳ *Estimated Days Left*: {int(days_left) if days_left else "N/A"}
-- 🧑‍💼 *Vendors (from Remarks)*: {', '.join(recent_vendors) if recent_vendors else 'N/A'}
-""")
-
-    # 📊 Usage Trend Chart (last 60 days)
-    chart_data = recent_out.groupby("Date")["Quantity"].sum().reset_index()
-    if not chart_data.empty:
-        st.markdown("#### 📊 Usage Trend (Last 60 Days)")
-        st.line_chart(chart_data.set_index("Date"))
-    else:
-        st.info("No outgoing movement in the past 60 days.")
-
 with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
