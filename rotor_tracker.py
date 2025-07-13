@@ -886,56 +886,62 @@ with tabs[4]:
 
 import re
 
-st.subheader("💬 Ask about a rotor size or vendor")
+st.subheader("💬 Ask about a rotor size or buyer")
 
-chat_query = st.text_input("Try: 'Vendor A', 'Pending from XYZ', or 'Tell me about 250mm'")
+chat_query = st.text_input("Try: 'Buyer A', '100mm entries', or 'Buyer B pendings'")
 
 df = st.session_state.data.copy()
 df["Date"] = pd.to_datetime(df["Date"])
 
-# === Rotor size match
+# === Match rotor size
 size_match = re.search(r"(\d{2,4})", chat_query)
 matched_size = int(size_match.group(1)) if size_match else None
 
-# === Extract possible vendor name
-vendor_match = re.search(r"from\s+(.+)", chat_query, re.IGNORECASE)
-possible_vendor = vendor_match.group(1).strip() if vendor_match else chat_query.strip()
-
-# === Is this a pending query?
+# === Is this a pending request?
 is_pending_query = "pending" in chat_query.lower()
 
-# === Vendor-based pending logic
+# === Try to extract buyer name
+buyer_match = re.search(r"(?:from|for)?\s*([a-zA-Z0-9\s]+)", chat_query)
+possible_buyer = buyer_match.group(1).strip() if buyer_match else chat_query.strip()
+
+# === CASE 1: Match Pending Orders from a Buyer
 if is_pending_query:
-    matched_pending = df[
+    pending = df[
+        (df["Type"] == "Outgoing") &
         (df["Pending"]) &
-        (df["Status"] == "Current") &
-        (df["Remarks"].str.contains(possible_vendor, case=False, na=False))
+        (df["Remarks"].str.contains(possible_buyer, case=False, na=False))
     ].copy()
 
-    if not matched_pending.empty:
-        st.success(f"📬 Pending entries for **{possible_vendor}**")
-        st.dataframe(matched_pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
-
-        # Store for editing
-        vendor_name_guess = possible_vendor
-        matched_vendors = matched_pending.copy()
+    if not pending.empty:
+        st.success(f"📬 Pending Outgoing Orders for *{possible_buyer}*")
+        st.dataframe(pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
     else:
-        st.info(f"No pending entries found for **{possible_vendor}**.")
-        matched_vendors = pd.DataFrame()
-        vendor_name_guess = None
+        st.info(f"No pending orders found for *{possible_buyer}*.")
 
-# === If vendor-only query (not using 'pending' but still valid)
-elif not matched_size:
-    matched_vendors = df[
-        (df["Remarks"].str.contains(possible_vendor, case=False, na=False))
+# === CASE 2: Show All Entries for Rotor Size
+elif matched_size:
+    size_entries = df[df["Size (mm)"] == matched_size].copy()
+    if not size_entries.empty:
+        st.success(f"📄 All entries for *{matched_size}mm rotors*")
+        st.dataframe(size_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+    else:
+        st.info(f"No entries found for {matched_size}mm rotors.")
+
+# === CASE 3: Show all orders (Pending + Delivered) for a Buyer
+elif possible_buyer:
+    buyer_data = df[
+        (df["Type"] == "Outgoing") &
+        (df["Remarks"].str.contains(possible_buyer, case=False, na=False))
     ].copy()
 
-    if not matched_vendors.empty:
-        vendor_name_guess = possible_vendor
-        st.success(f"🔍 Showing entries related to vendor: **{vendor_name_guess}**")
+    if not buyer_data.empty:
+        st.success(f"📤 All Outgoing Orders for *{possible_buyer}*")
+        st.dataframe(buyer_data[["Date", "Size (mm)", "Quantity", "Remarks", "Pending"]].sort_values("Date"), use_container_width=True)
     else:
-        matched_vendors = pd.DataFrame()
-        vendor_name_guess = None
+        st.info(f"No orders found for buyer: *{possible_buyer}*.")
+
+else:
+    st.info("❓ Please enter a valid rotor size or buyer name.")
 
 # === The rest of the logic continues
 # ... (recent outgoings, trend, edit support, etc. follows here)
