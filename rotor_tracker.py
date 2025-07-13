@@ -574,8 +574,7 @@ with tabs[1]:
 # === TAB 3: Rotor Trend ===
 with tabs[2]:
     import re
-
-    st.subheader("💬 Ask about a rotor size or buyer")
+    st.subheader("💬 Rotor Chatbot lite")
     
     chat_query = st.text_input("Try: 'Buyer A', '100mm last 5', 'Buyer B pending', or 'MegaTech last 3 outgoing pending'")
     
@@ -596,6 +595,20 @@ with tabs[2]:
     # Remove known keywords to isolate possible buyer name
     query_cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,4})", "", chat_query, flags=re.IGNORECASE).strip()
     buyer_name = query_cleaned if query_cleaned else None
+
+    # === CASE: "250mm pendings"
+    if rotor_size and is_pending:
+        pending_for_size = df[
+            (df["Size (mm)"] == rotor_size) &
+            (df["Type"] == "Outgoing") &
+            (df["Pending"] == True)
+        ]
+    
+        if not pending_for_size.empty:
+            st.success(f"📦 Pending Outgoing Orders for **{rotor_size}mm**")
+            st.dataframe(pending_for_size[["Date", "Quantity", "Remarks"]].sort_values("Date"), use_container_width=True)
+        else:
+            st.info(f"No pending outgoing orders found for **{rotor_size}mm**.")
     
     # === CASE 1: "last N" entries (with optional rotor, type, buyer, pending)
     if entry_count:
