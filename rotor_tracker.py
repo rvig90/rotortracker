@@ -923,18 +923,7 @@ if is_pending_query:
         st.info(f"No pending orders found for *{buyer_name}*.")
 
 # === CASE: "100mm last N entries"
-last_n_match = re.search(r"(\d{2,4}).last\s(\d+)", chat_query.lower())
-if last_n_match:
-    size = int(last_n_match.group(1))
-    count = int(last_n_match.group(2))
 
-    last_entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(count)
-
-    if not last_entries.empty:
-        st.success(f"📋 Last {count} entries for *{size}mm* rotor")
-        st.dataframe(last_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-    else:
-        st.info(f"No entries found for {size}mm rotors.")
 # === CASE 2: Show All Entries for Rotor Size
 elif matched_size:
     size_entries = df[df["Size (mm)"] == matched_size].copy()
@@ -943,6 +932,18 @@ elif matched_size:
         st.dataframe(size_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
     else:
         st.info(f"No entries found for {matched_size}mm rotors.")
+        last_n_match = re.search(r"(\d{2,4}).last\s(\d+)", chat_query.lower())
+    if last_n_match:
+        size = int(last_n_match.group(1))
+        count = int(last_n_match.group(2))
+    
+        last_entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(count)
+    
+        if not last_entries.empty:
+            st.success(f"📋 Last {count} entries for *{size}mm* rotor")
+            st.dataframe(last_entries[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+        else:
+            st.info(f"No entries found for {size}mm rotors.")
 
 
 
