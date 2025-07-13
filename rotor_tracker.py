@@ -610,6 +610,46 @@ with tabs[2]:
         else:
             st.info(f"No pending outgoing orders found for **{rotor_size}mm**.")
     
+    # === CASE: "250mm stock"
+    if rotor_size and "stock" in chat_query.lower():
+        current_df = df[
+            (df["Size (mm)"] == rotor_size) &
+            (df["Status"] == "Current")
+        ].copy()
+    
+        current_df["Net"] = current_df.apply(
+            lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"] if not x["Pending"] else 0,
+            axis=1
+        )
+    
+        current_stock = current_df["Net"].sum()
+    
+        st.success(f"📦 Current stock for **{rotor_size}mm** rotor: `{int(current_stock)}` units")
+    
+        # Optional: Breakdown
+        inward = current_df[current_df["Type"] == "Inward"]["Quantity"].sum()
+        delivered = current_df[
+            (current_df["Type"] == "Outgoing") &
+            (~current_df["Pending"])
+        ]["Quantity"].sum()
+    
+        pending_qty = current_df[
+            (current_df["Type"] == "Outgoing") &
+            (current_df["Pending"])
+        ]["Quantity"].sum()
+    
+        st.markdown(f"""
+    - 📥 **Total Inward**: `{int(inward)}`
+    - 📤 **Delivered Outgoing**: `{int(delivered)}`
+    - ❗ **Pending Outgoing**: `{int(pending_qty)}`
+    - 📦 **Net Stock (Available)**: `{int(current_stock)}`
+        """)
+    
+        # Optional: Trend chart
+        history = current_df.groupby("Date")["Net"].sum().cumsum().reset_index()
+        if not history.empty:
+            st.markdown("#### 📈 Stock Movement Over Time")
+            st.line_chart(history.set_index("Date"))
     # === CASE 1: "last N" entries (with optional rotor, type, buyer, pending)
     if entry_count:
         filtered = df.copy()
