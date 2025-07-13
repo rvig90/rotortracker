@@ -581,7 +581,7 @@ with tabs[2]:
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
     df = df[df["Status"] != "Future"]  # ✅ Exclude Future entries
-    # === CASE: "pendings" or "pending orders" (no size/buyer mentioned)
+    # === CASE: 'pendings' or 'pending orders' — group by buyer + size
     if re.search(r"\b(pendings|pending orders?)\b", chat_query.lower()):
         pending_df = df[
             (df["Type"] == "Outgoing") &
@@ -590,18 +590,21 @@ with tabs[2]:
         ].copy()
     
         if not pending_df.empty:
-            st.success("📬 Pending Outgoing Orders (Grouped by Buyer)")
+            st.success("📬 Pending Orders Grouped by Buyer and Rotor Size")
     
-            # Group by Remarks (Buyer)
-            buyer_grouped = (
-                pending_df.groupby("Remarks")
-                .agg({"Quantity": "sum", "Date": "count"})
+            grouped = (
+                pending_df.groupby(["Remarks", "Size (mm)"])["Quantity"]
+                .sum()
                 .reset_index()
-                .rename(columns={"Remarks": "Buyer", "Quantity": "Total Pending", "Date": "Orders"})
-                .sort_values("Total Pending", ascending=False)
+                .rename(columns={
+                    "Remarks": "Buyer",
+                    "Size (mm)": "Rotor Size (mm)",
+                    "Quantity": "Pending Quantity"
+                })
+                .sort_values(["Buyer", "Rotor Size (mm)"])
             )
     
-            st.dataframe(buyer_grouped, use_container_width=True, hide_index=True)
+            st.dataframe(grouped, use_container_width=True, hide_index=True)
         else:
             st.info("✅ No pending orders found.")
     
