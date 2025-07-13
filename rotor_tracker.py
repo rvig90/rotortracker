@@ -885,7 +885,12 @@ with tabs[4]:
                 st.dataframe(summary, use_container_width=True)
 
 import re
-import re
+st.subheader("💬 Ask about a rotor size or buyer")
+
+chat_query = st.text_input("Try: 'Buyer A', '100mm entries', or 'Buyer B pendings'")
+
+df = st.session_state.data.copy()
+df["Date"] = pd.to_datetime(df["Date"])
 
 # === LAYERED: "100mm last 5 entries for Buyer A pending"
 last_n_pattern = re.search(r"(?:last\s*(\d+))", chat_query.lower())
@@ -935,13 +940,6 @@ if entry_count and rotor_size:
         st.dataframe(filtered[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
     else:
         st.info("No matching entries found.")
-st.subheader("💬 Ask about a rotor size or buyer")
-
-chat_query = st.text_input("Try: 'Buyer A', '100mm entries', or 'Buyer B pendings'")
-
-df = st.session_state.data.copy()
-df["Date"] = pd.to_datetime(df["Date"])
-
 # === Match rotor size
 size_match = re.search(r"(\d{2,4})", chat_query)
 matched_size = int(size_match.group(1)) if size_match else None
