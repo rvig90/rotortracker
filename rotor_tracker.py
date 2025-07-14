@@ -286,7 +286,6 @@ with tabs[0]:
     
     st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
     
-    # Choose a rotor size
     available_sizes = sorted(outgoing["Size (mm)"].unique())
     selected_size = st.selectbox("Select Rotor Size to Forecast", available_sizes)
     
