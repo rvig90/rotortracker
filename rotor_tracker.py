@@ -217,54 +217,6 @@ tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot l
 # === TAB 1: Stock Summary ===
 with tabs[0]:
 # Forecast
-    st.subheader("📅 Seasonal Forecast by Month")
-
-    df = st.session_state.data.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    
-    # Use only outgoing, non-pending data
-    outgoing = df[
-        (df["Status"] == "Current") &
-        (~df["Pending"]) &
-        (df["Type"] == "Outgoing")
-    ].copy()
-    
-    # Extract month name for seasonality
-    outgoing["Month"] = outgoing["Date"].dt.month
-    outgoing["Month Name"] = outgoing["Date"].dt.strftime('%b')
-    
-    # Group by rotor size and month
-    seasonal = outgoing.groupby(["Size (mm)", "Month", "Month Name"])["Quantity"].mean().reset_index()
-    seasonal = seasonal.sort_values(["Size (mm)", "Month"])
-    
-    # Show seasonal trend per rotor size
-    if seasonal.empty:
-        st.info("Not enough outgoing data for seasonal analysis.")
-    else:
-        st.dataframe(seasonal[["Size (mm)", "Month Name", "Quantity"]].rename(columns={
-            "Quantity": "Average Outgoing Quantity"
-        }), use_container_width=True, hide_index=True)
-    
-        # Optional: Chart of seasonal trend
-       
-        seasonal["Month Name"] = pd.Categorical(seasonal["Month Name"],
-                                                categories=["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-                                                ordered=True)
-    
-        chart = alt.Chart(seasonal).mark_line(point=True).encode(
-            x=alt.X("Month Name:N", title="Month"),
-            y=alt.Y("Quantity:Q", title="Avg Outgoing Quantity"),
-            color=alt.Color("Size (mm):N", title="Rotor Size"),
-            tooltip=["Size (mm)", "Month Name", "Quantity"]
-        ).properties(
-            width="container",
-            height=400,
-            title="Seasonal Rotor Demand (Monthly Average)"
-        )
-    
-        st.altair_chart(chart, use_container_width=True)
-
         from prophet import Prophet
     
         st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
