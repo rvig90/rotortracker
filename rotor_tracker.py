@@ -385,6 +385,7 @@ with tabs[0]:
         forecast["Month"] = forecast["ds"].dt.to_period("M")
         monthly = forecast.groupby("Month")["yhat"].mean().reset_index()
         monthly.columns = ["Month", "Forecasted Quantity"]
+        monthly["Forcasted Quantity"] = monthly["Forecasted Quantity"].round(0).astype(int)
     
         st.dataframe(monthly.tail(6), use_container_width=True)
     
