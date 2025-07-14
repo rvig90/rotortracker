@@ -282,7 +282,7 @@ with tabs[0]:
     if not overdue.empty:
         st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
         st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)    
-      from prophet import Prophet
+      
     
         st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
         
