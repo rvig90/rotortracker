@@ -216,37 +216,7 @@ tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot l
 
 # === TAB 1: Stock Summary ===
 with tabs[0]:
-    st.subheader("🔔 Stock Alerts")
-
-    current = st.session_state.data[
-        (st.session_state.data['Status'] == 'Current') &
-        (~st.session_state.data['Pending'])
-    ].copy()
-    current['Net'] = current.apply(
-        lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
-    )
-    stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
-    stock.columns = ['Size (mm)', 'Current Stock']
-
-    # Alert: Low stock
-    low_stock = stock[stock['Current Stock'] < 100]
-    if not low_stock.empty:
-        st.warning("⚠️ Low Stock Rotor Sizes (Below 100 units):")
-        st.dataframe(low_stock, use_container_width=True, hide_index=True)
-
-    # Alert: Pending > 7 days
-    pending = st.session_state.data[
-        (st.session_state.data['Status'] == 'Current') &
-        (st.session_state.data['Pending'])
-    ].copy()
-    pending['Days Pending'] = (pd.Timestamp.today() - pd.to_datetime(pending['Date'])).dt.days
-    overdue = pending[pending['Days Pending'] > 7]
-
-    if not overdue.empty:
-        st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
-        st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)
-
-    # Forecast
+# Forecast
     st.subheader("📅 Seasonal Forecast by Month")
 
     df = st.session_state.data.copy()
@@ -338,24 +308,6 @@ with tabs[0]:
             )
             st.altair_chart(chart, use_container_width=True)    
         
-        
-        st.subheader("🔮 Forecast for Next Month Based on Seasonality")
-        
-        # Get next month number
-        today = datetime.today()
-        next_month_num = (today.month % 12) + 1  # handles Dec → Jan
-        
-        # Filter seasonal averages for next month
-        next_month_forecast = seasonal[seasonal["Month"] == next_month_num].copy()
-        
-        # Clean display
-        next_month_forecast = next_month_forecast[["Size (mm)", "Quantity"]]
-        next_month_forecast.columns = ["Size (mm)", f"Forecast for {datetime(1900, next_month_num, 1).strftime('%B')}"]
-        
-        if next_month_forecast.empty:
-            st.info("No seasonal data available to forecast next month.")
-        else:
-            st.dataframe(next_month_forecast, use_container_width=True, hide_index=True)
     # Stock Summary
     st.subheader("📊 Current Stock Summary")
     if not st.session_state.data.empty:
@@ -393,7 +345,37 @@ with tabs[0]:
             st.error(f"Error generating summary: {e}")
     else:
         st.info("No data available yet.")
-        
+    # Stock alerts
+    st.subheader("🔔 Stock Alerts")
+
+    current = st.session_state.data[
+        (st.session_state.data['Status'] == 'Current') &
+        (~st.session_state.data['Pending'])
+    ].copy()
+    current['Net'] = current.apply(
+        lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+    )
+    stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
+    stock.columns = ['Size (mm)', 'Current Stock']
+
+    # Alert: Low stock
+    low_stock = stock[stock['Current Stock'] < 100]
+    if not low_stock.empty:
+        st.warning("⚠️ Low Stock Rotor Sizes (Below 100 units):")
+        st.dataframe(low_stock, use_container_width=True, hide_index=True)
+
+    # Alert: Pending > 7 days
+    pending = st.session_state.data[
+        (st.session_state.data['Status'] == 'Current') &
+        (st.session_state.data['Pending'])
+    ].copy()
+    pending['Days Pending'] = (pd.Timestamp.today() - pd.to_datetime(pending['Date'])).dt.days
+    overdue = pending[pending['Days Pending'] > 7]
+
+    if not overdue.empty:
+        st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
+        st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)    
+    
     st.subheader("🧠 AI-Powered Reorder Suggestions (with Pending & Future Awareness)")
     
     df = st.session_state.data.copy()
