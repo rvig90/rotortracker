@@ -311,7 +311,49 @@ with tabs[0]:
         )
     
         st.altair_chart(chart, use_container_width=True)
-        
+    from prophet import Prophet
+
+    st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
+    
+    # Choose a rotor size
+    available_sizes = sorted(outgoing["Size (mm)"].unique())
+    selected_size = st.selectbox("Select Rotor Size to Forecast", available_sizes)
+    
+    # Filter data for selected size
+    df_size = outgoing[outgoing["Size (mm)"] == selected_size]
+    daily = df_size.groupby("Date")["Quantity"].sum().reset_index()
+    daily.columns = ["ds", "y"]
+    
+    if len(daily) < 10:
+        st.info("Not enough data to forecast this size.")
+    else:
+        m = Prophet()
+        m.fit(daily)
+    
+        future = m.make_future_dataframe(periods=180)  # Next 6 months
+        forecast = m.predict(future)
+    
+        # Monthly summary
+        forecast["Month"] = forecast["ds"].dt.to_period("M")
+        monthly = forecast.groupby("Month")["yhat"].mean().reset_index()
+        monthly.columns = ["Month", "Forecasted Quantity"]
+    
+        st.dataframe(monthly.tail(6), use_container_width=True)
+    
+        # Chart
+        import altair as alt
+        chart = alt.Chart(monthly.tail(6)).mark_bar().encode(
+            x=alt.X("Month:T", title="Month"),
+            y=alt.Y("Forecasted Quantity:Q", title="Forecasted Avg Quantity"),
+            tooltip=["Month", "Forecasted Quantity"]
+        ).properties(
+            title=f"Forecasted Monthly Demand for {selected_size}mm Rotor",
+            width="container",
+            height=300
+        )
+        st.altair_chart(chart, use_container_width=True)    
+    
+    
     st.subheader("🔮 Forecast for Next Month Based on Seasonality")
     
     # Get next month number
