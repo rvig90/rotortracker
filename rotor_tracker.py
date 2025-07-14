@@ -372,7 +372,7 @@ with tabs[0]:
     daily = df_size.groupby("Date")["Quantity"].sum().reset_index()
     daily.columns = ["ds", "y"]
     
-    if len(daily) < 10:
+    if len(daily) < 4:
         st.info("Not enough data to forecast this size.")
     else:
         m = Prophet()
