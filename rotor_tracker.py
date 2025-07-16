@@ -29,16 +29,26 @@ if 'data' not in st.session_state:
     st.session_state.filter_reset = False
 
 # ====== APP LOGO ======
+import streamlit as st
+import requests
+from PIL import Image
+import io
+
 def display_logo():
     try:
         logo_url = "https://ik.imagekit.io/zmv7kjha8x/D936A070-DB06-4439-B642-854E6510A701.PNG?updatedAt=1752629786861"
-        logo = Image.open(io.BytesIO(requests.get(logo_url).content))
+        response = requests.get(logo_url, timeout=5)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        logo = Image.open(io.BytesIO(response.content))
         st.image(logo, width=200)
-    except:
+    except requests.exceptions.RequestException as e:
+        st.warning(f"Couldn't load logo from URL: {e}")
+        st.title("Rotor Tracker")
+    except Exception as e:
+        st.warning(f"An error occurred: {e}")
         st.title("Rotor Tracker")
 
 display_logo()
-
 # ====== HELPER FUNCTIONS ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
