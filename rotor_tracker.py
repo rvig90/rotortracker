@@ -31,7 +31,7 @@ if 'data' not in st.session_state:
 # ====== APP LOGO ======
 def display_logo():
     try:
-        logo_url = "https://ibb.co/sJc31Npg"
+        logo_url = "i.ibb.co/R4tH6sGg/MR-Logo.png"
         logo = Image.open(io.BytesIO(requests.get(logo_url).content))
         st.image(logo, width=200)
     except:
