@@ -760,7 +760,6 @@ with tabs[4]:
 
     st.subheader("💬 Ask RotorBot Lite")
     
-    # --- Input + Clear History Button ---
     query = st.text_input("Ask about stock, pendings, buyers, or sizes", key="chat_query")
     
     if "chat_history" not in st.session_state:
@@ -770,115 +769,119 @@ with tabs[4]:
         st.session_state.chat_history = []
         st.success("Size history cleared.")
     
-    # --- Load and Prepare Data ---
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-    pending_df = df[(df["Pending"]) & (df["Status"] == "Current")].copy()
-    pending_df["Vendor Name"] = pending_df["Remarks"].fillna("").str.strip()
+    df["Clean_Remarks"] = df["Remarks"].fillna("").str.lower()
     
-    query = query.lower().strip()
-    
-    # === Extract Info ===
+    # Extract size from query
     size_match = re.findall(r"(\d{2,4})", query)
-    entry_match = re.search(r"last (\d{1,2}) entries", query)
     matched_size = int(size_match[0]) if size_match else None
-    entry_count = int(entry_match.group(1)) if entry_match else 5
-    is_stock = "stock" in query
-    is_pending = "pending" in query or "pendings" in query
-    is_entries = "entries" in query
-    buyer_match = None
+    entry_count_match = re.search(r"last\s+(\d+)", query.lower())
+    entry_count = int(entry_count_match.group(1)) if entry_count_match else 5
     
-    # Track sizes in session state
-    if size_match:
-        for s in size_match:
-            s_int = int(s)
-            if s_int not in st.session_state.chat_history:
-                st.session_state.chat_history.append(s_int)
+    # Flags
+    is_pending = "pending" in query.lower()
+    is_entries = "entry" in query.lower() or "entries" in query.lower()
+    is_stock = "stock" in query.lower()
     
-    # Try matching a buyer from Remarks
-    if not matched_size:
-        for r in df["Remarks"].dropna().unique():
-            if str(r).lower() in query:
-                buyer_match = str(r)
-                break
+    # === Buyer Detection from Remarks ===
+    buyer_name = None
+    for remark in df["Clean_Remarks"].dropna().unique():
+        if remark and remark in query.lower():
+            buyer_name = remark
+            break
     
-    # === Responses ===
-    # 1. Buyer pending
-    if buyer_match and is_pending:
-        filtered = pending_df[pending_df["Vendor Name"].str.contains(buyer_match, case=False, na=False)]
-        if not filtered.empty:
-            st.success(f"📦 Pending orders for buyer **{buyer_match}**:")
-            st.dataframe(filtered[["Date", "Size (mm)", "Quantity", "Remarks"]].sort_values("Date"), use_container_width=True)
+    # === 1. Show Buyer Pendings ===
+    if buyer_name and is_pending:
+        buyer_pending = df[
+            (df["Clean_Remarks"].str.contains(buyer_name)) &
+            (df["Pending"]) &
+            (df["Status"] == "Current")
+        ]
+        if not buyer_pending.empty:
+            st.success(f"📦 Pending orders for buyer: **{buyer_name.title()}**")
+            st.dataframe(buyer_pending[["Date", "Size (mm)", "Quantity", "Remarks"]])
         else:
-            st.info("No pending orders for this buyer.")
+            st.info("No pendings found for this buyer.")
     
-    # 2. Stock of a specific size
-    elif matched_size and is_stock:
-        data = df[df["Size (mm)"] == matched_size]
-        inward = data[data["Type"] == "Inward"]["Quantity"].sum()
-        outgoing = data[data["Type"] == "Outgoing"]["Quantity"].sum()
-        current_stock = inward - outgoing
-        st.success(f"📦 Current stock for **{matched_size} mm** rotor: `{int(current_stock)}`")
+    # === 2. Show Buyer Last Entries ===
+    elif buyer_name and is_entries:
+        buyer_entries = df[
+            df["Clean_Remarks"].str.contains(buyer_name, na=False)
+        ].sort_values("Date", ascending=False)
+        st.success(f"🕓 Last {entry_count} entries for buyer: **{buyer_name.title()}**")
+        st.dataframe(buyer_entries[["Date", "Size (mm)", "Type", "Quantity", "Remarks"]].head(entry_count))
     
-    # 3. Pending for specific size
+    # === 3. Show Size Pendings ===
     elif matched_size and is_pending:
-        filtered = pending_df[pending_df["Size (mm)"] == matched_size]
-        if not filtered.empty:
-            st.success(f"📦 Pending for **{matched_size} mm**:")
-            st.dataframe(filtered[["Date", "Quantity", "Remarks"]].sort_values("Date"), use_container_width=True)
+        size_pending = df[
+            (df["Size (mm)"] == matched_size) &
+            (df["Pending"]) &
+            (df["Status"] == "Current")
+        ]
+        if not size_pending.empty:
+            st.success(f"📦 Pending orders for rotor size **{matched_size} mm**")
+            st.dataframe(size_pending[["Date", "Quantity", "Remarks"]])
         else:
-            st.info(f"No pending orders for {matched_size} mm.")
+            st.info("No pending orders for this size.")
     
-    # 4. Last N entries for a size
+    # === 4. Show Last N Entries for Size ===
     elif matched_size and is_entries:
-        recent = df[df["Size (mm)"] == matched_size].sort_values("Date", ascending=False).head(entry_count)
-        if not recent.empty:
-            st.success(f"🕓 Last {entry_count} entries for **{matched_size} mm**:")
-            st.dataframe(recent[["Date", "Type", "Quantity", "Pending", "Remarks"]], use_container_width=True)
-        else:
-            st.info("No recent entries for this size.")
+        entries = df[df["Size (mm)"] == matched_size].sort_values("Date", ascending=False)
+        st.success(f"📄 Last {entry_count} entries for **{matched_size} mm**")
+        st.dataframe(entries[["Date", "Type", "Quantity", "Remarks"]].head(entry_count))
     
-    # 5. All pendings grouped by buyer
-    elif query in ["pendings", "pending orders"]:
-        grouped = pending_df.groupby("Vendor Name")["Size (mm)"].apply(list).reset_index()
-        grouped.columns = ["Buyer", "Pending Sizes"]
-        st.success("📋 Pending Orders Grouped by Buyer")
-        st.dataframe(grouped, use_container_width=True)
+    # === 5. Show Actual Current Stock for Size ===
+    elif matched_size and is_stock:
+        temp = df[
+            (df["Status"] == "Current") &
+            (df["Size (mm)"] == matched_size)
+        ].copy()
     
-    # 6. Unmatched
-    elif query:
-        st.warning("🤖 Sorry, I didn't understand. Try '100mm stock' or 'Buyer A pending'")
+        inward = temp[temp["Type"] == "Inward"]["Quantity"].sum()
+        outward = temp[temp["Type"] == "Outgoing"]["Quantity"].sum()
+        stock = inward - outward
     
-    # === Smart Summary ===
+        st.success(f"📦 Current stock for rotor size **{matched_size} mm**: `{int(stock)}` units")
+        st.session_state.chat_history.append(matched_size)
+    
+    # === 6. General Stock Suggestion Summary ===
     if st.session_state.chat_history:
         st.markdown("---")
-        st.markdown("🧠 **Rotor Sizes Recently Discussed**")
-        st.caption(", ".join(f"{s}mm" for s in st.session_state.chat_history))
+        st.markdown("🔎 **Recently Queried Rotor Sizes Stock Summary**")
     
-        stock_summary = []
+        report = []
         for size in st.session_state.chat_history:
             temp = df[df["Size (mm)"] == size]
-            inw = temp[temp["Type"] == "Inward"]["Quantity"].sum()
-            outw = temp[temp["Type"] == "Outgoing"]["Quantity"].sum()
-            stock = inw - outw
-            pending = temp[temp["Pending"]]["Quantity"].sum()
-            future = temp[(temp["Status"] == "Future") & (temp["Type"] == "Inward")]["Quantity"].sum()
+            current = temp[temp["Status"] == "Current"]
+            inward = current[current["Type"] == "Inward"]["Quantity"].sum()
+            outward = current[current["Type"] == "Outgoing"]["Quantity"].sum()
+            pending = current[current["Pending"]]["Quantity"].sum()
+            future = df[
+                (df["Status"] == "Future") &
+                (df["Size (mm)"] == size) &
+                (df["Type"] == "Inward")
+            ]["Quantity"].sum()
     
+            stock = inward - outward
             status = "🟢 OK"
             if stock < 5:
                 status = "🔴 Restock Suggested"
     
-            stock_summary.append({
+            report.append({
                 "Size (mm)": size,
                 "Current Stock": int(stock),
-                "Pending": int(pending),
-                "Coming Inward": int(future),
-                "Status": status
+                "Pending Qty": int(pending),
+                "Coming Qty": int(future),
+                "Restock Status": status
             })
     
-        st.markdown("📦 **Summary & Restock Suggestions**")
-        st.dataframe(stock_summary, use_container_width=True)
-with tabs[5]:
+        st.dataframe(report, use_container_width=True)
+    
+    # === 7. If nothing matches
+    if query and not (buyer_name or matched_size):
+        st.info("❓ Couldn’t match your query. Try asking: `250mm stock`, `Buyer XYZ pendings`, `100mm last 5 entries`")
+    with tabs[5]:
     
     st.title("📅 Interactive Rotor Planning Dashboard")
 
