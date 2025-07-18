@@ -755,7 +755,7 @@ with tabs[3]:
         except Exception as e:
             st.error(f"Failed to initialize chatbot: {e}")
   
-with tabs[4]:  
+with tabs[4]: 
     import re
 
     st.subheader("💬 Ask RotorBot Lite")
@@ -882,7 +882,8 @@ with tabs[4]:
     if query and not (buyer_name or matched_size):
         st.info("❓ Couldn’t match your query. Try asking: `250mm stock`, `Buyer XYZ pendings`, `100mm last 5 entries`")
     
-    with tabs[5]:
+    
+with tabs[5]:
     st.title("📅 Interactive Rotor Planning Dashboard")
 
     df = st.session_state.data.copy()
