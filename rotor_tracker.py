@@ -881,8 +881,8 @@ with tabs[4]:
     # === 7. If nothing matches
     if query and not (buyer_name or matched_size):
         st.info("❓ Couldn’t match your query. Try asking: `250mm stock`, `Buyer XYZ pendings`, `100mm last 5 entries`")
-    with tabs[5]:
     
+    with tabs[5]:
     st.title("📅 Interactive Rotor Planning Dashboard")
 
     df = st.session_state.data.copy()
