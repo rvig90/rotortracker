@@ -580,7 +580,7 @@ with tabs[2]:
     
     # === Extract all possible filters ===
     last_n_match = re.search(r"last\s*(\d+)", chat_query.lower())
-    size_match = re.search(r"(\d{2,4})", chat_query)
+    size_match = re.search(r"(\d{2,5})", chat_query)
     type_match = re.search(r"\b(inward|outgoing)\b", chat_query.lower())
     is_pending = "pending" in chat_query.lower()
     
