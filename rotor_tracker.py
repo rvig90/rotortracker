@@ -749,34 +749,33 @@ with tabs[3]:
     import streamlit as st
     from openai import OpenAI
     
-    # ✅ OpenRouter API key (stored securely in secrets)
+    # ✅ Connect to OpenRouter API
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
     
-    # ✅ Use Claude 3 Sonnet model via OpenRouter
-    MODEL_NAME = "anthropic/claude-3-sonnet"
+    # ✅ Set model to DeepSeek Coder R1
+    MODEL_NAME = "deepseek-ai/deepseek-coder:7b-instruct"
     
-    st.title("🤖 Claude 3 Sonnet Chatbot (via OpenRouter)")
+    st.title("💡 DeepSeek R1 Chatbot (OpenRouter)")
     
-    # Initialize chat memory
+    # Initialize conversation memory
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "system", "content": "You are a helpful assistant that knows about rotor stock data."}
+            {"role": "system", "content": "You are a helpful assistant for rotor inventory management."}
         ]
     
-    # Show previous chat
+    # Display chat history
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
     
-    # Take user input
-    if prompt := st.chat_input("Ask about stock, buyers, pendings..."):
-        # Store user message
+    # Input field
+    if prompt := st.chat_input("Ask something..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
     
-        # Send to Claude 3 Sonnet via OpenRouter
+        # Get response from DeepSeek R1
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
@@ -786,7 +785,7 @@ with tabs[3]:
                     )
                     reply = response.choices[0].message.content
                 except Exception as e:
-                    reply = f"⚠ Error from OpenRouter: {e}"
+                    reply = f"❌ Error: {e}"
     
             st.write(reply)
             st.session_state.messages.append({"role": "assistant", "content": reply})
