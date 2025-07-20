@@ -749,33 +749,32 @@ with tabs[3]:
     import streamlit as st
     from openai import OpenAI
     
-    # ✅ Connect to OpenRouter API
+    # ✅ Setup OpenRouter client
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
     
-    # ✅ Set model to DeepSeek Coder R1
-    MODEL_NAME = "deepseek-ai/deepseek-coder:7b-instruct"
+    # ✅ Use Qwen3 4B Chat model
+    MODEL_NAME = "qwen/qwen3-4b-chat"
     
-    st.title("💡 DeepSeek R1 Chatbot (OpenRouter)")
+    st.title("🤖 Qwen3 4B Chatbot (OpenRouter)")
     
-    # Initialize conversation memory
+    # Initialize message history
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "system", "content": "You are a helpful assistant for rotor inventory management."}
+            {"role": "system", "content": "You are a helpful assistant for managing rotor inventory and answering stock-related queries."}
         ]
     
-    # Display chat history
+    # Display past conversation
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
     
-    # Input field
-    if prompt := st.chat_input("Ask something..."):
+    # Handle user input
+    if prompt := st.chat_input("Ask a rotor-related question..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
     
-        # Get response from DeepSeek R1
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
