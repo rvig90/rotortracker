@@ -900,8 +900,7 @@ with tabs[3]:
                     except Exception as e:
                         st.error(f"❌ Chatbot error: {e}")
 
-                except Exception as e:
-                    st.error(f"❌ Chatbot error: {e}")
+               
   
 with tabs[4]: 
     import re
