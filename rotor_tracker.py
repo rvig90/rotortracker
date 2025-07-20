@@ -741,6 +741,72 @@ with tabs[2]:
     elif chat_query:
         st.info("❓ No match found. Try: 'Buyer A last 3', '300mm', or 'Buyer B pending'.")
     
+import re
+import pandas as pd
+
+def chatbot_logic(query, df):
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Vendor"] = df["Remarks"].fillna("").str.strip()
+
+    # Normalize query
+    q = query.lower()
+
+    # === Match Rotor Size (e.g., "250mm", "300mm")
+    size_match = re.search(r"(\d{2,4})\s?mm", q)
+    size = int(size_match.group(1)) if size_match else None
+
+    # === Match Buyer Name
+    buyer_match = re.search(r"buyer\s+(.+)", q)
+    buyer = buyer_match.group(1).strip() if buyer_match else None
+
+    # === Match "last N entries"
+    last_n_match = re.search(r"last\s+(\d+)\s+entries", q)
+    last_n = int(last_n_match.group(1)) if last_n_match else None
+
+    # === 1: Stock of specific size
+    if size and "stock" in q:
+        current = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
+        current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
+        stock = current.groupby("Size (mm)")["Net"].sum()
+        if size in stock:
+            return f"📦 Current stock of *{size}mm*: {int(stock[size])} units"
+        else:
+            return f"❌ No stock info found for {size}mm."
+
+    # === 2: Pendings by size
+    if size and "pending" in q:
+        pending = df[(df["Size (mm)"] == size) & (df["Pending"]) & (df["Status"] == "Current")]
+        if not pending.empty:
+            return pending[["Date", "Quantity", "Vendor", "Remarks"]].sort_values("Date")
+        else:
+            return f"✅ No pending orders found for {size}mm."
+
+    # === 3: Pendings by buyer
+    if "pending" in q and buyer:
+        pending = df[(df["Vendor"].str.contains(buyer, case=False)) & (df["Pending"]) & (df["Status"] == "Current")]
+        if not pending.empty:
+            return pending[["Date", "Size (mm)", "Quantity", "Vendor"]].sort_values("Date")
+        else:
+            return f"✅ No pending entries found for buyer: *{buyer}*"
+
+    # === 4: Last N entries for a size
+    if size and last_n:
+        entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(last_n)
+        return entries[["Date", "Type", "Quantity", "Vendor", "Pending"]]
+
+    # === 5: All buyer pendings
+    if "pending" in q and "buyer" in q:
+        buyer_pendings = df[(df["Pending"]) & (df["Status"] == "Current")]
+        grouped = buyer_pendings.groupby("Vendor")["Quantity"].sum().reset_index().sort_values("Quantity", ascending=False)
+        return grouped.rename(columns={"Vendor": "Buyer", "Quantity": "Pending Qty"})
+
+    # === 6: Show recent buyers
+    if "buyers" in q or "vendors" in q:
+        buyers = df["Vendor"].dropna().unique().tolist()
+        return f"🧑‍💼 Known Buyers:\n" + ", ".join(sorted(set(buyers)))
+
+    return None  # fallback to LLM
 with tabs[3]:
     import re
     from openai import OpenAI
@@ -798,25 +864,41 @@ with tabs[3]:
 
         with st.chat_message("assistant"):
             with st.spinner("🤖 Thinking..."):
-                try:
-                    stream = client.chat.completions.create(
-                        model=MODEL,
-                        messages=st.session_state.chatbot_messages[-10:],  # keep last few for context
-                        stream=True
-                    )
-
-                    def stream_generator():
-                        full_reply = ""
-                        for chunk in stream:
-                            content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-                            full_reply += content
-                            yield content
-                        # Save reply
-                        st.session_state.chatbot_messages.append({
-                            "role": "assistant", "content": full_reply
-                        })
-
-                    st.write_stream(stream_generator())
+                result = chatbot_logic(prompt, df)
+        
+                if result is not None:
+                    # Rule-based structured result
+                    if isinstance(result, pd.DataFrame):
+                        st.dataframe(result, use_container_width=True, hide_index=True)
+                    else:
+                        st.markdown(result)
+                    st.session_state.chatbot_messages.append({
+                        "role": "assistant",
+                        "content": str(result)  # Save to history
+                    })
+                else:
+                    # Fallback to LLM
+                    try:
+                        stream = client.chat.completions.create(
+                            model=MODEL,
+                            messages=st.session_state.chatbot_messages[-10:],
+                            stream=True
+                        )
+        
+                        def stream_generator():
+                            full_reply = ""
+                            for chunk in stream:
+                                content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                                full_reply += content
+                                yield content
+                            st.session_state.chatbot_messages.append({
+                                "role": "assistant", "content": full_reply
+                            })
+        
+                        st.write_stream(stream_generator())
+        
+                    except Exception as e:
+                        st.error(f"❌ Chatbot error: {e}")
 
                 except Exception as e:
                     st.error(f"❌ Chatbot error: {e}")
