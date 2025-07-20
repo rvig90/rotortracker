@@ -749,32 +749,34 @@ with tabs[3]:
     import streamlit as st
     from openai import OpenAI
     
-    # Set up OpenRouter client
+    # ✅ OpenRouter API key (stored securely in secrets)
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
     
-    # List of supported models: https://openrouter.ai/docs#models
-    MODEL_NAME = "mistralai/mixtral-8x7b"
+    # ✅ Use Claude 3 Sonnet model via OpenRouter
+    MODEL_NAME = "anthropic/claude-3-sonnet"
     
-    st.title("🤖 Chatbot (via OpenRouter)")
+    st.title("🤖 Claude 3 Sonnet Chatbot (via OpenRouter)")
     
-    # Initialize chat history
+    # Initialize chat memory
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "system", "content": "You are a helpful rotor assistant."}]
+        st.session_state.messages = [
+            {"role": "system", "content": "You are a helpful assistant that knows about rotor stock data."}
+        ]
     
-    # Display conversation
+    # Show previous chat
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
     
-    # User input
-    if prompt := st.chat_input("Ask anything about your rotor stock..."):
-        # Add user message
+    # Take user input
+    if prompt := st.chat_input("Ask about stock, buyers, pendings..."):
+        # Store user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
     
-        # Call OpenRouter model
+        # Send to Claude 3 Sonnet via OpenRouter
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
@@ -784,7 +786,7 @@ with tabs[3]:
                     )
                     reply = response.choices[0].message.content
                 except Exception as e:
-                    reply = f"⚠ Error: {e}"
+                    reply = f"⚠ Error from OpenRouter: {e}"
     
             st.write(reply)
             st.session_state.messages.append({"role": "assistant", "content": reply})
