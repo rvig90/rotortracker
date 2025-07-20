@@ -746,84 +746,56 @@ with tabs[3]:
     df = st.session_state.data.copy()
     
     st.subheader("🧠 Ask Your Rotor Assistant")
-    import streamlit as st
-    import pandas as pd
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
+    # === TAB: Assistant Lite Chatbot ===
+
+    import re
     from openai import OpenAI
+
+    st.subheader("🤖 Assistant Lite (Mistral 7B via OpenRouter)")
     
-    # ========== SETUP ==========
-    st.set_page_config(page_title="Rotor Chatbot", layout="wide")
+    df = st.session_state.data.copy()
     
-    # Connect to Google Sheet
-    @st.cache_data(ttl=300)
-    def load_gsheet():
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds_dict = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        
-        # 🔁 Set your actual sheet URL
-        sheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE"
-        sheet = client.open_by_url(sheet_url).sheet1
-        data = sheet.get_all_records()
-        return pd.DataFrame(data)
-    
-    # Load data
-    df = load_gsheet()
-    st.session_state.data = df.copy()
-    
-    # Initialize OpenRouter client
+    # Load OpenRouter client
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
-    
-    MODEL_NAME = "mistralai/mistral-7b-instruct"
-    
-    st.title("🤖 Rotor Inventory Chatbot (Mistral 7B + GSheet)")
-    
-    # ========== CREATE DATA CONTEXT ==========
-    def build_context(data):
+    MODEL = "mistralai/mistral-7b-instruct"
+
+    # Build chatbot context
+    def get_rotor_summary(data):
         try:
-            data["Net"] = data.apply(
-                lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
-            )
-            stock_summary = data[data["Status"] == "Current"].groupby("Size (mm)")["Net"].sum().reset_index()
-            buyer_summary = data[data["Type"] == "Outgoing"].groupby("Remarks")["Quantity"].sum().reset_index()
-    
-            context = "📦 Rotor Stock Summary:\n"
-            context += stock_summary.to_string(index=False)
-            context += "\n\n🧾 Buyer Summary (from Remarks):\n"
-            context += buyer_summary.to_string(index=False)
+            data["Net"] = data.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
+            stock = data[data["Status"] == "Current"].groupby("Size (mm)")["Net"].sum().reset_index()
+            buyers = data[data["Type"] == "Outgoing"].groupby("Remarks")["Quantity"].sum().reset_index()
+
+            context = "Rotor Stock:\n" + stock.to_string(index=False) + "\n\nBuyers (from Remarks):\n" + buyers.to_string(index=False)
             return context
         except Exception as e:
-            return f"Context generation failed: {e}"
-    
-    # Initial chat history
-    if "messages" not in st.session_state:
-        context = build_context(df)
-        st.session_state.messages = [
-            {"role": "system", "content": "You are a helpful assistant for managing rotor inventory. Use this data:\n\n" + context}
+            return f"Failed to create context: {e}"
+
+    # Init messages
+    if "chatbot_messages" not in st.session_state:
+        context = get_rotor_summary(df)
+        st.session_state.chatbot_messages = [
+            {"role": "system", "content": "You are a rotor inventory assistant. Use the following data:\n" + context}
         ]
-    
-    # Show chat history
-    for msg in st.session_state.messages:
+
+    # Show history
+    for msg in st.session_state.chatbot_messages:
         st.chat_message(msg["role"]).write(msg["content"])
-    
-    # ========== CHAT INTERFACE ==========
-    if prompt := st.chat_input("Ask about rotor stock, buyers, pendings..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
-    
+
+    # Input
+    user_input = st.chat_input("Ask about rotor stock, buyers, pendings...")
+    if user_input:
+        st.session_state.chatbot_messages.append({"role": "user", "content": user_input})
+        st.chat_message("user").write(user_input)
+
         with st.chat_message("assistant"):
             try:
                 stream = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=st.session_state.messages,
+                    model=MODEL,
+                    messages=st.session_state.chatbot_messages,
                     stream=True
                 )
                 full_reply = ""
@@ -831,9 +803,9 @@ with tabs[3]:
                     content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
                     full_reply += content
                     st.write_stream(content)
-                st.session_state.messages.append({"role": "assistant", "content": full_reply})
+                st.session_state.chatbot_messages.append({"role": "assistant", "content": full_reply})
             except Exception as e:
-                st.error(f"❌ Chatbot error: {e}")
+                st.error(f"Chatbot error: {e}")
    
    
   
