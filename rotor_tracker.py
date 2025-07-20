@@ -746,37 +746,49 @@ with tabs[3]:
     df = st.session_state.data.copy()
     
     st.subheader("🧠 Ask Your Rotor Assistant")
+    import streamlit as st
+    from openai import OpenAI
     
-    if "openai" not in st.secrets:
-        st.error("❌ OpenAI key missing from secrets.toml")
-    else:
-        try:
-            # ✅ Build LLM with explicit key
-            llm = OpenAI(
-                temperature=0,
-                openai_api_key=st.secrets["openai"]["api_key"]
-            )
+    # Set up OpenRouter client
+    client = OpenAI(
+        api_key=st.secrets["openrouter"]["api_key"],
+        base_url="https://openrouter.ai/api/v1"
+    )
     
-            # ✅ Create agent
-            agent = create_pandas_dataframe_agent(
-                llm,
-                df,
-                verbose=False,
-                allow_dangerous_code=True
-            )
+    # List of supported models: https://openrouter.ai/docs#models
+    MODEL_NAME = "mistralai/mixtral-8x7b"
     
-            # ✅ User input
-            user_q = st.text_input("Ask about rotor data:")
-            if user_q:
-                with st.spinner("Thinking..."):
-                    try:
-                        response = agent.run(user_q)
-                        st.success(response)
-                    except Exception as e:
-                        st.error(f"Chatbot error: {e}")
+    st.title("🤖 Chatbot (via OpenRouter)")
     
-        except Exception as e:
-            st.error(f"Failed to initialize chatbot: {e}")
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "system", "content": "You are a helpful rotor assistant."}]
+    
+    # Display conversation
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+    
+    # User input
+    if prompt := st.chat_input("Ask anything about your rotor stock..."):
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+    
+        # Call OpenRouter model
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=st.session_state.messages
+                    )
+                    reply = response.choices[0].message.content
+                except Exception as e:
+                    reply = f"⚠ Error: {e}"
+    
+            st.write(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+   
   
 with tabs[4]: 
     import re
