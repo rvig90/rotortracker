@@ -790,22 +790,30 @@ with tabs[3]:
     if user_input:
         st.session_state.chatbot_messages.append({"role": "user", "content": user_input})
         st.chat_message("user").write(user_input)
-
+       
         with st.chat_message("assistant"):
-            try:
-                stream = client.chat.completions.create(
-                    model=MODEL,
-                    messages=st.session_state.chatbot_messages,
-                    stream=True
-                )
+        try:
+            stream = client.chat.completions.create(
+                model=MODEL,
+                messages=st.session_state.chatbot_messages,
+                stream=True
+            )
+    
+            # ✅ Wrap in generator
+            def stream_generator():
                 full_reply = ""
                 for chunk in stream:
                     content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
                     full_reply += content
-                    st.write_stream(content)
+                    yield content
                 st.session_state.chatbot_messages.append({"role": "assistant", "content": full_reply})
-            except Exception as e:
-                st.error(f"Chatbot error: {e}")
+    
+            st.write_stream(stream_generator())
+    
+        except Exception as e:
+            st.error(f"❌ Chatbot error: {e}")
+
+       
    
    
   
