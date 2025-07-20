@@ -747,9 +747,36 @@ with tabs[3]:
     
     st.subheader("🧠 Ask Your Rotor Assistant")
     import streamlit as st
+    import pandas as pd
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
     from openai import OpenAI
     
-    # ✅ Setup OpenRouter client
+    # ========== SETUP ==========
+    st.set_page_config(page_title="Rotor Chatbot", layout="wide")
+    
+    # Connect to Google Sheet
+    @st.cache_data(ttl=300)
+    def load_gsheet():
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        
+        # 🔁 Set your actual sheet URL
+        sheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE"
+        sheet = client.open_by_url(sheet_url).sheet1
+        data = sheet.get_all_records()
+        return pd.DataFrame(data)
+    
+    # Load data
+    df = load_gsheet()
+    st.session_state.data = df.copy()
+    
+    # Initialize OpenRouter client
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
@@ -757,20 +784,38 @@ with tabs[3]:
     
     MODEL_NAME = "mistralai/mistral-7b-instruct"
     
-    st.title("🤖 Mistral 7B Chatbot (Streaming via OpenRouter)")
+    st.title("🤖 Rotor Inventory Chatbot (Mistral 7B + GSheet)")
     
-    # Chat history
+    # ========== CREATE DATA CONTEXT ==========
+    def build_context(data):
+        try:
+            data["Net"] = data.apply(
+                lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
+            )
+            stock_summary = data[data["Status"] == "Current"].groupby("Size (mm)")["Net"].sum().reset_index()
+            buyer_summary = data[data["Type"] == "Outgoing"].groupby("Remarks")["Quantity"].sum().reset_index()
+    
+            context = "📦 Rotor Stock Summary:\n"
+            context += stock_summary.to_string(index=False)
+            context += "\n\n🧾 Buyer Summary (from Remarks):\n"
+            context += buyer_summary.to_string(index=False)
+            return context
+        except Exception as e:
+            return f"Context generation failed: {e}"
+    
+    # Initial chat history
     if "messages" not in st.session_state:
+        context = build_context(df)
         st.session_state.messages = [
-            {"role": "system", "content": "You are a helpful assistant that provides inventory support, rotor stock updates, and buyer info."}
+            {"role": "system", "content": "You are a helpful assistant for managing rotor inventory. Use this data:\n\n" + context}
         ]
     
-    # Display chat history
+    # Show chat history
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
     
-    # User input
-    if prompt := st.chat_input("Ask about stock, buyers, pendings..."):
+    # ========== CHAT INTERFACE ==========
+    if prompt := st.chat_input("Ask about rotor stock, buyers, pendings..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
     
@@ -779,21 +824,17 @@ with tabs[3]:
                 stream = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=st.session_state.messages,
-                    stream=True  # ✅ Streaming enabled
+                    stream=True
                 )
-    
-                # Collect streamed output
-                full_response = ""
+                full_reply = ""
                 for chunk in stream:
                     content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-                    full_response += content
+                    full_reply += content
                     st.write_stream(content)
-    
-                # Save full response to chat history
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-    
+                st.session_state.messages.append({"role": "assistant", "content": full_reply})
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Chatbot error: {e}")
+   
    
   
 with tabs[4]: 
