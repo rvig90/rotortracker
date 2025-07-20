@@ -755,39 +755,45 @@ with tabs[3]:
         base_url="https://openrouter.ai/api/v1"
     )
     
-    # ✅ Use Qwen3 4B Chat model
-    MODEL_NAME = "qwen/qwen3-4b-chat"
+    MODEL_NAME = "mistralai/mistral-7b-instruct"
     
-    st.title("🤖 Qwen3 4B Chatbot (OpenRouter)")
+    st.title("🤖 Mistral 7B Chatbot (Streaming via OpenRouter)")
     
-    # Initialize message history
+    # Chat history
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "system", "content": "You are a helpful assistant for managing rotor inventory and answering stock-related queries."}
+            {"role": "system", "content": "You are a helpful assistant that provides inventory support, rotor stock updates, and buyer info."}
         ]
     
-    # Display past conversation
+    # Display chat history
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
     
-    # Handle user input
-    if prompt := st.chat_input("Ask a rotor-related question..."):
+    # User input
+    if prompt := st.chat_input("Ask about stock, buyers, pendings..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
     
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    response = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=st.session_state.messages
-                    )
-                    reply = response.choices[0].message.content
-                except Exception as e:
-                    reply = f"❌ Error: {e}"
+            try:
+                stream = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=st.session_state.messages,
+                    stream=True  # ✅ Streaming enabled
+                )
     
-            st.write(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+                # Collect streamed output
+                full_response = ""
+                for chunk in stream:
+                    content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                    full_response += content
+                    st.write_stream(content)
+    
+                # Save full response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+    
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
    
   
 with tabs[4]: 
