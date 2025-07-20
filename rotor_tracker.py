@@ -742,75 +742,84 @@ with tabs[2]:
         st.info("❓ No match found. Try: 'Buyer A last 3', '300mm', or 'Buyer B pending'.")
     
 with tabs[3]:
-    # Sample dataframe (you can use st.session_state.data instead)
-    df = st.session_state.data.copy()
-    
-    st.subheader("🧠 Ask Your Rotor Assistant")
-    # === TAB: Assistant Lite Chatbot ===
     import re
     from openai import OpenAI
 
     st.subheader("🤖 Assistant Lite (Mistral 7B via OpenRouter)")
-    
+
     df = st.session_state.data.copy()
-    
-    # Load OpenRouter client
+
+    # OpenRouter client setup
     client = OpenAI(
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
     MODEL = "mistralai/mistral-7b-instruct"
 
-    # Build chatbot context
+    # Context builder
     def get_rotor_summary(data):
         try:
             data["Net"] = data.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
             stock = data[data["Status"] == "Current"].groupby("Size (mm)")["Net"].sum().reset_index()
             buyers = data[data["Type"] == "Outgoing"].groupby("Remarks")["Quantity"].sum().reset_index()
 
-            context = "Rotor Stock:\n" + stock.to_string(index=False) + "\n\nBuyers (from Remarks):\n" + buyers.to_string(index=False)
+            context = "Rotor Stock Summary:\n" + stock.to_string(index=False) + "\n\nTop Buyers:\n" + buyers.to_string(index=False)
             return context
         except Exception as e:
             return f"Failed to create context: {e}"
 
-    # Init messages
+    # Init session state
     if "chatbot_messages" not in st.session_state:
-        context = get_rotor_summary(df)
         st.session_state.chatbot_messages = [
-            {"role": "system", "content": "You are a rotor inventory assistant. Use the following data:\n" + context}
+            {"role": "system", "content": "You are an inventory assistant. Use rotor stock and buyer data to answer naturally.\n\n" + get_rotor_summary(df)}
         ]
 
-    # Show history
-    for msg in st.session_state.chatbot_messages:
-        st.chat_message(msg["role"]).write(msg["content"])
+    # Clear history button
+    col_clear, _ = st.columns([1, 8])
+    with col_clear:
+        if st.button("🧹 Clear History"):
+            context = get_rotor_summary(df)
+            st.session_state.chatbot_messages = [
+                {"role": "system", "content": "You are an inventory assistant. Use rotor stock and buyer data to answer naturally.\n\n" + context}
+            ]
+            st.experimental_rerun()
 
-    # Input
-    user_input = st.chat_input("Ask about rotor stock, buyers, pendings...")
-    if user_input:
-        st.session_state.chatbot_messages.append({"role": "user", "content": user_input})
-        st.chat_message("user").write(user_input)
+    # Display history
+    for msg in st.session_state.chatbot_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # User input
+    prompt = st.chat_input("Ask about rotor stock, buyers, pendings...")
+    if prompt:
+        st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            try:
-                stream = client.chat.completions.create(
-                    model=MODEL,
-                    messages=st.session_state.chatbot_messages,
-                    stream=True
-                )
-        
-                # ✅ Wrap in generator
-                def stream_generator():
-                    full_reply = ""
-                    for chunk in stream:
-                        content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-                        full_reply += content
-                        yield content
-                    st.session_state.chatbot_messages.append({"role": "assistant", "content": full_reply})
-        
-                st.write_stream(stream_generator())
-        
-            except Exception as e:
-                st.error(f"❌ Chatbot error: {e}")
+            with st.spinner("🤖 Thinking..."):
+                try:
+                    stream = client.chat.completions.create(
+                        model=MODEL,
+                        messages=st.session_state.chatbot_messages[-10:],  # keep last few for context
+                        stream=True
+                    )
+
+                    def stream_generator():
+                        full_reply = ""
+                        for chunk in stream:
+                            content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
+                            full_reply += content
+                            yield content
+                        # Save reply
+                        st.session_state.chatbot_messages.append({
+                            "role": "assistant", "content": full_reply
+                        })
+
+                    st.write_stream(stream_generator())
+
+                except Exception as e:
+                    st.error(f"❌ Chatbot error: {e}")
   
 with tabs[4]: 
     import re
