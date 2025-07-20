@@ -265,21 +265,44 @@ with tabs[0]:
     # Stock alerts
     st.subheader("🔔 Stock Alerts")
 
-    current = st.session_state.data[
-        (st.session_state.data['Status'] == 'Current') &
-        (~st.session_state.data['Pending'])
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    
+    # Filter current entries and calculate stock
+    current = df[
+        (df["Status"] == "Current") &
+        (~df["Pending"])
     ].copy()
-    current['Net'] = current.apply(
-        lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+    
+    current["Net"] = current.apply(
+        lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"],
+        axis=1
     )
-    stock = current.groupby('Size (mm)')['Net'].sum().reset_index()
-    stock.columns = ['Size (mm)', 'Current Stock']
-
-    # Alert: Low stock
-    low_stock = stock[stock['Current Stock'] < 100]
-    if not low_stock.empty:
-        st.warning("⚠️ Low Stock Rotor Sizes (Below 100 units):")
-        st.dataframe(low_stock, use_container_width=True, hide_index=True)
+    
+    stock = current.groupby("Size (mm)")["Net"].sum().reset_index()
+    stock.columns = ["Size (mm)", "Current Stock"]
+    
+    # Get future rotors (inward)
+    future = df[
+        (df["Status"] == "Future") &
+        (df["Type"] == "Inward")
+    ].groupby("Size (mm)")["Quantity"].sum().reset_index()
+    future.columns = ["Size (mm)", "Coming Qty"]
+    
+    # Merge to identify which ones have no incoming
+    combined = pd.merge(stock, future, on="Size (mm)", how="left").fillna(0)
+    
+    # Alert if stock < 100 and no future quantity
+    alert_df = combined[
+        (combined["Current Stock"] < 100) &
+        (combined["Coming Qty"] == 0)
+    ]
+    
+    if not alert_df.empty:
+        st.warning("⚠ Low Stock Rotors with No Incoming Orders:")
+        st.dataframe(alert_df, use_container_width=True, hide_index=True)
+    else:
+        st.success("✅ All rotor sizes have sufficient stock or incoming orders.")
 
     # Alert: Pending > 7 days
     pending = st.session_state.data[
