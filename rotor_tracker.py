@@ -782,7 +782,7 @@ with tabs[3]:
             st.session_state.chatbot_messages = [
                 {"role": "system", "content": "You are an inventory assistant. Use rotor stock and buyer data to answer naturally.\n\n" + context}
             ]
-            st.experimental_rerun()
+            st.rerun()
 
     # Display history
     for msg in st.session_state.chatbot_messages:
