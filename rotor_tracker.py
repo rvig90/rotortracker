@@ -499,7 +499,7 @@ with tabs[1]:
         if "sf" not in st.session_state: st.session_state.sf = "All"
         if "zf" not in st.session_state: st.session_state.zf = []
         if "pf" not in st.session_state: st.session_state.pf = "All"
-        if "tp" not in st.session_state: st.session_state.pf = "All"
+        if "tf" not in st.session_state: st.session_state.tf = "All"
         if "rs" not in st.session_state: st.session_state.rs = ""
         if "dr" not in st.session_state:
             min_date = pd.to_datetime(df['Date']).min().date()
@@ -511,7 +511,7 @@ with tabs[1]:
             st.session_state.sf = "All"
             st.session_state.zf = []
             st.session_state.pf = "All"
-            st.session_state.tp = "All"
+            st.session_state.tf = "All"
             st.session_state.rs = ""
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
@@ -529,7 +529,7 @@ with tabs[1]:
             pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
 
         with c4:
-            type_f = st.selectbox("Type, ["All", "Inward", "Outgoing"], key="tp")
+            type_f = st.selectbox("Type, ["All", "Inward", "Outgoing"], key="tf")
 
         remark_s = st.text_input("📝 Search Remarks", key="rs")
 
