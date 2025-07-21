@@ -529,7 +529,7 @@ with tabs[1]:
             pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
 
         with c4:
-            type_f = st.selectbox("Type, ["All", "Inward", "Outgoing"], key="tf")
+            type_f = st.selectbox("Type", ["All", "Inward", "Outgoing"], key="tf")
 
         remark_s = st.text_input("📝 Search Remarks", key="rs")
 
@@ -547,6 +547,9 @@ with tabs[1]:
                 df = df[df['Size (mm)'].isin(size_f)]
             if remark_s:
                 df = df[df['Remarks'].astype(str).str.contains(remark_s, case=False, na=False)]
+
+            if type_f !="All":
+                df = df[df["Type"] == type_f]
             if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
                 start, end = date_range
                 df = df[
