@@ -811,42 +811,46 @@ with tabs[3]:
     import openai
     import streamlit as st
     
-    # Setup OpenRouter
-    openai.api_base = "https://openrouter.ai/api/v1"
-    openai.api_key = st.secrets["openai"]["api_key"]  # or hardcode for testing
+    # Configure OpenRouter
+    openai.api_key = st.secrets["openai"]["api_key"]
+    openai.base_url = "https://openrouter.ai/api/v1"
     
-    # Keep chat history
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    st.title("🧠 Rotor Assistant (Streaming Chatbot)")
     
-    st.subheader("🤖 Rotor Assistant")
+    # Input box for user query
+    query = st.chat_input("Ask anything about stock, buyers, sizes...")
     
-    user_input = st.chat_input("Ask anything about stock, buyers, sizes...")
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "system", "content": "You are a helpful rotor assistant."}
+        ]
     
-    if user_input:
-        st.chat_message("user").write(user_input)
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
+    # Show previous messages
+    for msg in st.session_state.messages[1:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
     
-        try:
-            with st.chat_message("assistant"):
-                response = openai.ChatCompletion.create(
-                    model="mistralai/mistral-7b-instruct",  # Replace with your model
-                    messages=st.session_state.chat_history,
-                    stream=True,
-                )
+    # Handle user message
+    if query:
+        st.session_state.messages.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
     
-                full_reply = ""
-                for chunk in response:
-                    delta = chunk["choices"][0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        st.write_stream(lambda: iter([content]))
-                        full_reply += content
+        # Display streaming reply
+        with st.chat_message("assistant"):
+            stream_response = openai.chat.completions.create(
+                model="deepseek-chat",  # ✅ You can change this to mistral-7b-instruct or others
+                messages=st.session_state.messages,
+                stream=True,
+            )
     
-                st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
-    
-        except Exception as e:
-            st.error(f"⚠ Error: {e}")
+            full_reply = ""
+            for chunk in stream_response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    full_reply += chunk.choices[0].delta.content
+                    st.write(chunk.choices[0].delta.content, end="")
+            st.session_state.messages.append({"role": "assistant", "content": full_reply})
 
                
   
