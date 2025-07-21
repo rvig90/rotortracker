@@ -863,7 +863,7 @@ with tabs[3]:
         with st.spinner("Thinking..."):
             try:
                 response = client.chat.completions.create(
-                    model="cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+                    model="mistralai/mistral-small-3.2-24b-instruct:free",
                     messages=messages,
                     temperature=0.4,
                     stream=True  # Enable streaming if OpenRouter allows it
