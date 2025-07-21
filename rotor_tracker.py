@@ -860,23 +860,22 @@ with tabs[3]:
     
     # Run the model
     if chat_query:
-        with st.spinner("Thinking..."):
-            try:
-                response = client.chat.completions.create(
-                    model="deepseek/deepseek-r1-0528:free",
-                    messages=messages,
-                    temperature=0.4,
-                    stream=True  # Enable streaming if OpenRouter allows it
-                )
-    
-                full_reply = ""
-                placeholder = st.empty()
-                for chunk in response:
-                    delta = chunk.choices[0].delta.get("content", "")
-                    full_reply += delta
-                    placeholder.markdown(full_reply)
-    
-                st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
+       with st.chat_message("assistant"):
+            response = openai.ChatCompletion.create(
+                model="mistralai/mistral-7b-instruct",
+                messages=st.session_state.chat_history,
+                stream=True,
+            )
+        
+            full_reply = ""
+            for chunk in response:
+                delta = chunk["choices"][0].get("delta", {})
+                content = delta.get("content", "")
+                full_reply += content
+                st.write_stream(lambda: iter([content]))
+        
+            # Optionally save full reply to history
+            st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
     
             except Exception as e:
                 st.error(f"Error: {e}")
