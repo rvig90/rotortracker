@@ -504,7 +504,7 @@ with tabs[1]:
         if "dr" not in st.session_state:
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
-            st.session_state.dr = [min_date, max_date]
+            st.session_state.dr = [max_date, max_date]
 
         # Filter Reset Button
         if st.button("🔄 Reset All Filters"):
@@ -515,7 +515,7 @@ with tabs[1]:
             st.session_state.rs = ""
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
-            st.session_state.dr = [min_date, max_date]
+            st.session_state.dr = [max_date, max_date]
             st.rerun()
 
         # Filter Controls
