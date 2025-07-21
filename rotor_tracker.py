@@ -808,77 +808,45 @@ def chatbot_logic(query, df):
 
     return None  # fallback to LLM
 with tabs[3]:
+    import openai
     import streamlit as st
-    from openai import OpenAI
-    import pandas as pd
     
-    st.subheader("💬 Rotor Assistant (Qwen 2.5 Coder 32B)")
+    # Setup OpenRouter
+    openai.api_base = "https://openrouter.ai/api/v1"
+    openai.api_key = st.secrets["openai"]["api_key"]  # or hardcode for testing
     
-    chat_query = st.text_input("Ask anything about stock, buyers, sizes…")
-    
-    df = st.session_state.data.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    
-    # Initialize chat history
+    # Keep chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
-    # Append user message to history
-    if chat_query:
-        st.session_state.chat_history.append({"role": "user", "content": chat_query})
+    st.subheader("🤖 Rotor Assistant")
     
-    # Set up OpenRouter client
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=st.secrets["openrouter"]["api_key"]
-    )
+    user_input = st.chat_input("Ask anything about stock, buyers, sizes...")
     
-    # Prepare system prompt with rotor data context
-    system_prompt = f"""
-    You are a rotor stock assistant. You can analyze rotor sizes, buyers (mentioned in remarks), pending and future orders, and forecast trends.
+    if user_input:
+        st.chat_message("user").write(user_input)
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
     
-    The dataset includes columns like:
-    - Date
-    - Size (mm)
-    - Quantity
-    - Type (Inward / Outgoing)
-    - Status (Current / Future)
-    - Pending (True/False)
-    - Remarks (buyer names)
+        try:
+            with st.chat_message("assistant"):
+                response = openai.ChatCompletion.create(
+                    model="mistralai/mistral-7b-instruct",  # Replace with your model
+                    messages=st.session_state.chat_history,
+                    stream=True,
+                )
     
-    Answer questions like:
-    - "What is the stock for 250mm?"
-    - "Buyer A pendings?"
-    - "Show last 5 entries of 100mm"
-    - "Who has pending orders?"
-    - "Is 300mm rotor running low?"
-    """
+                full_reply = ""
+                for chunk in response:
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        st.write_stream(lambda: iter([content]))
+                        full_reply += content
     
-    # Build messages list
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(st.session_state.chat_history)
-    
-    # Run the model
-    if chat_query:
-       with st.chat_message("assistant"):
-            response = openai.ChatCompletion.create(
-                model="mistralai/mistral-7b-instruct",
-                messages=st.session_state.chat_history,
-                stream=True,
-            )
-        
-            full_reply = ""
-            for chunk in response:
-                delta = chunk["choices"][0].get("delta", {})
-                content = delta.get("content", "")
-                full_reply += content
-                st.write_stream(lambda: iter([content]))
-        
-            # Optionally save full reply to history
-            st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
+                st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
     
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"⚠ Error: {e}")
 
                
   
