@@ -840,7 +840,7 @@ with tabs[3]:
         # Display streaming reply
         with st.chat_message("assistant"):
             stream_response = openai.chat.completions.create(
-                model="deepseek-chat",  # ✅ You can change this to mistral-7b-instruct or others
+                model="mistralai/mistral-7b-instruct:free",  # ✅ You can change this to mistral-7b-instruct or others
                 messages=st.session_state.messages,
                 stream=True,
             )
