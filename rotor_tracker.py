@@ -496,72 +496,82 @@ with tabs[1]:
         df = st.session_state.data.copy()
         st.markdown("### 🔍 Filter Movement Log")
 
-        # Ensure all filter keys exist
-        if "sf" not in st.session_state: st.session_state.sf = "All"
-        if "zf" not in st.session_state: st.session_state.zf = []
-        if "pf" not in st.session_state: st.session_state.pf = "All"
-        if "tf" not in st.session_state: st.session_state.tf = "All"
-        if "rs" not in st.session_state: st.session_state.rs = ""
-        if "dr" not in st.session_state:
-            min_date = pd.to_datetime(df['Date']).min().date()
-            max_date = pd.to_datetime(df['Date']).max().date()
-            st.session_state.dr = [min_date, max_date]
+        # ====== SESSION STATE INITIALIZATION ======
+        default_min_date = pd.to_datetime(df['Date']).min().date()
+        default_max_date = pd.to_datetime(df['Date']).max().date()
 
-        # 🔄 Reset button
+        filter_defaults = {
+            "sf": "All",            # Status Filter
+            "zf": [],               # Size Filter
+            "pf": "All",            # Pending Filter
+            "rs": "",               # Remarks Search
+            "dr": [default_min_date, default_max_date],  # Date Range
+            "tf": "All",            # Type Filter (NEW)
+        }
+
+        for key, default in filter_defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = default
+
+        # ====== FILTER CONTROLS ======
         if st.button("🔄 Reset All Filters"):
-            st.session_state.sf = "All"
-            st.session_state.zf = []
-            st.session_state.pf = "All"
-            st.session_state.tf = "All"
-            st.session_state.rs = ""
-            min_date = pd.to_datetime(df['Date']).min().date()
-            max_date = pd.to_datetime(df['Date']).max().date()
-            st.session_state.dr = [min_date, max_date]
+            for key, val in filter_defaults.items():
+                st.session_state[key] = val
             st.rerun()
 
-        # 🧮 Filter controls
         c1, c2, c3 = st.columns(3)
         with c1:
             st.session_state.sf = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
-            size_options = sorted(df['Size (mm)'].dropna().unique())
-            st.session_state.zf = st.multiselect("📐 Size (mm)", options=size_options, key="zf")
-        with c3:
             st.session_state.pf = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
+        with c3:
+            st.session_state.tf = st.selectbox("🔄 Type", ["All", "Inward", "Outgoing"], key="tf")
 
         c4, c5 = st.columns(2)
         with c4:
-            st.session_state.tf = st.selectbox("🔄 Type", ["All", "Inward", "Outgoing"], key="tf")
+            size_options = sorted(df["Size (mm)"].dropna().unique())
+            st.session_state.zf = st.multiselect("📐 Size (mm)", size_options, key="zf")
         with c5:
             st.session_state.rs = st.text_input("📝 Search Remarks", key="rs")
 
-        st.session_state.dr = st.date_input("📅 Date Range", key="dr")
+        st.session_state.dr = st.date_input(
+            "📅 Date Range",
+            value=st.session_state.dr,
+            key="dr"
+        )
 
-        # ✅ Apply filters
+        # ====== APPLY FILTERS ======
         try:
             if st.session_state.sf != "All":
-                df = df[df['Status'] == st.session_state.sf]
+                df = df[df["Status"] == st.session_state.sf]
+
             if st.session_state.pf == "Yes":
-                df = df[df['Pending'] == True]
+                df = df[df["Pending"] == True]
             elif st.session_state.pf == "No":
-                df = df[df['Pending'] == False]
-            if st.session_state.zf:
-                df = df[df['Size (mm)'].isin(st.session_state.zf)]
+                df = df[df["Pending"] == False]
+
             if st.session_state.tf != "All":
-                df = df[df['Type'] == st.session_state.tf]
+                df = df[df["Type"] == st.session_state.tf]
+
+            if st.session_state.zf:
+                df = df[df["Size (mm)"].isin(st.session_state.zf)]
+
             if st.session_state.rs:
-                df = df[df['Remarks'].astype(str).str.contains(st.session_state.rs, case=False, na=False)]
-            if isinstance(st.session_state.dr, (list, tuple)) and len(st.session_state.dr) == 2:
+                df = df[df["Remarks"].astype(str).str.contains(st.session_state.rs, case=False, na=False)]
+
+            if isinstance(st.session_state.dr, list) and len(st.session_state.dr) == 2:
                 start, end = st.session_state.dr
                 df = df[
-                    (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
-                    (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
+                    (pd.to_datetime(df["Date"]) >= pd.to_datetime(start)) &
+                    (pd.to_datetime(df["Date"]) <= pd.to_datetime(end))
                 ]
         except Exception as e:
-            st.error(f"Error applying filters: {str(e)}")
+            st.error(f"Error applying filters: {e}")
             df = st.session_state.data.copy()
 
         df = df.reset_index(drop=True)
+
+        # ====== DISPLAY FILTERED DATA ======
         st.markdown("### 📄 Filtered Entries")
 
         for idx, row in df.iterrows():
@@ -570,10 +580,10 @@ with tabs[1]:
             if match.empty:
                 continue
             match_idx = match.index[0]
-            cols = st.columns([10, 1, 1])
 
+            cols = st.columns([10, 1, 1])
             with cols[0]:
-                disp = row.drop(labels="ID").to_dict()
+                disp = row.drop("ID").to_dict()
                 disp["Pending"] = "Yes" if row["Pending"] else "No"
                 st.dataframe(pd.DataFrame([disp]), hide_index=True, use_container_width=True)
 
@@ -586,6 +596,7 @@ with tabs[1]:
                 if st.button("❌", key=f"del_{entry_id}"):
                     safe_delete_entry(entry_id)
 
+            # ====== EDIT MODE ======
             if st.session_state.editing == match_idx:
                 er = st.session_state.data.loc[match_idx]
                 with st.form(f"edit_form_{entry_id}"):
@@ -596,6 +607,7 @@ with tabs[1]:
                     with ec2:
                         e_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"], index=0 if er["Type"] == "Inward" else 1, key=f"e_type_{entry_id}")
                         e_qty = st.number_input("🔢 Quantity", min_value=1, value=int(er["Quantity"]), key=f"e_qty_{entry_id}")
+
                     e_remarks = st.text_input("📝 Remarks", value=er["Remarks"], key=f"e_remark_{entry_id}")
                     e_status = st.selectbox("📂 Status", ["Current", "Future"], index=0 if er["Status"] == "Current" else 1, key=f"e_status_{entry_id}")
                     e_pending = st.checkbox("❗ Pending", value=er["Pending"], key=f"e_pending_{entry_id}")
