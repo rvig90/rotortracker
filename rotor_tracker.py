@@ -811,7 +811,7 @@ with tabs[3]:
     import re
     from openai import OpenAI
 
-    st.subheader("🤖 Assistant Lite (Mistral 7B via OpenRouter)")
+    st.subheader("🤖 Assistant Lite (qwen 2.5 instruct via OpenRouter)")
 
     df = st.session_state.data.copy()
 
@@ -820,7 +820,7 @@ with tabs[3]:
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
-    MODEL = "mistralai/mistral-7b-instruct"
+    MODEL = "qwen/qwen2.5-coder-32b-instruct"
 
     # Context builder
     def get_rotor_summary(data):
