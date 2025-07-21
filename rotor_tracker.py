@@ -877,8 +877,8 @@ with tabs[3]:
             # Optionally save full reply to history
             st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
     
-            except Exception as e:
-                st.error(f"Error: {e}")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
                
   
