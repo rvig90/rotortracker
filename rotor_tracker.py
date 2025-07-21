@@ -220,6 +220,7 @@ with form_tabs[0]:
                 [st.session_state.data, pd.DataFrame([new_entry])],
                 ignore_index=True
             )
+            save_data(st.session_state.data)
             st.success("✅ Entry added successfully.")
 
 with form_tabs[1]:
