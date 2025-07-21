@@ -489,61 +489,70 @@ with tabs[0]:
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
     st.subheader("📋 Movement Log")
+
     if st.session_state.data.empty:
         st.info("No entries to show yet.")
     else:
         df = st.session_state.data.copy()
         st.markdown("### 🔍 Filter Movement Log")
 
-        # Ensure filter keys exist in session state
+        # Ensure all filter keys exist
         if "sf" not in st.session_state: st.session_state.sf = "All"
         if "zf" not in st.session_state: st.session_state.zf = []
         if "pf" not in st.session_state: st.session_state.pf = "All"
+        if "tf" not in st.session_state: st.session_state.tf = "All"
         if "rs" not in st.session_state: st.session_state.rs = ""
         if "dr" not in st.session_state:
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
             st.session_state.dr = [min_date, max_date]
 
-        # Filter Reset Button
+        # 🔄 Reset button
         if st.button("🔄 Reset All Filters"):
             st.session_state.sf = "All"
             st.session_state.zf = []
             st.session_state.pf = "All"
+            st.session_state.tf = "All"
             st.session_state.rs = ""
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
             st.session_state.dr = [min_date, max_date]
             st.rerun()
 
-        # Filter Controls
+        # 🧮 Filter controls
         c1, c2, c3 = st.columns(3)
         with c1:
-            status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
+            st.session_state.sf = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
             size_options = sorted(df['Size (mm)'].dropna().unique())
-            size_f = st.multiselect("📐 Size (mm)", options=size_options, key="zf")
+            st.session_state.zf = st.multiselect("📐 Size (mm)", options=size_options, key="zf")
         with c3:
-            pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
+            st.session_state.pf = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
 
-        remark_s = st.text_input("📝 Search Remarks", key="rs")
+        c4, c5 = st.columns(2)
+        with c4:
+            st.session_state.tf = st.selectbox("🔄 Type", ["All", "Inward", "Outgoing"], key="tf")
+        with c5:
+            st.session_state.rs = st.text_input("📝 Search Remarks", key="rs")
 
-        date_range = st.date_input("📅 Date Range", key="dr")
+        st.session_state.dr = st.date_input("📅 Date Range", key="dr")
 
-        # Apply filters
+        # ✅ Apply filters
         try:
-            if status_f != "All":
-                df = df[df['Status'] == status_f]
-            if pending_f == "Yes":
+            if st.session_state.sf != "All":
+                df = df[df['Status'] == st.session_state.sf]
+            if st.session_state.pf == "Yes":
                 df = df[df['Pending'] == True]
-            elif pending_f == "No":
+            elif st.session_state.pf == "No":
                 df = df[df['Pending'] == False]
-            if size_f:
-                df = df[df['Size (mm)'].isin(size_f)]
-            if remark_s:
-                df = df[df['Remarks'].astype(str).str.contains(remark_s, case=False, na=False)]
-            if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-                start, end = date_range
+            if st.session_state.zf:
+                df = df[df['Size (mm)'].isin(st.session_state.zf)]
+            if st.session_state.tf != "All":
+                df = df[df['Type'] == st.session_state.tf]
+            if st.session_state.rs:
+                df = df[df['Remarks'].astype(str).str.contains(st.session_state.rs, case=False, na=False)]
+            if isinstance(st.session_state.dr, (list, tuple)) and len(st.session_state.dr) == 2:
+                start, end = st.session_state.dr
                 df = df[
                     (pd.to_datetime(df['Date']) >= pd.to_datetime(start)) &
                     (pd.to_datetime(df['Date']) <= pd.to_datetime(end))
@@ -559,9 +568,10 @@ with tabs[1]:
             entry_id = row['ID']
             match = st.session_state.data[st.session_state.data['ID'] == entry_id]
             if match.empty:
-                continue  # Skip rendering this row
-            match_idx = match.index[0]            
+                continue
+            match_idx = match.index[0]
             cols = st.columns([10, 1, 1])
+
             with cols[0]:
                 disp = row.drop(labels="ID").to_dict()
                 disp["Pending"] = "Yes" if row["Pending"] else "No"
