@@ -808,97 +808,78 @@ def chatbot_logic(query, df):
 
     return None  # fallback to LLM
 with tabs[3]:
-    import re
+    import streamlit as st
     from openai import OpenAI
-
-    st.subheader("🤖 Assistant Lite (qwen 2.5 instruct via OpenRouter)")
-
+    import pandas as pd
+    
+    st.subheader("💬 Rotor Assistant (Qwen 2.5 Coder 32B)")
+    
+    chat_query = st.text_input("Ask anything about stock, buyers, sizes…")
+    
     df = st.session_state.data.copy()
-
-    # OpenRouter client setup
+    df["Date"] = pd.to_datetime(df["Date"])
+    
+    # Initialize chat history
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Append user message to history
+    if chat_query:
+        st.session_state.chat_history.append({"role": "user", "content": chat_query})
+    
+    # Set up OpenRouter client
     client = OpenAI(
-        api_key=st.secrets["openrouter"]["api_key"],
-        base_url="https://openrouter.ai/api/v1"
+        base_url="https://openrouter.ai/api/v1",
+        api_key=st.secrets["openrouter"]["api_key"]
     )
-    MODEL = "qwen/qwen2-coder-32b-instruct"
-
-    # Context builder
-    def get_rotor_summary(data):
-        try:
-            data["Net"] = data.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
-            stock = data[data["Status"] == "Current"].groupby("Size (mm)")["Net"].sum().reset_index()
-            buyers = data[data["Type"] == "Outgoing"].groupby("Remarks")["Quantity"].sum().reset_index()
-
-            context = "Rotor Stock Summary:\n" + stock.to_string(index=False) + "\n\nTop Buyers:\n" + buyers.to_string(index=False)
-            return context
-        except Exception as e:
-            return f"Failed to create context: {e}"
-
-    # Init session state
-    if "chatbot_messages" not in st.session_state:
-        st.session_state.chatbot_messages = [
-            {"role": "system", "content": "You are an inventory assistant. Use rotor stock and buyer data to answer naturally.\n\n" + get_rotor_summary(df)}
-        ]
-
-    # Clear history button
-    col_clear, _ = st.columns([1, 8])
-    with col_clear:
-        if st.button("🧹 Clear History"):
-            context = get_rotor_summary(df)
-            st.session_state.chatbot_messages = [
-                {"role": "system", "content": "You are an inventory assistant. Use rotor stock and buyer data to answer naturally.\n\n" + context}
-            ]
-            st.rerun()
-
-    # Display history
-    for msg in st.session_state.chatbot_messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # User input
-    prompt = st.chat_input("Ask about rotor stock, buyers, pendings...")
-    if prompt:
-        st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("🤖 Thinking..."):
-                result = chatbot_logic(prompt, df)
-        
-                if result is not None:
-                    # Rule-based structured result
-                    if isinstance(result, pd.DataFrame):
-                        st.dataframe(result, use_container_width=True, hide_index=True)
-                    else:
-                        st.markdown(result)
-                    st.session_state.chatbot_messages.append({
-                        "role": "assistant",
-                        "content": str(result)  # Save to history
-                    })
-                else:
-                    # Fallback to LLM
-                    try:
-                        stream = client.chat.completions.create(
-                            model=MODEL,
-                            messages=st.session_state.chatbot_messages[-10:],
-                            stream=True
-                        )
-        
-                        def stream_generator():
-                            full_reply = ""
-                            for chunk in stream:
-                                content = chunk.choices[0].delta.content if chunk.choices[0].delta else ""
-                                full_reply += content
-                                yield content
-                            st.session_state.chatbot_messages.append({
-                                "role": "assistant", "content": full_reply
-                            })
-        
-                        st.write_stream(stream_generator())
-        
-                    except Exception as e:
-                        st.error(f"❌ Chatbot error: {e}")
+    
+    # Prepare system prompt with rotor data context
+    system_prompt = f"""
+    You are a rotor stock assistant. You can analyze rotor sizes, buyers (mentioned in remarks), pending and future orders, and forecast trends.
+    
+    The dataset includes columns like:
+    - Date
+    - Size (mm)
+    - Quantity
+    - Type (Inward / Outgoing)
+    - Status (Current / Future)
+    - Pending (True/False)
+    - Remarks (buyer names)
+    
+    Answer questions like:
+    - "What is the stock for 250mm?"
+    - "Buyer A pendings?"
+    - "Show last 5 entries of 100mm"
+    - "Who has pending orders?"
+    - "Is 300mm rotor running low?"
+    """
+    
+    # Build messages list
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(st.session_state.chat_history)
+    
+    # Run the model
+    if chat_query:
+        with st.spinner("Thinking..."):
+            try:
+                response = client.chat.completions.create(
+                    model="qwen/qwen2-coder-32b-instruct",
+                    messages=messages,
+                    temperature=0.4,
+                    stream=True  # Enable streaming if OpenRouter allows it
+                )
+    
+                full_reply = ""
+                placeholder = st.empty()
+                for chunk in response:
+                    delta = chunk.choices[0].delta.get("content", "")
+                    full_reply += delta
+                    placeholder.markdown(full_reply)
+    
+                st.session_state.chat_history.append({"role": "assistant", "content": full_reply})
+    
+            except Exception as e:
+                st.error(f"Error: {e}")
 
                
   
