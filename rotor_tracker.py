@@ -863,7 +863,7 @@ with tabs[3]:
         with st.spinner("Thinking..."):
             try:
                 response = client.chat.completions.create(
-                    model="deepseek/deepseek-r1-0528-qwen3-8b:free",
+                    model="qwen/qwen3-4b:free",
                     messages=messages,
                     temperature=0.4,
                     stream=True  # Enable streaming if OpenRouter allows it
