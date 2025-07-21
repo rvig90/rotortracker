@@ -499,6 +499,7 @@ with tabs[1]:
         if "sf" not in st.session_state: st.session_state.sf = "All"
         if "zf" not in st.session_state: st.session_state.zf = []
         if "pf" not in st.session_state: st.session_state.pf = "All"
+        if "tp" not in st.session_state: st.session_state.pf = "All"
         if "rs" not in st.session_state: st.session_state.rs = ""
         if "dr" not in st.session_state:
             min_date = pd.to_datetime(df['Date']).min().date()
@@ -510,6 +511,7 @@ with tabs[1]:
             st.session_state.sf = "All"
             st.session_state.zf = []
             st.session_state.pf = "All"
+            st.session_state.tp = "All"
             st.session_state.rs = ""
             min_date = pd.to_datetime(df['Date']).min().date()
             max_date = pd.to_datetime(df['Date']).max().date()
@@ -517,7 +519,7 @@ with tabs[1]:
             st.rerun()
 
         # Filter Controls
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3,c4 = st.columns(3)
         with c1:
             status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
@@ -525,6 +527,9 @@ with tabs[1]:
             size_f = st.multiselect("📐 Size (mm)", options=size_options, key="zf")
         with c3:
             pending_f = st.selectbox("❗ Pending", ["All", "Yes", "No"], key="pf")
+
+        with c4:
+            type_f = st.selectbox("Type, ["All", "Inward", "Outgoing"], key="tp")
 
         remark_s = st.text_input("📝 Search Remarks", key="rs")
 
