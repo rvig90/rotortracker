@@ -519,7 +519,7 @@ with tabs[1]:
             st.rerun()
 
         # Filter Controls
-        c1, c2, c3,c4 = st.columns(3)
+        c1, c2, c3,c4 = st.columns(4)
         with c1:
             status_f = st.selectbox("📂 Status", ["All", "Current", "Future"], key="sf")
         with c2:
