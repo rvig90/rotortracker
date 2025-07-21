@@ -820,7 +820,7 @@ with tabs[3]:
         api_key=st.secrets["openrouter"]["api_key"],
         base_url="https://openrouter.ai/api/v1"
     )
-    MODEL = "qwen/qwen2.5-coder-32b-instruct"
+    MODEL = "qwen/qwen2-coder-32b-instruct"
 
     # Context builder
     def get_rotor_summary(data):
