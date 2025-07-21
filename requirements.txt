@@ -8,7 +8,7 @@ altair
 prophet
 xgboost
 scikit-learn
-openai
+openai==0.28
 langchain
 langchain-experimental
 tabulate
