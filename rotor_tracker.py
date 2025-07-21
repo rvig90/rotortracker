@@ -165,63 +165,66 @@ with form_tabs[0]:
             entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks")
-    
-        if st.form_submit_button("➕ Add Entry"):
+
+        submitted = st.form_submit_button("➕ Add Entry")
+        if submitted:
+            # ✅ Construct new entry
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
-                'Size (mm)': rotor_size,
+                'Size (mm)': int(rotor_size),
                 'Type': entry_type,
-                'Quantity': quantity,
+                'Quantity': int(quantity),
                 'Remarks': remarks.strip(),
                 'Status': 'Current',
-                'Pending': False
+                'Pending': False,
+                'ID': str(uuid4())
             }
-    
+
             df = st.session_state.data.copy()
-    
-            # ✅ Only apply logic if it's an Outgoing entry
+
             if entry_type == "Outgoing":
-                buyer_name = remarks.strip()
-                size = rotor_size
-                qty = quantity
-    
+                buyer_name = remarks.strip().lower()
+                size = int(rotor_size)
+                qty = int(quantity)
+
+                # 🔍 Match pending entries
                 pending_match = df[
                     (df["Size (mm)"] == size) &
-                    (df["Remarks"].str.contains(buyer_name, case=False, na=False)) &
-                    (df["Pending"]) &
+                    (df["Remarks"].str.lower().str.contains(buyer_name)) &
+                    (df["Pending"] == True) &
                     (df["Status"] == "Current")
-                ]
-    
+                ].sort_values("Date")
+
                 if not pending_match.empty:
-                    st.warning(f"📌 Pending order found for *{buyer_name}, size **{size} mm*.")
-    
+                    st.warning(f"📌 Pending found for *{remarks}* ({size}mm). Deducting...")
+
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
-                            break  # Nothing left to deduct
-    
-                        pending_qty = row["Quantity"]
-    
+                            break
+                        pending_qty = int(row["Quantity"])
                         if qty >= pending_qty:
-                            # Fully fulfilled
                             df.at[idx, "Quantity"] = 0
                             df.at[idx, "Pending"] = False
-                            st.info(f"✔ Fulfilled: {pending_qty} units removed from pending.")
                             qty -= pending_qty
+                            st.info(f"✔ Cleared {pending_qty} from pending")
                         else:
-                            # Partial
                             df.at[idx, "Quantity"] = pending_qty - qty
-                            st.info(f"➖ Partially fulfilled: {qty} units deducted from pending.")
+                            st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
-    
-                    st.session_state.data = df.copy()
-    
-            # ✅ Finally add the new entry
-            st.session_state.data = pd.concat(
-                [st.session_state.data, pd.DataFrame([new_entry])],
-                ignore_index=True
-            )
-            auto_save_to_gsheet()
-            st.success("✅ Entry added successfully.")
+
+                    # 💡 Remove entries with 0 quantity
+                    df = df[df["Quantity"] > 0]
+
+            # ✅ Add final new entry
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            st.session_state.data = df.reset_index(drop=True)
+
+            # ✅ Save to Google Sheet
+            try:
+                auto_save_to_gsheet()
+                st.success("✅ Entry added and auto-saved.")
+            except Exception as e:
+                st.error(f"❌ Save failed: {e}")
 
 with form_tabs[1]:
     with st.form("future_form"):
