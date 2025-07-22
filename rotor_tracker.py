@@ -30,6 +30,17 @@ import io
 import requests
 from uuid import uuid4
 
+import streamlit as st
+import pandas as pd
+from datetime import datetime, timedelta
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
+from PIL import Image
+import io
+import requests
+from uuid import uuid4
+
 # ========== INIT STATE ==========
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
@@ -146,7 +157,6 @@ if st.button("🔄 Sync Now", help="Reload from Google Sheets"):
     load_from_gsheet()
 
 # ========== UNDO ==========
-# ========== UNDO ==========
 with st.expander("♻ Undo Recent Change"):
     if st.session_state.undo_stack:
         if not st.session_state.confirm_undo:
@@ -158,15 +168,13 @@ with st.expander("♻ Undo Recent Change"):
             with col1:
                 if st.button("✅ Yes, Undo"):
                     try:
-                        if st.session_state.undo_stack:  # Check if stack is not empty
-                            previous_data = st.session_state.undo_stack.pop()
-                            st.session_state.data = previous_data.copy()
-                            auto_save_to_gsheet()
-                            st.success("✅ Last change undone.")
-                            st.session_state.confirm_undo = False
-                            st.rerun()
+                        st.session_state.data = st.session_state.undo_stack.pop()
+                        auto_save_to_gsheet()
+                        st.success("✅ Last change undone.")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"❌ Undo failed: {e}")
+                    st.session_state.confirm_undo = False
             with col2:
                 if st.button("❌ Cancel Undo"):
                     st.session_state.confirm_undo = False
@@ -295,7 +303,7 @@ with tabs[2]:
                 'Remarks': pending_remarks.strip(),
                 'Status': 'Current',
                 'Pending': True
-            }) 
+            })
 
 # ✂ (Remaining part like stock summary, movement log, edit form is unchanged but should use 'ID' for match/edit)
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
