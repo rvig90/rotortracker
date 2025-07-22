@@ -19,29 +19,7 @@ from langchain.llms import OpenAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
-import streamlit as st
-import pandas as pd
-from datetime import datetime, timedelta
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import json
-from PIL import Image
-import io
-import requests
-from uuid import uuid4
-
-import streamlit as st
-import pandas as pd
-from datetime import datetime, timedelta
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import json
-from PIL import Image
-import io
-import requests
-from uuid import uuid4
-
-# ========== INIT STATE ==========
+# ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
         'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
@@ -50,25 +28,28 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.filter_reset = False
 
-if "undo_stack" not in st.session_state:
-    st.session_state.undo_stack = []
+# ====== APP LOGO ======
+import streamlit as st
+import requests
+from PIL import Image
+import io
 
-if "confirm_undo" not in st.session_state:
-    st.session_state.confirm_undo = False
-
-# ========== LOGO ==========
 def display_logo():
     try:
         logo_url = "https://ik.imagekit.io/zmv7kjha8x/D936A070-DB06-4439-B642-854E6510A701.PNG?updatedAt=1752629786861"
         response = requests.get(logo_url, timeout=5)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
         logo = Image.open(io.BytesIO(response.content))
         st.image(logo, width=200)
-    except:
+    except requests.exceptions.RequestException as e:
+        st.warning(f"Couldn't load logo from URL: {e}")
+        st.title("Rotor Tracker")
+    except Exception as e:
+        st.warning(f"An error occurred: {e}")
         st.title("Rotor Tracker")
 
 display_logo()
-
-# ========== HELPERS ==========
+# ====== HELPER FUNCTIONS ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
         lambda x: str(x).lower() == 'true' if isinstance(x, str) else bool(x)
@@ -77,19 +58,25 @@ def normalize_pending_column(df):
 
 def safe_delete_entry(id_to_delete):
     try:
-        st.session_state.undo_stack.append(st.session_state.data.copy())
-        st.session_state.data = st.session_state.data[st.session_state.data['ID'] != id_to_delete].reset_index(drop=True)
+        df = st.session_state.data
+        st.session_state.data = df[df['ID'] != id_to_delete].reset_index(drop=True)
         auto_save_to_gsheet()
         st.success("Entry deleted successfully")
         st.rerun()
     except Exception as e:
         st.error(f"Error deleting entry: {e}")
 
-# ========== GOOGLE SHEETS ==========
+# ====== GOOGLE SHEETS INTEGRATION ======
 def get_gsheet_connection():
     try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = json.loads(st.secrets["gcp_service_account"]) if isinstance(st.secrets["gcp_service_account"], str) else dict(st.secrets["gcp_service_account"])
+        scope = [
+            "https://spreadsheets.google.com/feeds", 
+            "https://www.googleapis.com/auth/drive"
+        ]
+        if isinstance(st.secrets["gcp_service_account"], str):
+            creds_dict = json.loads(st.secrets["gcp_service_account"])
+        else:
+            creds_dict = dict(st.secrets["gcp_service_account"])
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -101,7 +88,8 @@ def get_gsheet_connection():
 def save_to_backup_sheet(df):
     try:
         sheet = get_gsheet_connection()
-        if not sheet: return
+        if not sheet:
+            return
         ss = sheet.spreadsheet
         try:
             backup = ss.worksheet("Backup")
@@ -150,50 +138,27 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 
+# ====== MAIN APP ======
 if st.session_state.last_sync == "Never":
     load_from_gsheet()
 
-if st.button("🔄 Sync Now", help="Reload from Google Sheets"):
+if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
-# ========== UNDO ==========
-with st.expander("♻ Undo Recent Change"):
-    if st.session_state.undo_stack:
-        if not st.session_state.confirm_undo:
-            if st.button("🔙 Undo Last Change"):
-                st.session_state.confirm_undo = True
-        else:
-            st.warning("Are you sure you want to undo?")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Yes, Undo"):
-                    try:
-                        st.session_state.data = st.session_state.undo_stack.pop()
-                        auto_save_to_gsheet()
-                        st.success("✅ Last change undone.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Undo failed: {e}")
-                    st.session_state.confirm_undo = False
-            with col2:
-                if st.button("❌ Cancel Undo"):
-                    st.session_state.confirm_undo = False
-    else:
-        st.info("Nothing to undo yet.")
 
-# ========== ADD ENTRY FUNCTION ==========
+# ====== ENTRY FORMS ======
+form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
+
 def add_entry(data_dict):
     data_dict['ID'] = str(uuid4())
     new = pd.DataFrame([data_dict])
     st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
+    st.session_state.last_entry = data_dict
+    st.session_state.undo_confirm = False
     auto_save_to_gsheet()
     st.rerun()
 
-# ========== TABS ==========
-tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
-
-# ========== TAB: Current Movement ==========
-with tabs[0]:
+with form_tabs[0]:
     with st.form("current_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -204,12 +169,9 @@ with tabs[0]:
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks")
 
-        if st.form_submit_button("➕ Add Entry"):
-            # 📦 Save current state for undo
-            st.session_state.undo_stack.append(st.session_state.data.copy())
-            if len(st.session_state.undo_stack) > 20:
-                st.session_state.undo_stack = st.session_state.undo_stack[-20:]
-
+        submitted = st.form_submit_button("➕ Add Entry")
+        if submitted:
+            # ✅ Construct new entry
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -217,17 +179,18 @@ with tabs[0]:
                 'Quantity': int(quantity),
                 'Remarks': remarks.strip(),
                 'Status': 'Current',
-                'Pending': False
+                'Pending': False,
+                'ID': str(uuid4())
             }
 
             df = st.session_state.data.copy()
 
-            # ⬇ Auto adjust pending
             if entry_type == "Outgoing":
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
 
+                # 🔍 Match pending entries
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
@@ -236,7 +199,7 @@ with tabs[0]:
                 ].sort_values("Date")
 
                 if not pending_match.empty:
-                    st.warning(f"📌 Matching pending for {remarks} ({size}mm)")
+                    st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
 
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
@@ -246,19 +209,27 @@ with tabs[0]:
                             df.at[idx, "Quantity"] = 0
                             df.at[idx, "Pending"] = False
                             qty -= pending_qty
+                            st.info(f"✔ Cleared {pending_qty} from pending")
                         else:
                             df.at[idx, "Quantity"] = pending_qty - qty
+                            st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
 
+                    # 💡 Remove entries with 0 quantity
                     df = df[df["Quantity"] > 0]
 
-            st.session_state.data = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            auto_save_to_gsheet()
-            st.success("✅ Entry added successfully.")
-            st.rerun()
+            # ✅ Add final new entry
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            st.session_state.data = df.reset_index(drop=True)
 
-# ========== TAB: Coming Rotors ==========
-with tabs[1]:
+            # ✅ Save to Google Sheet
+            try:
+                auto_save_to_gsheet()
+                st.success("✅ Entry added and auto-saved.")
+            except Exception as e:
+                st.error(f"❌ Save failed: {e}")
+
+with form_tabs[1]:
     with st.form("future_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -268,21 +239,17 @@ with tabs[1]:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
             future_remarks = st.text_input("📝 Remarks")
         if st.form_submit_button("➕ Add Coming Rotors"):
-            st.session_state.undo_stack.append(st.session_state.data.copy())
-            if len(st.session_state.undo_stack) > 20:
-                st.session_state.undo_stack = st.session_state.undo_stack[-20:]
             add_entry({
                 'Date': future_date.strftime('%Y-%m-%d'),
                 'Size (mm)': future_size,
                 'Type': 'Inward',
                 'Quantity': future_qty,
-                'Remarks': future_remarks.strip(),
+                'Remarks': future_remarks,
                 'Status': 'Future',
                 'Pending': False
             })
 
-# ========== TAB: Pending Rotors ==========
-with tabs[2]:
+with form_tabs[2]:
     with st.form("pending_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -292,15 +259,12 @@ with tabs[2]:
             pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
             pending_remarks = st.text_input("📝 Remarks", value="Pending delivery")
         if st.form_submit_button("➕ Add Pending Rotors"):
-            st.session_state.undo_stack.append(st.session_state.data.copy())
-            if len(st.session_state.undo_stack) > 20:
-                st.session_state.undo_stack = st.session_state.undo_stack[-20:]
             add_entry({
                 'Date': pending_date.strftime('%Y-%m-%d'),
                 'Size (mm)': pending_size,
                 'Type': 'Outgoing',
                 'Quantity': pending_qty,
-                'Remarks': pending_remarks.strip(),
+                'Remarks': pending_remarks,
                 'Status': 'Current',
                 'Pending': True
             })
