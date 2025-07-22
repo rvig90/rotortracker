@@ -295,7 +295,7 @@ with tabs[2]:
                 'Remarks': pending_remarks.strip(),
                 'Status': 'Current',
                 'Pending': True
-            }) fix the undo function
+            }) 
 
 # ✂ (Remaining part like stock summary, movement log, edit form is unchanged but should use 'ID' for match/edit)
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
