@@ -128,13 +128,21 @@ def auto_save_to_gsheet():
             sheet.clear()
             if not st.session_state.data.empty:
                 df = st.session_state.data.copy()
+
+                # 🔧 Convert all data to string for GSheet compatibility
                 df['Pending'] = df['Pending'].apply(lambda x: "TRUE" if x else "FALSE")
+                df['Date'] = pd.to_datetime(df['Date']).dt.strftime("%Y-%m-%d")
+                df['Size (mm)'] = df['Size (mm)'].astype(str)
+                df['Quantity'] = df['Quantity'].astype(str)
+
                 expected = ['Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID']
                 for c in expected:
                     if c not in df.columns:
                         df[c] = ""
+
                 df = df[expected]
-                sheet.update([df.columns.tolist()] + df.values.tolist())
+                records = [df.columns.tolist()] + df.values.tolist()
+                sheet.update(records)
                 save_to_backup_sheet(df)
         st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
