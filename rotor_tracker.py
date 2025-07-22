@@ -185,7 +185,7 @@ with form_tabs[0]:
 
             df = st.session_state.data.copy()
 
-            if entry_type == "Outgoing":
+            if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
