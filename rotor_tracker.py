@@ -165,22 +165,34 @@ def add_entry(data_dict):
     st.session_state.data = pd.concat([st.session_state.data, new_entry_df], ignore_index=True)
     auto_save_to_gsheet()
     st.rerun()
-
-with st.sidebar:
-    st.markdown("### ⏪ Undo System")
+# ====== UNDO BLOCK ======
+with st.expander("♻ Undo Recent Change"):
     if st.session_state.undo_stack:
-        if st.button("⏪ Undo Last Entry"):
-            confirm = st.checkbox("✅ Confirm Undo", key="confirm_undo")
-            if confirm:
-                st.session_state.data = st.session_state.undo_stack.pop()
-                auto_save_to_gsheet()
-                st.success("Last action undone.")
-                st.experimental_rerun()
-            else:
-                st.warning("Check confirmation to undo.")
-    else:
-        st.info("Undo stack is empty.")
+        if "confirm_undo" not in st.session_state:
+            st.session_state.confirm_undo = False
 
+        if not st.session_state.confirm_undo:
+            if st.button("🔙 Undo Last Change"):
+                st.session_state.confirm_undo = True
+        else:
+            st.warning("Are you sure you want to undo the last change?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Yes, Undo"):
+                    try:
+                        # Restore previous state
+                        st.session_state.data = st.session_state.undo_stack.pop()
+                        st.success("✅ Undo successful. Last change has been reverted.")
+                        auto_save_to_gsheet()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Undo failed: {e}")
+                    st.session_state.confirm_undo = False
+            with col2:
+                if st.button("❌ Cancel Undo"):
+                    st.session_state.confirm_undo = False
+    else:
+        st.info("No previous state to undo.")
 with form_tabs[0]:
     with st.form("current_form"):
         col1, col2 = st.columns(2)
