@@ -165,7 +165,32 @@ def add_entry(data_dict):
     auto_save_to_gsheet()
     st.rerun()
 # ====== UNDO BLOCK ======
-
+# ========== UNDO ==========
+with st.expander("♻ Undo Recent Change"):
+    if st.session_state.undo_stack:
+        if not st.session_state.confirm_undo:
+            if st.button("🔙 Undo Last Change"):
+                st.session_state.confirm_undo = True
+        else:
+            st.warning("Are you sure you want to undo?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Yes, Undo"):
+                    try:
+                        if st.session_state.undo_stack:  # Check if stack is not empty
+                            previous_data = st.session_state.undo_stack.pop()
+                            st.session_state.data = previous_data.copy()
+                            auto_save_to_gsheet()
+                            st.success("✅ Last change undone.")
+                            st.session_state.confirm_undo = False
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Undo failed: {e}")
+            with col2:
+                if st.button("❌ Cancel Undo"):
+                    st.session_state.confirm_undo = False
+    else:
+        st.info("Nothing to undo yet.")
 with form_tabs[0]:
     with st.form("current_form"):
         col1, col2 = st.columns(2)
