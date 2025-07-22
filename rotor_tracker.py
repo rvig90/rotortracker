@@ -29,7 +29,7 @@ if 'data' not in st.session_state:
     st.session_state.filter_reset = False
 
 if "undo_stack" not in st.session_state:
-    st.session_state_undo_stack = []
+    st.session_state.undo_stack = []
 
 # ====== APP LOGO ======
 import streamlit as st
