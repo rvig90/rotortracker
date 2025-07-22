@@ -28,6 +28,9 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.filter_reset = False
 
+if "undo_stack" not in st.session_state:
+    st.session_state_undo_stack = []
+
 # ====== APP LOGO ======
 import streamlit as st
 import requests
@@ -145,15 +148,40 @@ if st.session_state.last_sync == "Never":
 if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
+
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
 
 def add_entry(data_dict):
     data_dict['ID'] = str(uuid4())
     new = pd.DataFrame([data_dict])
+
+    # 🔁 Push current state before modifying
+    st.session_state.undo_stack.append(st.session_state.data.copy())
+    st.session_state.undo_stack.append(st.session_state.data.copy())
+
+    MAX_UNDO = 20
+    if len(st.session_state.undo_stack) > MAX_UNDO:
+        st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
+
     st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
     auto_save_to_gsheet()
     st.rerun()
+
+with st.sidebar:
+    st.markdown("### ⏪ Undo System")
+    if st.session_state.undo_stack:
+        if st.button("⏪ Undo Last Entry"):
+            confirm = st.checkbox("✅ Confirm Undo", key="confirm_undo")
+            if confirm:
+                st.session_state.data = st.session_state.undo_stack.pop()
+                auto_save_to_gsheet()
+                st.success("Last action undone.")
+                st.experimental_rerun()
+            else:
+                st.warning("Check confirmation to undo.")
+    else:
+        st.info("Undo stack is empty.")
 
 with form_tabs[0]:
     with st.form("current_form"):
