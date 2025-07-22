@@ -257,7 +257,7 @@ with form_tabs[2]:
             pending_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
             pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
-            pending_remarks = st.text_input("📝 Remarks", value="Pending delivery")
+            pending_remarks = st.text_input("📝 Remarks", value="")
         if st.form_submit_button("➕ Add Pending Rotors"):
             add_entry({
                 'Date': pending_date.strftime('%Y-%m-%d'),
