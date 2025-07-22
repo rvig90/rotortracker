@@ -162,7 +162,7 @@ def add_entry(data_dict):
     if len(st.session_state.undo_stack) > MAX_UNDO:
         st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
 
-    st.session_state.data = pd.concat([st.session_state.data, new_entry_df], ignore_index=True)
+    st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
     auto_save_to_gsheet()
     st.rerun()
 # ====== UNDO BLOCK ======
