@@ -151,20 +151,13 @@ if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
-
 def add_entry(data_dict):
     data_dict['ID'] = str(uuid4())
     new = pd.DataFrame([data_dict])
-
-    # 🔁 Push current state before modifying
-    st.session_state.undo_stack.append(st.session_state.data.copy())
-    MAX_UNDO = 20
-    if len(st.session_state.undo_stack) > MAX_UNDO:
-        st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
-
     st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
     auto_save_to_gsheet()
     st.rerun()
+
 # ====== UNDO BLOCK ======
 with st.expander("♻ Undo Recent Change"):
     if st.session_state.undo_stack:
@@ -206,6 +199,11 @@ with form_tabs[0]:
 
         submitted = st.form_submit_button("➕ Add Entry")
         if submitted:
+            # Save current state to undo stack
+        st.session_state.undo_stack.append(st.session_state.data.copy())
+        MAX_UNDO = 20
+        if len(st.session_state.undo_stack) > MAX_UNDO:
+            st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
             # ✅ Construct new entry
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
@@ -274,6 +272,11 @@ with form_tabs[1]:
             future_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
             future_remarks = st.text_input("📝 Remarks")
         if st.form_submit_button("➕ Add Coming Rotors"):
+            # Save current state to undo stack
+        st.session_state.undo_stack.append(st.session_state.data.copy())
+        MAX_UNDO = 20
+        if len(st.session_state.undo_stack) > MAX_UNDO:
+            st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
             add_entry({
                 'Date': future_date.strftime('%Y-%m-%d'),
                 'Size (mm)': future_size,
@@ -294,6 +297,11 @@ with form_tabs[2]:
             pending_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
             pending_remarks = st.text_input("📝 Remarks", value="Pending delivery")
         if st.form_submit_button("➕ Add Pending Rotors"):
+            # Save current state to undo stack
+        st.session_state.undo_stack.append(st.session_state.data.copy())
+        MAX_UNDO = 20
+        if len(st.session_state.undo_stack) > MAX_UNDO:
+            st.session_state.undo_stack = st.session_state.undo_stack[-MAX_UNDO:]
             add_entry({
                 'Date': pending_date.strftime('%Y-%m-%d'),
                 'Size (mm)': pending_size,
