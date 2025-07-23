@@ -737,6 +737,10 @@ with tabs[2]:
         st.success(f"📦 Current stock for *{rotor_size}mm*: {int(stock)} units")
         st.stop()
 
+    if not chat_query.strip():
+        st.info("💬 Enter a query to begin. Try: 'Buyer A June', '250mm last 3', or '300mm stock'")
+        st.stop()
+
     # === Final Filtered Display ===
     if not filtered.empty:
         title = f"📄 Entries"
