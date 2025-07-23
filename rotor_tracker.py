@@ -651,7 +651,7 @@ with tabs[2]:
     year = int(year_match.group(1)) if year_match else datetime.today().year
 
     # Extract other keywords
-    rotor_match = re.search(r"(\d{2,5})\s*mm", query)
+    rotor_match = re.search(r"(\d{2,6})\s*mm", query)
     rotor_size = int(rotor_match.group(1)) if rotor_match else None
 
     last_n_match = re.search(r"last\s+(\d+)", query)
