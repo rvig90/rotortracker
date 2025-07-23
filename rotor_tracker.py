@@ -869,10 +869,9 @@ def chatbot_logic(query, df):
     if "buyers" in q or "vendors" in q:
         buyers = df["Vendor"].dropna().unique().tolist()
         return f"🧑‍💼 Known Buyers:\n" + ", ".join(sorted(set(buyers)))
-
+   
     import calendar
 
-    # === Extract month name from query
     month_match = re.search(
         r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
         chat_query.lower()
@@ -885,7 +884,6 @@ def chatbot_logic(query, df):
         start_date = datetime(current_year, month_num, 1)
         end_date = datetime(current_year, month_num, calendar.monthrange(current_year, month_num)[1])
     
-        # Filter for selected month
         filtered = df[
             (df["Date"] >= pd.to_datetime(start_date)) &
             (df["Date"] <= pd.to_datetime(end_date))
@@ -893,7 +891,6 @@ def chatbot_logic(query, df):
     
         filters_applied = []
     
-        # Apply optional filters from query
         if rotor_size:
             filtered = filtered[filtered["Size (mm)"] == rotor_size]
             filters_applied.append(f"{rotor_size}mm**")
@@ -902,7 +899,7 @@ def chatbot_logic(query, df):
             filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
             filters_applied.append(f"{buyer_name}")
     
-        if movement_type:  # Matches 'Outgoing' or 'Inward'
+        if movement_type:
             filtered = filtered[filtered["Type"] == movement_type]
             filters_applied.append(f"{movement_type}")
     
@@ -910,24 +907,17 @@ def chatbot_logic(query, df):
             filtered = filtered[filtered["Pending"] == True]
             filters_applied.append("*Pending*")
     
-        # Prepare display
+        title = f"📅 Entries in *{month_name}*"
         if filters_applied:
-            title = f"📅 Entries in *{month_name}* for: " + ", ".join(filters_applied)
-        else:
-            title = f"📅 All entries in *{month_name}*"
+            title += " for: " + ", ".join(filters_applied)
     
         if not filtered.empty:
             st.success(title)
-            st.dataframe(
-                filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]],
-                use_container_width=True
-            )
+            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
         else:
             st.info(f"No entries found in *{month_name}* matching the criteria.")
-    
-        st.stop()  # End chatbot block after fulfilling this query
-
-    return None  # fallback to LLM
+        st.stop()
+   
 with tabs[3]:
     import openai
     import streamlit as st
