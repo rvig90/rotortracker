@@ -658,6 +658,7 @@ def chatbot_logic(query, df):
     buyer_name = query_clean if query_clean else None
 
     # === Month + Year match ===
+    # === Month + Year match ===
     month_match = re.search(
         r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
         query
@@ -665,6 +666,15 @@ def chatbot_logic(query, df):
     year_match = re.search(r"(20\d{2})", query)
     month_name = month_match.group(1).capitalize() if month_match else None
     year = int(year_match.group(1)) if year_match else datetime.today().year
+    
+    start_date = end_date = None
+    if month_name:
+        try:
+            month_num = list(calendar.month_name).index(month_name)
+            start_date = datetime(year, month_num, 1)
+            end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
+        except:
+            pass
 
     if month_name:
         month_num = list(calendar.month_name).index(month_name)
@@ -700,21 +710,26 @@ def chatbot_logic(query, df):
         return grouped.sort_values(["Buyer", "Rotor Size"])
 
     # === Apply filters ===
+    # === Apply all filters at once ===
     filtered = df.copy()
     filters_applied = []
-
+    
+    if start_date and end_date:
+        filtered = filtered[(filtered["Date"] >= start_date) & (filtered["Date"] <= end_date)]
+        filters_applied.append(f"{month_name} {year}")
+    
     if rotor_size:
         filtered = filtered[filtered["Size (mm)"] == rotor_size]
         filters_applied.append(f"{rotor_size}mm")
-
+    
     if movement_type:
         filtered = filtered[filtered["Type"] == movement_type]
         filters_applied.append(movement_type)
-
+    
     if is_pending:
         filtered = filtered[filtered["Pending"] == True]
         filters_applied.append("Pending")
-
+    
     if buyer_name:
         filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
         filters_applied.append(f"Buyer: {buyer_name}")
