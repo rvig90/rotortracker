@@ -663,7 +663,7 @@ with tabs[2]:
             st.dataframe(grouped, use_container_width=True, hide_index=True)
         else:
             st.info("✅ No pending orders found.")
-    
+        st.stop()
     # === Extract all possible filters ===
     last_n_match = re.search(r"last\s*(\d+)", chat_query.lower())
     size_match = re.search(r"(\d{2,6})", chat_query)
