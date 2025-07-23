@@ -787,7 +787,6 @@ with tabs[2]:
             st.dataframe(buyer_pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
         else:
             st.info(f"No pending orders found for {buyer_name}.")
-
         st.stop()
     
     # === CASE 4: Buyer name only
