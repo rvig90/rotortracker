@@ -738,7 +738,7 @@ with tabs[2]:
         st.stop()
 
     if not chat_query.strip():
-        st.info("💬 Enter a query to begin. Try: 'Buyer A June', '250mm last 3', or '300mm stock'")
+        st.info("💬 Enter a query to begin.")
         st.stop()
 
     # === Final Filtered Display ===
