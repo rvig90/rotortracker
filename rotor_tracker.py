@@ -628,295 +628,129 @@ with tabs[1]:
                         st.session_state.editing = None
                         st.rerun()
 # === TAB 3: Rotor Trend ===
-with tabs[2]:
-    import re
-    st.subheader("💬 Rotor Chatbot lite")
-    
-    chat_query = st.text_input("Try: 'Buyer A', '100mm last 5', 'Buyer B pending', or 'MegaTech last 3 outgoing pending'")
-    
-    df = st.session_state.data.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df[df["Status"] != "Future"]  # ✅ Exclude Future entries
-    # === CASE: 'pendings' or 'pending orders' — group by buyer + size
-    if re.search(r"\b(pendings|pending orders?)\b", chat_query.lower()):
-        pending_df = df[
-            (df["Type"] == "Outgoing") &
-            (df["Pending"] == True) &
-            (df["Status"] == "Current")
-        ].copy()
-    
-        if not pending_df.empty:
-            st.success("📬 Pending Orders Grouped by Buyer and Rotor Size")
-    
-            grouped = (
-                pending_df.groupby(["Remarks", "Size (mm)"])["Quantity"]
-                .sum()
-                .reset_index()
-                .rename(columns={
-                    "Remarks": "Buyer",
-                    "Size (mm)": "Rotor Size (mm)",
-                    "Quantity": "Pending Quantity"
-                })
-                .sort_values(["Buyer", "Rotor Size (mm)"])
-            )
-    
-            st.dataframe(grouped, use_container_width=True, hide_index=True)
-        else:
-            st.info("✅ No pending orders found.")
-        st.stop()
-    # === Extract all possible filters ===
-    last_n_match = re.search(r"last\s*(\d+)", chat_query.lower())
-    size_match = re.search(r"(\d{2,6})", chat_query)
-    type_match = re.search(r"\b(inward|outgoing)\b", chat_query.lower())
-    is_pending = "pending" in chat_query.lower()
-    
-    entry_count = int(last_n_match.group(1)) if last_n_match else None
-    rotor_size = int(size_match.group(1)) if size_match else None
-    movement_type = type_match.group(1).capitalize() if type_match else None
-    
-    # Remove known keywords to isolate possible buyer name
-    query_cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,4})", "", chat_query, flags=re.IGNORECASE).strip()
-    buyer_name = query_cleaned if query_cleaned else None
+import re
+import pandas as pd
+from datetime import datetime
+import calendar
 
-    # === CASE: "250mm pendings"
-    if rotor_size and is_pending:
-        pending_for_size = df[
-            (df["Size (mm)"] == rotor_size) &
-            (df["Type"] == "Outgoing") &
-            (df["Pending"] == True)
-        ]
-    
-        if not pending_for_size.empty:
-            st.success(f"📦 Pending Outgoing Orders for **{rotor_size}mm**")
-            st.dataframe(pending_for_size[["Date", "Quantity", "Remarks"]].sort_values("Date"), use_container_width=True)
-        else:
-            st.info(f"No pending outgoing orders found for **{rotor_size}mm**.")
-    
-    # === CASE: "250mm stock"
-    if rotor_size and "stock" in chat_query.lower():
-        current_df = df[
-            (df["Size (mm)"] == rotor_size) &
-            (df["Status"] == "Current")
-        ].copy()
-    
-        current_df["Net"] = current_df.apply(
+def chatbot_logic(query, df):
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df[df["Status"] != "Future"]
+    df["Vendor"] = df["Remarks"].fillna("").str.strip()
+
+    query = query.strip().lower()
+
+    # === Extract parts from query ===
+    size_match = re.search(r"(\d{2,5})\s?mm", query)
+    rotor_size = int(size_match.group(1)) if size_match else None
+
+    last_n_match = re.search(r"last\s*(\d+)", query)
+    entry_count = int(last_n_match.group(1)) if last_n_match else None
+
+    type_match = re.search(r"\b(inward|outgoing)\b", query)
+    movement_type = type_match.group(1).capitalize() if type_match else None
+
+    is_pending = "pending" in query
+
+    # Extract buyer name (by removing known terms)
+    query_clean = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,5}mm|stock)", "", query, flags=re.IGNORECASE).strip()
+    buyer_name = query_clean if query_clean else None
+
+    # === Month + Year match ===
+    month_match = re.search(
+        r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
+        query
+    )
+    year_match = re.search(r"(20\d{2})", query)
+    month_name = month_match.group(1).capitalize() if month_match else None
+    year = int(year_match.group(1)) if year_match else datetime.today().year
+
+    if month_name:
+        month_num = list(calendar.month_name).index(month_name)
+        start_date = datetime(year, month_num, 1)
+        end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
+        df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
+
+    # === Stock check ===
+    if rotor_size and "stock" in query:
+        current = df[df["Status"] == "Current"].copy()
+        current["Net"] = current.apply(
             lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"] if not x["Pending"] else 0,
             axis=1
         )
-    
-        current_stock = current_df["Net"].sum()
-    
-        st.success(f"📦 Current stock for **{rotor_size}mm** rotor: `{int(current_stock)}` units")
-    
-        # Optional: Breakdown
-        inward = current_df[current_df["Type"] == "Inward"]["Quantity"].sum()
-        delivered = current_df[
-            (current_df["Type"] == "Outgoing") &
-            (~current_df["Pending"])
-        ]["Quantity"].sum()
-    
-        pending_qty = current_df[
-            (current_df["Type"] == "Outgoing") &
-            (current_df["Pending"])
-        ]["Quantity"].sum()
-    
-        st.markdown(f"""
-    - 📥 **Total Inward**: `{int(inward)}`
-    - 📤 **Delivered Outgoing**: `{int(delivered)}`
-    - ❗ **Pending Outgoing**: `{int(pending_qty)}`
-    - 📦 **Net Stock (Available)**: `{int(current_stock)}`
-        """)
-    
-        # Optional: Trend chart
-        history = current_df.groupby("Date")["Net"].sum().cumsum().reset_index()
-        if not history.empty:
-            st.markdown("#### 📈 Stock Movement Over Time")
-            st.line_chart(history.set_index("Date"))
-    # === CASE 1: "last N" entries (with optional rotor, type, buyer, pending)
+        stock = current[current["Size (mm)"] == rotor_size]["Net"].sum()
+        return f"📦 Current stock of {rotor_size}mm rotor: *{int(stock)} units*"
+
+    # === Pending summary (grouped) ===
+    if re.search(r"\b(pendings|pending orders?)\b", query):
+        pending_df = df[(df["Pending"] == True) & (df["Type"] == "Outgoing")]
+        if pending_df.empty:
+            return "✅ No pending orders found."
+        grouped = (
+            pending_df.groupby(["Vendor", "Size (mm)"])["Quantity"]
+            .sum()
+            .reset_index()
+            .rename(columns={
+                "Vendor": "Buyer",
+                "Size (mm)": "Rotor Size",
+                "Quantity": "Pending Qty"
+            })
+        )
+        return grouped.sort_values(["Buyer", "Rotor Size"])
+
+    # === Apply filters ===
+    filtered = df.copy()
+    filters_applied = []
+
+    if rotor_size:
+        filtered = filtered[filtered["Size (mm)"] == rotor_size]
+        filters_applied.append(f"{rotor_size}mm")
+
+    if movement_type:
+        filtered = filtered[filtered["Type"] == movement_type]
+        filters_applied.append(movement_type)
+
+    if is_pending:
+        filtered = filtered[filtered["Pending"] == True]
+        filters_applied.append("Pending")
+
+    if buyer_name:
+        filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
+        filters_applied.append(f"Buyer: {buyer_name}")
+
     if entry_count:
-        filtered = df.copy()
-    
-        if rotor_size:
-            filtered = filtered[filtered["Size (mm)"] == rotor_size]
-    
-        if movement_type:
-            filtered = filtered[filtered["Type"] == movement_type]
-    
-        if is_pending:
-            filtered = filtered[filtered["Pending"] == True]
-    
-        if buyer_name:
-            filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
-    
         filtered = filtered.sort_values("Date", ascending=False).head(entry_count)
-    
-        if not filtered.empty:
-            title = f"📋 Last {entry_count} entries"
-            if rotor_size:
-                title += f" for **{rotor_size}mm**"
-            if movement_type:
-                title += f" ({movement_type})"
-            if is_pending:
-                title += " [Pending]"
-            if buyer_name:
-                title += f" from **{buyer_name}**"
-    
-            st.success(title)
-            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
+        filters_applied.append(f"Last {entry_count}")
+
+    if filtered.empty:
+        return "❌ No matching entries found."
+
+    title = " | ".join(filters_applied) if filters_applied else "Matching entries"
+    filtered = filtered.sort_values("Date", ascending=False)
+    return title, filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]]
+
+with tabs[2]:
+    st.subheader("💬 Rotor Chatbot Lite")
+
+    chat_query = st.text_input("Try queries like: '250mm stock', 'Buyer A pending', 'last 5 outgoing', 'June 2024', or 'MegaTech 100mm June'")
+
+    if chat_query:
+        result = chatbot_logic(chat_query, st.session_state.data)
+
+        if isinstance(result, tuple):
+            title, df_result = result
+            st.success(f"🔍 {title}")
+            st.dataframe(df_result, use_container_width=True, hide_index=True)
+
+        elif isinstance(result, pd.DataFrame):
+            st.dataframe(result, use_container_width=True, hide_index=True)
+
+        elif isinstance(result, str):
+            st.info(result)
+
         else:
-            st.info("No matching entries found.")
-    
-    # === CASE 2: Just rotor size
-    elif rotor_size:
-        size_df = df[df["Size (mm)"] == rotor_size]
-        if not size_df.empty:
-            st.success(f"📄 All entries for **{rotor_size}mm** rotor")
-            st.dataframe(size_df[["Date", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-        else:
-            st.info(f"No entries found for {rotor_size}mm.")
-    
-    # === CASE 3: Buyer with 'pending'
-    elif is_pending and buyer_name:
-        buyer_pending = df[
-            (df["Type"] == "Outgoing") &
-            (df["Pending"] == True) &
-            (df["Remarks"].str.contains(buyer_name, case=False, na=False))
-        ]
-        if not buyer_pending.empty:
-            st.success(f"📬 Pending orders for **{buyer_name}**")
-            st.dataframe(buyer_pending[["Date", "Size (mm)", "Quantity", "Remarks"]], use_container_width=True)
-        else:
-            st.info(f"No pending orders found for {buyer_name}.")
-        st.stop()
-    
-    # === CASE 4: Buyer name only
-    elif buyer_name:
-        buyer_data = df[
-            (df["Type"] == "Outgoing") &
-            (df["Remarks"].str.contains(buyer_name, case=False, na=False))
-        ]
-        if not buyer_data.empty:
-            st.success(f"📤 All orders for **{buyer_name}**")
-            st.dataframe(buyer_data[["Date", "Size (mm)", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-        else:
-            st.info(f"No entries found for buyer: **{buyer_name}**.")
-    
-    # === CASE 5: Nothing matched
-    elif chat_query:
-        st.info("❓ No match found. Try: 'Buyer A last 3', '300mm', or 'Buyer B pending'.")
-    
-import re
-import pandas as pd
-
-    df = df.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Vendor"] = df["Remarks"].fillna("").str.strip()
-
-    # Normalize query
-    q = query.lower()
-
-    # === Match Rotor Size (e.g., "250mm", "300mm")
-    size_match = re.search(r"(\d{2,4})\s?mm", q)
-    size = int(size_match.group(1)) if size_match else None
-
-    # === Match Buyer Name
-    buyer_match = re.search(r"buyer\s+(.+)", q)
-    buyer = buyer_match.group(1).strip() if buyer_match else None
-
-    # === Match "last N entries"
-    last_n_match = re.search(r"last\s+(\d+)\s+entries", q)
-    last_n = int(last_n_match.group(1)) if last_n_match else None
-
-    # === 1: Stock of specific size
-    if size and "stock" in q:
-        current = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
-        current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
-        stock = current.groupby("Size (mm)")["Net"].sum()
-        if size in stock:
-            return f"📦 Current stock of *{size}mm*: {int(stock[size])} units"
-        else:
-            return f"❌ No stock info found for {size}mm."
-
-    # === 2: Pendings by size
-    if size and "pending" in q:
-        pending = df[(df["Size (mm)"] == size) & (df["Pending"]) & (df["Status"] == "Current")]
-        if not pending.empty:
-            return pending[["Date", "Quantity", "Vendor", "Remarks"]].sort_values("Date")
-        else:
-            return f"✅ No pending orders found for {size}mm."
-
-    # === 3: Pendings by buyer
-    if "pending" in q and buyer:
-        pending = df[(df["Vendor"].str.contains(buyer, case=False)) & (df["Pending"]) & (df["Status"] == "Current")]
-        if not pending.empty:
-            return pending[["Date", "Size (mm)", "Quantity", "Vendor"]].sort_values("Date")
-        else:
-            return f"✅ No pending entries found for buyer: *{buyer}*"
-
-    # === 4: Last N entries for a size
-    if size and last_n:
-        entries = df[df["Size (mm)"] == size].sort_values("Date", ascending=False).head(last_n)
-        return entries[["Date", "Type", "Quantity", "Vendor", "Pending"]]
-
-    # === 5: All buyer pendings
-    if "pending" in q and "buyer" in q:
-        buyer_pendings = df[(df["Pending"]) & (df["Status"] == "Current")]
-        grouped = buyer_pendings.groupby("Vendor")["Quantity"].sum().reset_index().sort_values("Quantity", ascending=False)
-        return grouped.rename(columns={"Vendor": "Buyer", "Quantity": "Pending Qty"})
-
-    # === 6: Show recent buyers
-    if "buyers" in q or "vendors" in q:
-        buyers = df["Vendor"].dropna().unique().tolist()
-        return f"🧑‍💼 Known Buyers:\n" + ", ".join(sorted(set(buyers)))
-   
-    import calendar
-
-    month_match = re.search(
-        r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
-        chat_query.lower()
-    )
-    month_name = month_match.group(1).capitalize() if month_match else None
-    
-    if month_name:
-        current_year = datetime.today().year
-        month_num = list(calendar.month_name).index(month_name)
-        start_date = datetime(current_year, month_num, 1)
-        end_date = datetime(current_year, month_num, calendar.monthrange(current_year, month_num)[1])
-    
-        filtered = df[
-            (df["Date"] >= pd.to_datetime(start_date)) &
-            (df["Date"] <= pd.to_datetime(end_date))
-        ].copy()
-    
-        filters_applied = []
-    
-        if rotor_size:
-            filtered = filtered[filtered["Size (mm)"] == rotor_size]
-            filters_applied.append(f"{rotor_size}mm**")
-    
-        if buyer_name:
-            filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
-            filters_applied.append(f"{buyer_name}")
-    
-        if movement_type:
-            filtered = filtered[filtered["Type"] == movement_type]
-            filters_applied.append(f"{movement_type}")
-    
-        if is_pending:
-            filtered = filtered[filtered["Pending"] == True]
-            filters_applied.append("*Pending*")
-    
-        title = f"📅 Entries in *{month_name}*"
-        if filters_applied:
-            title += " for: " + ", ".join(filters_applied)
-    
-        if not filtered.empty:
-            st.success(title)
-            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-        else:
-            st.info(f"No entries found in *{month_name}* matching the criteria.")
-        st.stop()
-   
+            st.warning("🤔 Unexpected response.")
 with tabs[3]:
     import openai
     import streamlit as st
