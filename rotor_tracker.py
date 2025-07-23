@@ -663,7 +663,7 @@ with tabs[2]:
     is_pending = "pending" in query
 
     # Remove known words to isolate possible buyer
-    cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,5}mm|stock|january|february|march|april|may|june|july|august|september|october|november|december|20\d{2})", "", query, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|january|february|march|april|may|june|july|august|september|october|november|december|20\d{2})", "", query, flags=re.IGNORECASE)
     buyer_name = cleaned.strip()
 
     # Filter for selected month
