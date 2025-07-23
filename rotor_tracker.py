@@ -19,6 +19,22 @@ from langchain.llms import OpenAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
+import streamlit as st
+
+st.set_page_config(page_title="Rotor Tracker", layout="wide")
+
+# Grey background
+st.markdown("""
+    <style>
+        body {
+            background-color: #f0f2f6;
+        }
+        .stApp {
+            background-color: #f0f2f6;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
