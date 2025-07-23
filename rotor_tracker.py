@@ -808,7 +808,6 @@ with tabs[2]:
 import re
 import pandas as pd
 
-def chatbot_logic(query, df):
     df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"])
     df["Vendor"] = df["Remarks"].fillna("").str.strip()
