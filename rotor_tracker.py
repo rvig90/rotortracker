@@ -20,13 +20,7 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
 import pandas as pd
-
 import os
-
-
-import os
-
-
 
 @st.cache_data
 def load_data():
