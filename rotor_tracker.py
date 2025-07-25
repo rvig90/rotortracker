@@ -209,6 +209,8 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
+            st.session_state["data"].to_csv("rotordata.csv", index=False)
+            st.success("Entry added!")
 
             df = st.session_state.data.copy()
 
@@ -275,6 +277,8 @@ with form_tabs[1]:
                 'Status': 'Future',
                 'Pending': False
             })
+            st.session_state["data"].to_csv("rotordata.csv", index=False)
+            st.success("Entry added!")
 
 with form_tabs[2]:
     with st.form("pending_form"):
@@ -295,6 +299,8 @@ with form_tabs[2]:
                 'Status': 'Current',
                 'Pending': True
             })
+            st.session_state["data"].to_csv("rotordata.csv", index=False)
+            st.success("Entry added!")
 
 # ✂ (Remaining part like stock summary, movement log, edit form is unchanged but should use 'ID' for match/edit)
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
