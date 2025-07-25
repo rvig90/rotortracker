@@ -167,7 +167,7 @@ def auto_save_to_gsheet():
         st.error(f"Auto-save failed: {e}")
 
 # ====== MAIN APP ======
-if st.session_state.last_sync == "Never":
+if st.session_state["last_sync"] == "Never":
     load_from_gsheet()
 
 if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
