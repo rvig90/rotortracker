@@ -623,7 +623,7 @@ with tabs[1]:
                 if st.button("❌", key=f"del_{entry_id}"):
                     safe_delete_entry(entry_id)
 
-            if st.session_state.editing == match_idx:
+            if st.session_state.get("editing") == match_idx:
                 er = st.session_state.data.loc[match_idx]
                 with st.form(f"edit_form_{entry_id}"):
                     ec1, ec2 = st.columns(2)
