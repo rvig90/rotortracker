@@ -218,8 +218,6 @@ with form_tabs[0]:
             }
             csv_path = os.path.abspath("rotordata.csv")
             st.write("Saving to:", csv_path)
-            
-
             st.session_state["data"].to_csv("rotordata.csv", index=False)
             st.success("Entry added!")
 
