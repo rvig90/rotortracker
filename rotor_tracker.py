@@ -20,6 +20,22 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
 
+if "query" in st.query_params:
+    from chatbot_logic import chatbot_logic  # or wherever you define it
+    import pandas as pd
+
+    query = st.query_params["query"]
+    
+    # Load your data
+    df = pd.read_csv("rotordata.csv")  # or from gsheet, session_state, etc.
+
+    result = chatbot_logic(query, df)
+
+    if isinstance(result, pd.DataFrame):
+        result = result.to_dict(orient="records")
+
+    st.json({"response": result})
+    st.stop()
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
