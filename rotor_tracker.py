@@ -19,6 +19,15 @@ from langchain.llms import OpenAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
+import pandas as pd
+
+@st.cache_data
+def load_data():
+    return pd.read_csv("rotordata.csv")
+
+# Load it into session state once
+if "data" not in st.session_state:
+    st.session_state["data"] = load_data()
 
 if "query" in st.query_params:
     from chatbot_logic import chatbot_logic  # or wherever you define it
