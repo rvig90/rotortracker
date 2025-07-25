@@ -21,6 +21,19 @@ import openai
 import re
 import pandas as pd
 
+import os
+
+csv_path = os.path.abspath("rotordata.csv")
+st.write("Saving to:", csv_path)
+st.session_state["data"].to_csv(csv_path, index=False)
+
+import os
+
+if os.access("rotordata.csv", os.W_OK):
+    st.success("CSV is writable ✅")
+else:
+    st.error("CSV is not writable ❌")
+
 @st.cache_data
 def load_data():
     return pd.read_csv("rotordata.csv")
