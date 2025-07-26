@@ -38,6 +38,16 @@ if st.button("🔄 Reload from CSV"):
     except Exception as e: 
         st.error(f"❌ Failed to reload CSV: {e}")
 
+import os
+
+if st.button("💾 Save to CSV"):
+    try:
+        csv_path = os.path.abspath("rotordata.csv")
+        st.session_state.data.to_csv(csv_path, index=False)
+        st.success(f"✅ Saved to CSV at: `{csv_path}`")
+    except Exception as e:
+        st.error(f"❌ Failed to save CSV: {e}")
+
 if "query" in st.query_params:
     from chatbot_logic import chatbot_logic  # or wherever you define it
     import pandas as pd
