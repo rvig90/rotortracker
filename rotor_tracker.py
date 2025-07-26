@@ -58,24 +58,6 @@ if 'data' not in st.session_state:
     st.session_state.editing = None
     st.session_state.filter_reset = False
 
-if st.button("🔄 Reload from CSV"):
-    try:
-        df = pd.read_csv("rotordata.csv")
-        st.session_state.data = df
-        st.success("✅ Data reloaded from CSV.")
-    except Exception as e: 
-        st.error(f"❌ Failed to reload CSV: {e}")
-
-import os
-
-if st.button("💾 Save to CSV"):
-    try:
-        csv_path = os.path.abspath("rotordata.csv")
-        st.session_state.data.to_csv(csv_path, index=False)
-        st.success(f"✅ Saved to CSV at: `{csv_path}`")
-    except Exception as e:
-        st.error(f"❌ Failed to save CSV: {e}")
-
 # ====== APP LOGO ======
 import streamlit as st
 import requests
