@@ -35,7 +35,7 @@ if st.button("🔄 Reload from CSV"):
         df = pd.read_csv("rotordata.csv")
         st.session_state.data = df
         st.success("✅ Data reloaded from CSV.")
-    except Exception as e:
+    except Exception as e: 
         st.error(f"❌ Failed to reload CSV: {e}")
 
 if "query" in st.query_params:
