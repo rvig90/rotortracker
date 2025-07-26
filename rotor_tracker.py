@@ -30,6 +30,14 @@ def load_data():
 if "data" not in st.session_state:
     st.session_state["data"] = load_data()
 
+if st.button("🔄 Reload from CSV"):
+    try:
+        df = pd.read_csv("rotordata.csv")
+        st.session_state.data = df
+        st.success("✅ Data reloaded from CSV.")
+    except Exception as e:
+        st.error(f"❌ Failed to reload CSV: {e}")
+
 if "query" in st.query_params:
     from chatbot_logic import chatbot_logic  # or wherever you define it
     import pandas as pd
