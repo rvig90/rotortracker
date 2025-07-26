@@ -22,15 +22,6 @@ import re
 import pandas as pd
 import os
 
-
-# Load it into session state once
-if "data" not in st.session_state:
-    st.session_state["data"] = load_data()
-
-
-
-
-
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
