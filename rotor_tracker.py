@@ -22,9 +22,6 @@ import re
 import pandas as pd
 import os
 
-@st.cache_data
-def load_data():
-    return pd.read_csv("rotordata.csv")
 
 # Load it into session state once
 if "data" not in st.session_state:
@@ -32,22 +29,7 @@ if "data" not in st.session_state:
 
 
 
-if "query" in st.query_params:
-    from chatbot_logic import chatbot_logic  # or wherever you define it
-    import pandas as pd
 
-    query = st.query_params["query"]
-    
-    # Load your data
-    df = pd.read_csv("rotordata.csv")  # or from gsheet, session_state, etc.
-
-    result = chatbot_logic(query, df)
-
-    if isinstance(result, pd.DataFrame):
-        result = result.to_dict(orient="records")
-
-    st.json({"response": result})
-    st.stop()
 
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
