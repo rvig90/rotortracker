@@ -30,7 +30,7 @@ if st.query_params.get("api") == "true":
 
         # ✅ Load data if not already in session
         if "data" not in st.session_state:
-            from utils import load_from_gsheet  # adjust this import if needed
+              # adjust this import if needed
             load_from_gsheet()
 
         df = st.session_state.get("data")
