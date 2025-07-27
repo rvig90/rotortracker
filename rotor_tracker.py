@@ -23,6 +23,31 @@ import pandas as pd
 import os
 
 
+if st.query_params.get("api") == "true":
+    try:
+        query = st.query_params.get("query", "").strip().lower()
+
+        # ✅ Load data if not already in session
+        if "data" not in st.session_state:
+              # adjust this import if needed
+           st.session_state["data"] = load_from_gsheet()
+
+        df = st.session_state.get("data")
+        if df is None or df.empty:
+            st.json({"response": "❌ No data loaded from sheet."})
+            st.stop()
+
+        # 🔍 Match query
+        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
+        results = matches.to_dict(orient="records")
+
+        st.json({
+            "response": results if not matches.empty else f"No match for: '{query}'"
+        })
+        st.stop()
+    except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
+        st.stop()
 
 
 
@@ -289,31 +314,6 @@ with form_tabs[2]:
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
             auto_save_to_gsheet()
             st.rerun()
-if st.query_params.get("api") == "true":
-    try:
-        query = st.query_params.get("query", "").strip().lower()
-
-        # ✅ Load data if not already in session
-        if "data" not in st.session_state:
-              # adjust this import if needed
-           st.session_state["data"] = load_from_gsheet()
-
-        df = st.session_state.get("data")
-        if df is None or df.empty:
-            st.json({"response": "❌ No data loaded from sheet."})
-            st.stop()
-
-        # 🔍 Match query
-        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
-        results = matches.to_dict(orient="records")
-
-        st.json({
-            "response": results if not matches.empty else f"No match for: '{query}'"
-        })
-        st.stop()
-    except Exception as e:
-        st.json({"response": f"❌ Server error: {e}"})
-        st.stop()
 
 # ====== STOCK SUMMARY ======
 tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
