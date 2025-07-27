@@ -153,7 +153,31 @@ if st.session_state.get("last_sync") == "Never":
 
 if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
+if st.query_params.get("api") == "true":
+    try:
+        query = st.query_params.get("query", "").strip().lower()
 
+        # ✅ Load data if not already in session
+        if "data" not in st.session_state:
+              # adjust this import if needed
+            load_from_gsheet()
+
+        df = st.session_state.get("data")
+        if df is None or df.empty:
+            st.json({"response": "❌ No data loaded from sheet."})
+            st.stop()
+
+        # 🔍 Match query
+        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
+        results = matches.to_dict(orient="records")
+
+        st.json({
+            "response": results if not matches.empty else f"No match for: '{query}'"
+        })
+        st.stop()
+    except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
+        st.stop()
 
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
@@ -1008,31 +1032,7 @@ with tabs[5]:
 
 import streamlit as st
 import json
-if st.query_params.get("api") == "true":
-    try:
-        query = st.query_params.get("query", "").strip().lower()
 
-        # ✅ Load data if not already in session
-        if "data" not in st.session_state:
-              # adjust this import if needed
-            load_from_gsheet()
-
-        df = st.session_state.get("data")
-        if df is None or df.empty:
-            st.json({"response": "❌ No data loaded from sheet."})
-            st.stop()
-
-        # 🔍 Match query
-        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
-        results = matches.to_dict(orient="records")
-
-        st.json({
-            "response": results if not matches.empty else f"No match for: '{query}'"
-        })
-        st.stop()
-    except Exception as e:
-        st.json({"response": f"❌ Server error: {e}"})
-        st.stop()
 
 # 🔌 Streamlit API endpoint for Swift
 
