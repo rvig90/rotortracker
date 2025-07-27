@@ -22,23 +22,23 @@ import re
 import pandas as pd
 import os
 
-import streamlit as st
-import json
-import pandas as pd
 
-# === API HANDLER FOR SWIFT ===
-import streamlit as st
-import json
 
 if st.query_params.get("api") == "true":
     try:
         query = st.query_params.get("query", "").strip().lower()
 
+        # ✅ Load data if not already in session
+        if "data" not in st.session_state:
+            from utils import load_from_gsheet  # adjust this import if needed
+            load_from_gsheet()
+
         df = st.session_state.get("data")
-        if df is None:
-            st.json({"response": "❌ No data loaded in session."})
+        if df is None or df.empty:
+            st.json({"response": "❌ No data loaded from sheet."})
             st.stop()
 
+        # 🔍 Match query
         matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
         results = matches.to_dict(orient="records")
 
