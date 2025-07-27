@@ -1030,7 +1030,7 @@ if st.query_params.get("api") == "true":
             "response": results if not matches.empty else f"No match for: '{query}'"
         })
         st.stop()
-     except Exception as e:
+    except Exception as e:
         st.json({"response": f"❌ Server error: {e}"})
         st.stop()
 
