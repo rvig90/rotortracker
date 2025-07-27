@@ -34,6 +34,14 @@ if st.query_params.get("api") == "true":
 
         matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
         results = matches.to_dict(orient="records")
+        st.set_page_config(page_title="Rotor API")
+        st.experimental_set_query_params(api="true")
+        
+        # Set content type manually (optional safety)
+        st.markdown(
+            "<meta http-equiv='Content-Type' content='application/json'>",
+            unsafe_allow_html=True
+        )
         st.json({"response": results if not matches.empty else f"No match for: '{query}'"})
         st.stop()
     except Exception as e:
