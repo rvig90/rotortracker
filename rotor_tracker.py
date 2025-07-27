@@ -22,6 +22,23 @@ import re
 import pandas as pd
 import os
 
+import streamlit as st
+import json
+import pandas as pd
+
+# === API HANDLER FOR SWIFT ===
+if st.query_params.get("api") == "true":
+    try:
+        query = st.query_params.get("query", "").strip().lower()
+        df = st.session_state.get("data", pd.DataFrame())
+
+        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
+        results = matches.to_dict(orient="records")
+        st.json({"response": results if not matches.empty else f"No match for: '{query}'"})
+        st.stop()
+    except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
+        st.stop()
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
@@ -1005,24 +1022,7 @@ import streamlit as st
 import json
 
 # 🔌 Streamlit API endpoint for Swift
-if st.query_params.get("api") == "true":
-    try:
-        # Read raw POST body
-        raw_body = st.experimental_get_query_params().get("query", [""])[0]
-        query = raw_body.strip().lower()
 
-        df = st.session_state.data.copy()
-
-        # Very basic matching — you can extend with chatbot logic
-        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
-
-        results = matches.to_dict(orient="records")
-        st.json({"response": results if not matches.empty else f"No match for: '{query}'"})
-
-        st.stop()
-    except Exception as e:
-        st.json({"response": f"❌ Server error: {e}"})
-        st.stop()
 # ====== LAST SYNC STATUS ======
    # just do this directly
 
