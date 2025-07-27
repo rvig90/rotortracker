@@ -26,9 +26,7 @@ import os
 
 
 
-    except Exception as e:
-        st.json({"response": f"❌ Server error: {e}"})
-        st.stop()
+    
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
@@ -1031,6 +1029,9 @@ if st.query_params.get("api") == "true":
         st.json({
             "response": results if not matches.empty else f"No match for: '{query}'"
         })
+        st.stop()
+     except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
         st.stop()
 
 # 🔌 Streamlit API endpoint for Swift
