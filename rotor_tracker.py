@@ -135,7 +135,7 @@ if st.query_params.get("api") == "true":
         # ✅ Load data if not already in session
         if "data" not in st.session_state:
               # adjust this import if needed
-           st.session_state["data"] = load_from_gsheet()
+           st.write(load_from_gsheet())
 
         df = st.session_state.get("data")
         if df is None or df.empty:
