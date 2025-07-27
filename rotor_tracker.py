@@ -27,23 +27,26 @@ import json
 import pandas as pd
 
 # === API HANDLER FOR SWIFT ===
+import streamlit as st
+import json
+
 if st.query_params.get("api") == "true":
     try:
         query = st.query_params.get("query", "").strip().lower()
-        df = st.session_state.get("data", pd.DataFrame())
+
+        df = st.session_state.get("data")
+        if df is None:
+            st.json({"response": "❌ No data loaded in session."})
+            st.stop()
 
         matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
         results = matches.to_dict(orient="records")
-        st.set_page_config(page_title="Rotor API")
-        st.experimental_set_query_params(api="true")
-        
-        # Set content type manually (optional safety)
-        st.markdown(
-            "<meta http-equiv='Content-Type' content='application/json'>",
-            unsafe_allow_html=True
-        )
-        st.json({"response": results if not matches.empty else f"No match for: '{query}'"})
+
+        st.json({
+            "response": results if not matches.empty else f"No match for: '{query}'"
+        })
         st.stop()
+
     except Exception as e:
         st.json({"response": f"❌ Server error: {e}"})
         st.stop()
