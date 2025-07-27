@@ -1000,7 +1000,29 @@ with tabs[5]:
     csv = plan.to_csv(index=False).encode("utf-8")
     st.download_button("⬇ Download Full Planning Table", data=csv, file_name="rotor_planning.csv", mime="text/csv")
 
-   
+
+import streamlit as st
+import json
+
+# 🔌 Streamlit API endpoint for Swift
+if st.query_params.get("api") == "true":
+    try:
+        # Read raw POST body
+        raw_body = st.experimental_get_query_params().get("query", [""])[0]
+        query = raw_body.strip().lower()
+
+        df = st.session_state.data.copy()
+
+        # Very basic matching — you can extend with chatbot logic
+        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
+
+        results = matches.to_dict(orient="records")
+        st.json({"response": results if not matches.empty else f"No match for: '{query}'"})
+
+        st.stop()
+    except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
+        st.stop()
 # ====== LAST SYNC STATUS ======
    # just do this directly
 
