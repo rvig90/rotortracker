@@ -23,31 +23,7 @@ import pandas as pd
 import os
 
 
-if st.query_params.get("api") == "true":
-    try:
-        query = st.query_params.get("query", "").strip().lower()
 
-        # ✅ Load data if not already in session
-        if "data" not in st.session_state:
-              # adjust this import if needed
-           st.session_state["data"] = load_from_gsheet()
-
-        df = st.session_state.get("data")
-        if df is None or df.empty:
-            st.json({"response": "❌ No data loaded from sheet."})
-            st.stop()
-
-        # 🔍 Match query
-        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
-        results = matches.to_dict(orient="records")
-
-        st.json({
-            "response": results if not matches.empty else f"No match for: '{query}'"
-        })
-        st.stop()
-    except Exception as e:
-        st.json({"response": f"❌ Server error: {e}"})
-        st.stop()
 
 
 
@@ -152,7 +128,31 @@ def load_from_gsheet():
             st.session_state.last_sync = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         st.error(f"Error loading data: {e}")
+if st.query_params.get("api") == "true":
+    try:
+        query = st.query_params.get("query", "").strip().lower()
 
+        # ✅ Load data if not already in session
+        if "data" not in st.session_state:
+              # adjust this import if needed
+           st.session_state["data"] = load_from_gsheet()
+
+        df = st.session_state.get("data")
+        if df is None or df.empty:
+            st.json({"response": "❌ No data loaded from sheet."})
+            st.stop()
+
+        # 🔍 Match query
+        matches = df[df.apply(lambda row: query in " ".join(map(str, row)).lower(), axis=1)]
+        results = matches.to_dict(orient="records")
+
+        st.json({
+            "response": results if not matches.empty else f"No match for: '{query}'"
+        })
+        st.stop()
+    except Exception as e:
+        st.json({"response": f"❌ Server error: {e}"})
+        st.stop()
 def auto_save_to_gsheet():
     try:
         sheet = get_gsheet_connection()
