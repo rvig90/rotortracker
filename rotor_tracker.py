@@ -206,45 +206,44 @@ with form_tabs[0]:
             }
 
             # ✅ Inward with empty remarks → check for future entry conflict
-            if entry_type == "Inward" and remarks.strip() == "":
-            # Convert 'Date' column to datetime.date
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-        
-            # 🔍 Find future entries for same size and empty remarks (regardless of current date)
-            future_matches = df[
-                (df["Type"] == "Inward") &
-                (df["Size (mm)"] == int(rotor_size)) &
-                (df["Remarks"].str.strip() == "")
-            ].sort_values("Date")
-        
-            if not future_matches.empty:
-                st.warning("⚠ Matching future Inward entry found for this rotor size with empty remarks.")
-                st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
-        
-                action = st.radio(
-                    "What would you like to do with the future entry?",
-                    ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
-                )
-        
-                if action == "Delete the future entry":
-                    df = df.drop(future_matches.index)
-                    st.success("🗑 Deleted future inward entry.")
-        
-                elif action == "Deduct from the future entry":
-                    qty = int(quantity)
-                    for idx, row in future_matches.iterrows():
-                        if qty <= 0:
-                            break
-                        future_qty = int(row["Quantity"])
-                        if qty >= future_qty:
-                            df.at[idx, "Quantity"] = 0
-                            qty -= future_qty
-                        else:
-                            df.at[idx, "Quantity"] = future_qty - qty
-                            qty = 0
-                    # Remove entries with 0 quantity
-                    df = df[df["Quantity"] > 0]
-                    st.success("➖ Deducted quantity from future entry.")
+            if (
+                entry_type == "Inward" and 
+                remarks.strip() == ""
+            ):
+                future_matches = df[
+                    (df["Type"] == "Inward") &
+                    (df["Size (mm)"] == int(rotor_size)) &
+                   
+                    (df["Remarks"].str.strip() == "")
+                ].sort_values("Date")
+
+                if not future_matches.empty:
+                    st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
+                    st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
+
+                    action = st.radio(
+                        "What would you like to do with the future entry?",
+                        ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
+                    )
+
+                    if action == "Delete the future entry":
+                        df = df.drop(future_matches.index)
+                        st.success("🗑 Deleted future inward entry.")
+
+                    elif action == "Deduct from the future entry":
+                        qty = int(quantity)
+                        for idx, row in future_matches.iterrows():
+                            if qty <= 0:
+                                break
+                            future_qty = int(row["Quantity"])
+                            if qty >= future_qty:
+                                df.at[idx, "Quantity"] = 0
+                                qty -= future_qty
+                            else:
+                                df.at[idx, "Quantity"] = future_qty - qty
+                                qty = 0
+                        df = df[df["Quantity"] > 0]
+                        st.success("➖ Deducted from future inward entry.")
 
             # ✅ Outgoing → deduct from pending entries
             if entry_type == "Outgoing" and remarks.strip():
