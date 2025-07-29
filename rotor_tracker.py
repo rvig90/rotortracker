@@ -234,23 +234,23 @@ with form_tabs[0]:
 
             if action == "Delete the future entry":
             # Ask for confirmation before deleting
-            confirm_action = st.button("Confirm Delete")
-            if confirm_action:
-                df = df.drop(future_matches.index)
-                st.success("■ Deleted future inward entry.")
+                confirm_action = st.button("Confirm Delete")
+                if confirm_action:
+                    df = df.drop(future_matches.index)
+                    st.success("■ Deleted future inward entry.")
+                    
+            elif action == "Deduct from the future entry":
+                qty = int(quantity)
+                future_qty = int(df.at[selected_entry, "Quantity"])
                 
-        elif action == "Deduct from the future entry":
-            qty = int(quantity)
-            future_qty = int(df.at[selected_entry, "Quantity"])
-            
-            confirm_action = st.button("Confirm Deduction")
-            if confirm_action:
-                if qty >= future_qty:
-                    df = df.drop(selected_entry)  # Remove entry if deduction >= quantity
-                    st.success("■ Fully deducted and removed the entry.")
-                else:
-                    df.at[selected_entry, "Quantity"] = future_qty - qty
-                    st.success(f"■ Deducted {qty}. Remaining quantity: {future_qty - qty}")
+                confirm_action = st.button("Confirm Deduction")
+                if confirm_action:
+                    if qty >= future_qty:
+                        df = df.drop(selected_entry)  # Remove entry if deduction >= quantity
+                        st.success("■ Fully deducted and removed the entry.")
+                    else:
+                        df.at[selected_entry, "Quantity"] = future_qty - qty
+                        st.success(f"■ Deducted {qty}. Remaining quantity: {future_qty - qty}")
                 
                     
                     
