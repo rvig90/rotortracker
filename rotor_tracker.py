@@ -182,7 +182,7 @@ for key in ["conflict_resolved", "selected_idx", "future_matches"]:
 with form_tabs[0]:
     st.subheader("📥 Add Rotor Movement")
 
-    # === FORM ===
+    # === Form fields ===
     with st.form("current_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -193,39 +193,13 @@ with form_tabs[0]:
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks")
 
-        submitted = st.form_submit_button("📋 Submit Entry Info")
+        submit_form = st.form_submit_button("📋 Submit Entry Info")
 
-    if submitted:
-        # Prepare dataframe
+    if submit_form:
         df = st.session_state.data.copy()
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
 
-        # Check for conflict with future entries
-        if entry_type == "Inward" and remarks.strip() == "":
-            matches = df[
-                (df["Type"] == "Inward") &
-                (df["Size (mm)"] == int(rotor_size)) &
-                (df["Remarks"].str.strip() == "") &
-                (df["Status"].str.lower() == "future")
-            ].sort_values("Date")
-
-            if not matches.empty:
-                st.warning("⚠️ Matching future entry found for this size.")
-                st.dataframe(matches[["Date", "Quantity", "Status"]], use_container_width=True)
-                st.session_state.future_matches = matches
-                st.session_state.conflict_resolved = False
-                st.session_state.selected_idx = st.selectbox(
-                    "Select entry to act on:",
-                    options=matches.index,
-                    format_func=lambda i: f"{matches.at[i, 'Date']} — Qty: {matches.at[i, 'Quantity']}"
-                )
-            else:
-                st.session_state.conflict_resolved = True
-        else:
-            st.session_state.conflict_resolved = True  # No conflict
-
-        # Save initial form values
-        st.session_state.temp_entry = {
+        new_entry = {
             'Date': date.strftime('%Y-%m-%d'),
             'Size (mm)': int(rotor_size),
             'Type': entry_type,
@@ -236,83 +210,105 @@ with form_tabs[0]:
             'ID': str(uuid4())
         }
 
-# === Action Buttons for Conflict ===
-if (
-    st.session_state.future_matches is not None and
-    not st.session_state.future_matches.empty and
-    not st.session_state.conflict_resolved
-):
-    st.info("⚙ Choose how to handle future entry:")
+        st.session_state["new_entry"] = new_entry
+        st.session_state["conflict_resolved"] = True  # assume no conflict initially
+        st.session_state["action_required"] = False
 
-    col_del, col_deduct = st.columns(2)
-    if col_del.button("🗑 Delete Selected Future Entry"):
-        st.session_state.data = st.session_state.data.drop(st.session_state.selected_idx)
-        st.success("✅ Deleted selected entry.")
-        st.session_state.conflict_resolved = True
-        st.experimental_rerun()
-
-    if col_deduct.button("➖ Deduct Quantity from Entry"):
-        idx = st.session_state.selected_idx
-        df = st.session_state.data.copy()
-        qty = st.session_state.temp_entry["Quantity"]
-        future_qty = int(df.at[idx, "Quantity"])
-        if qty >= future_qty:
-            df = df.drop(idx)
-        else:
-            df.at[idx, "Quantity"] = future_qty - qty
-        st.session_state.data = df
-        st.success(f"✔ Deducted from future entry. Remaining: {max(future_qty - qty, 0)}")
-        st.session_state.conflict_resolved = True
-        st.experimental_rerun()
-
-# === Final Save Button ===
-if st.session_state.conflict_resolved and st.session_state.temp_entry:
-    if st.button("💾 Save Entry"):
-        df = st.session_state.data.copy()
-
-        # Deduct from pending if outgoing
-        if st.session_state.temp_entry["Type"] == "Outgoing" and st.session_state.temp_entry["Remarks"]:
-            buyer = st.session_state.temp_entry["Remarks"].lower()
-            size = st.session_state.temp_entry["Size (mm)"]
-            qty = st.session_state.temp_entry["Quantity"]
-
-            pending_match = df[
-                (df["Size (mm)"] == size) &
-                (df["Remarks"].str.lower().str.contains(buyer)) &
-                (df["Pending"] == True) &
-                (df["Status"] == "Current")
+        # Inward with no remarks → check future status entries
+        if entry_type == "Inward" and remarks.strip() == "":
+            matches = df[
+                (df["Type"] == "Inward") &
+                (df["Size (mm)"] == int(rotor_size)) &
+                (df["Remarks"].str.strip() == "") &
+                (df["Status"].str.lower() == "future")
             ].sort_values("Date")
 
-            for idx, row in pending_match.iterrows():
-                if qty <= 0:
-                    break
-                pending_qty = int(row["Quantity"])
-                if qty >= pending_qty:
-                    df.at[idx, "Quantity"] = 0
-                    df.at[idx, "Pending"] = False
-                    qty -= pending_qty
-                else:
-                    df.at[idx, "Quantity"] = pending_qty - qty
-                    qty = 0
-            df = df[df["Quantity"] > 0]
+            if not matches.empty:
+                st.warning("⚠ Matching future rotor(s) found.")
+                st.session_state["conflict_resolved"] = False
+                st.session_state["action_required"] = True
+                st.session_state["future_matches"] = matches
+                st.session_state["selected_idx"] = matches.index[0]  # default selection
 
-        # Append new entry
-        df = pd.concat([df, pd.DataFrame([st.session_state.temp_entry])], ignore_index=True)
-        df["Date"] = df["Date"].astype(str)
-        st.session_state.data = df.reset_index(drop=True)
+    # If conflict exists and user needs to choose what to do
+    if st.session_state.get("action_required") and not st.session_state.get("conflict_resolved"):
 
-        try:
-            auto_save_to_gsheet()
-            st.success("✅ Entry saved to Google Sheets!")
-        except Exception as e:
-            st.error(f"❌ Save failed: {e}")
+        matches = st.session_state["future_matches"]
+        st.dataframe(matches[["Date", "Quantity", "Status"]], use_container_width=True)
 
-        # Clear state
-        st.session_state.temp_entry = None
-        st.session_state.future_matches = pd.DataFrame()
-        st.session_state.conflict_resolved = False
-        st.session_state.selected_idx = None
-        st.experimental_rerun()
+        selected = st.selectbox(
+            "Select a future entry to act on:",
+            options=matches.index,
+            index=0,
+            format_func=lambda i: f"{matches.at[i, 'Date']} → Qty: {matches.at[i, 'Quantity']}"
+        )
+        st.session_state["selected_idx"] = selected
+
+        col1, col2 = st.columns(2)
+        if col1.button("🗑 Delete Selected Entry"):
+            st.session_state.data = st.session_state.data.drop(selected)
+            st.session_state["conflict_resolved"] = True
+            st.session_state["action_required"] = False
+            st.success("✅ Deleted selected future entry.")
+
+        if col2.button("➖ Deduct from Selected Entry"):
+            qty = st.session_state["new_entry"]["Quantity"]
+            future_qty = int(st.session_state.data.at[selected, "Quantity"])
+            if qty >= future_qty:
+                st.session_state.data = st.session_state.data.drop(selected)
+            else:
+                st.session_state.data.at[selected, "Quantity"] = future_qty - qty
+            st.session_state["conflict_resolved"] = True
+            st.session_state["action_required"] = False
+            st.success("✅ Deducted from future entry.")
+
+    # Final save button — only shown if conflict is resolved and entry is ready
+    if st.session_state.get("conflict_resolved") and st.session_state.get("new_entry"):
+        if st.button("💾 Save Entry"):
+            df = st.session_state.data.copy()
+            new_entry = st.session_state["new_entry"]
+
+            # Outgoing deduction from pending
+            if new_entry["Type"] == "Outgoing" and new_entry["Remarks"]:
+                buyer = new_entry["Remarks"].lower()
+                size = new_entry["Size (mm)"]
+                qty = new_entry["Quantity"]
+                pending = df[
+                    (df["Size (mm)"] == size) &
+                    (df["Remarks"].str.lower().str.contains(buyer)) &
+                    (df["Pending"] == True) &
+                    (df["Status"] == "Current")
+                ].sort_values("Date")
+                for idx, row in pending.iterrows():
+                    if qty <= 0:
+                        break
+                    pending_qty = int(row["Quantity"])
+                    if qty >= pending_qty:
+                        df.at[idx, "Quantity"] = 0
+                        df.at[idx, "Pending"] = False
+                        qty -= pending_qty
+                    else:
+                        df.at[idx, "Quantity"] = pending_qty - qty
+                        qty = 0
+                df = df[df["Quantity"] > 0]
+
+            # Append new entry
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            df["Date"] = df["Date"].astype(str)
+            st.session_state.data = df.reset_index(drop=True)
+
+            try:
+                auto_save_to_gsheet()
+                st.success("✅ Entry saved to Google Sheets.")
+            except Exception as e:
+                st.error(f"❌ Failed to save: {e}")
+
+            # Clear all session temp
+            st.session_state["new_entry"] = None
+            st.session_state["future_matches"] = None
+            st.session_state["selected_idx"] = None
+            st.session_state["conflict_resolved"] = False
+            st.session_state["action_required"] = False
 
     if st.session_state.get("last_snapshot") is not None:
         if st.button(" undo last action"):
