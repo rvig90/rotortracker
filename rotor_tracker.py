@@ -240,23 +240,22 @@ with form_tabs[0]:
 
                     if confirm_action:
                         if action == "Delete the future entry":
-                            df = df.drop(selected_entry)
-                            st.success(" deleted the selected future entry.")
-
+                            df = df.drop(index=selected_entry)
+                            st.success("🗑 Deleted the selected future entry.")
+                    
                         elif action == "Deduct from the future entry":
                             qty = int(quantity)
-                            for idx, row in future_matches.iterrows():
-                                if qty <= 0:
-                                    break
-                                future_qty = int(row["Quantity"])
-                                if qty >= future_qty:
-                                    df.at[idx, "Quantity"] = 0
-                                    qty -= future_qty
-                                else:
-                                    df.at[idx, "Quantity"] = future_qty - qty
-                                    qty = 0
+                            future_qty = int(df.at[selected_entry, "Quantity"])
+                    
+                            if qty >= future_qty:
+                                df.at[selected_entry, "Quantity"] = 0
+                                st.success(f"✔ Deducted all {future_qty} from the selected entry.")
+                            else:
+                                df.at[selected_entry, "Quantity"] = future_qty - qty
+                                st.success(f"➖ Deducted {qty} from the selected entry ({future_qty} → {future_qty - qty})")
+                    
+                            # Drop any rows with 0 quantity
                             df = df[df["Quantity"] > 0]
-                            st.success("➖ Deducted from future inward entry.")
 
             # ✅ Outgoing → deduct from pending entries
             if entry_type == "Outgoing" and remarks.strip():
