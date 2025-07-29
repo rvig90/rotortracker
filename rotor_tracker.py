@@ -187,7 +187,7 @@ with form_tabs[0]:
             df = st.session_state.data.copy()
         
             # Ensure date column is parsed
-            df["Date"] = pd.to_datetime(df["Date"]).dt.date
+            df["Date"] = df["Date"].astype(str)
         
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
