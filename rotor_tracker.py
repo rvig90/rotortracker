@@ -215,7 +215,7 @@ with form_tabs[0]:
                 future_matches = df[
                     (df["Type"] == "Inward") &
                     (df["Size (mm)"] == int(rotor_size)) &
-                    (df["Date"] > today) &  # ✅ Only future entries
+                    (df["Status"] == "Future") &  # ✅ Only future entries
                     (df["Remarks"].str.strip() == "")
                 ].sort_values("Date")
             
