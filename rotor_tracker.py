@@ -218,7 +218,7 @@ with form_tabs[0]:
                 )
 
         # ✅ Only one submit button
-       submitted = st.form_submit_button("💾 Save Entry / Apply Action")
+           submitted = st.form_submit_button("💾 Save Entry / Apply Action")
             if submitted and not st.session_state.form_submitted:
                 st.session_state.form_submitted = True  # prevent duplicate save
             
