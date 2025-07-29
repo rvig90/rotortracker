@@ -221,6 +221,12 @@ with form_tabs[0]:
                     st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
                     st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
 
+                    selected_empty = st.selectbox(
+                        "select a future entry to act on:",
+                        options=future_matches.index,
+                        format_func=lamda idx: f"{future_matches.at[idx, 'Data']} → Qty: {future_matches.at[idx, 'Quantity']}"
+                    )
+
                     action = st.radio(
                         "What would you like to do with the future entry?",
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
@@ -230,20 +236,27 @@ with form_tabs[0]:
                         df = df.drop(future_matches.index)
                         st.success("🗑 Deleted future inward entry.")
 
-                    elif action == "Deduct from the future entry":
-                        qty = int(quantity)
-                        for idx, row in future_matches.iterrows():
-                            if qty <= 0:
-                                break
-                            future_qty = int(row["Quantity"])
-                            if qty >= future_qty:
-                                df.at[idx, "Quantity"] = 0
-                                qty -= future_qty
-                            else:
-                                df.at[idx, "Quantity"] = future_qty - qty
-                                qty = 0
-                        df = df[df["Quantity"] > 0]
-                        st.success("➖ Deducted from future inward entry.")
+                    confirm_action = st.button("Save changes")
+
+                    if confirm_action:
+                        if action == "Delete the future entry":
+                            df = df.drop(selected_entry)
+                            st.success(" deleted the selected future entry.")
+
+                        elif action == "Deduct from the future entry":
+                            qty = int(quantity)
+                            for idx, row in future_matches.iterrows():
+                                if qty <= 0:
+                                    break
+                                future_qty = int(row["Quantity"])
+                                if qty >= future_qty:
+                                    df.at[idx, "Quantity"] = 0
+                                    qty -= future_qty
+                                else:
+                                    df.at[idx, "Quantity"] = future_qty - qty
+                                    qty = 0
+                            df = df[df["Quantity"] > 0]
+                            st.success("➖ Deducted from future inward entry.")
 
             # ✅ Outgoing → deduct from pending entries
             if entry_type == "Outgoing" and remarks.strip():
