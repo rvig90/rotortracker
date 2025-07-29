@@ -188,14 +188,12 @@ with form_tabs[0]:
 
         if submitted:
             df = st.session_state.data.copy()
-
-            # ✅ Ensure 'Date' column is parsed for proper filtering
+        
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
             entry_date = date  # Already datetime.date from st.date_input()
-
-            # ✅ Build new entry
+        
             new_entry = {
-                'Date': entry_date.strftime('%Y-%m-%d'),  # Save as string
+                'Date': entry_date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
                 'Type': entry_type,
                 'Quantity': int(quantity),
@@ -204,74 +202,66 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
-
-            # ✅ Inward with empty remarks → check for future entry conflict
-            if (
-                
-                entry_type == "Inward" and 
-                remarks.strip() == ""
-            ):
-                today = datetime.today().date()
+        
+            # ✅ Inward with empty remarks — check future entries (by STATUS only)
+            if entry_type == "Inward" and remarks.strip() == "":
                 future_matches = df[
                     (df["Type"] == "Inward") &
                     (df["Size (mm)"] == int(rotor_size)) &
-                    (df["Status"] == "Future") &  # ✅ Only future entries
-                    (df["Remarks"].str.strip() == "")
+                    (df["Remarks"].str.strip() == "") &
+                    (df["Status"].str.lower() == "future")
                 ].sort_values("Date")
-            
+        
                 if not future_matches.empty:
-                    st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
-                    st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
-            
-                    selected_entry = st.selectbox(
+                    st.warning("⚠ Matching future rotor(s) found.")
+        
+                    st.dataframe(future_matches[["Date", "Quantity", "Status"]], use_container_width=True)
+        
+                    selected_idx = st.selectbox(
                         "Select a future entry to act on:",
                         options=future_matches.index,
                         format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
                     )
-            
+        
                     action = st.radio(
-                        "What would you like to do with the future entry?",
+                        "What would you like to do?",
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                     )
-                    confirm_action = st.button(" save changes")
-            
-                    if confirm_action == "Delete the future entry":
-                        if st.button("🗑 Confirm Delete"):
-                            df = df.drop(selected_entry)
-                            st.success("✅ Deleted the selected future entry.")
-            
-                    elif action == "Deduct from the future entry":
-                        qty = int(quantity)
-                        future_qty = int(df.at[selected_entry, "Quantity"])
-                        
-                        if st.button("➖ Confirm Deduction"):
+        
+                    confirm_action = st.button("💾 Save Changes")
+        
+                    if confirm_action:
+                        if action == "Delete the future entry":
+                            df = df.drop(selected_idx)
+                            st.success("🗑 Deleted the selected future entry.")
+        
+                        elif action == "Deduct from the future entry":
+                            qty = int(quantity)
+                            future_qty = int(df.at[selected_idx, "Quantity"])
+        
                             if qty >= future_qty:
-                                df = df.drop(selected_entry)
-                                st.success("✅ Fully deducted and removed the entry.")
+                                df = df.drop(selected_idx)
+                                st.success("✔ Fully deducted and deleted the future entry.")
                             else:
-                                df.at[selected_entry, "Quantity"] = future_qty - qty
-                                st.success(f"✅ Deducted {qty}. Remaining quantity: {future_qty - qty}")
-            
-                
-                    
-                    
-
-            # ✅ Outgoing → deduct from pending entries
+                                df.at[selected_idx, "Quantity"] = future_qty - qty
+                                st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
+        
+            # ✅ Outgoing logic (deduct from pending)
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
-
+        
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
                     (df["Pending"] == True) &
                     (df["Status"] == "Current")
                 ].sort_values("Date")
-
+        
                 if not pending_match.empty:
                     st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
-
+        
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
                             break
@@ -286,15 +276,12 @@ with form_tabs[0]:
                             st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
                     df = df[df["Quantity"] > 0]
-
-            # ✅ Add final new entry
+        
+            # ✅ Add new entry
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-
-            # ✅ Convert Date column to string for serialization
             df["Date"] = df["Date"].astype(str)
             st.session_state.data = df.reset_index(drop=True)
-
-            # ✅ Save to Google Sheet
+        
             try:
                 auto_save_to_gsheet()
                 st.success("✅ Entry added and auto-saved.")
