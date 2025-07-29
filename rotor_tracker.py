@@ -235,8 +235,7 @@ with form_tabs[0]:
                     if action == "Delete the future entry":
                         df = df.drop(future_matches.index)
                         st.success("🗑 Deleted future inward entry.")
-
-                    confirm_action = st.button("Save Changes")
+                        confirm_action = st.button("Save Changes")
                     if confirm_action:
                         if action == "Delete the future entry":
                             df = df.drop(index=selected_entry)
