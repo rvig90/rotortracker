@@ -177,14 +177,11 @@ import streamlit as st
 with form_tabs[0]:
     st.subheader("📦 Add Rotor Movement Entry")
 
-    # === Setup variables ===
+    # Load data
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-    future_matches = pd.DataFrame()
-    selected_idx = None
-    action_selected = st.session_state.get("action_selected", None)
 
-    # === FORM START ===
+    # UI
     with st.form("current_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -195,7 +192,11 @@ with form_tabs[0]:
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks").strip()
 
-        # === Find matching future entries ===
+        # Check for matching future entries if Inward with no remarks
+        future_matches = pd.DataFrame()
+        action_selected = "None"
+        selected_idx = None
+
         if entry_type == "Inward" and remarks == "":
             future_matches = df[
                 (df["Type"] == "Inward") &
@@ -206,7 +207,6 @@ with form_tabs[0]:
 
             if not future_matches.empty:
                 st.warning("⚠ Matching future entries found")
-
                 st.dataframe(future_matches[["Date", "Quantity", "Status"]], use_container_width=True)
 
                 selected_idx = st.selectbox(
@@ -214,7 +214,6 @@ with form_tabs[0]:
                     options=future_matches.index,
                     format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
                 )
-                st.session_state.selected_idx = selected_idx
 
                 action_selected = st.radio(
                     "Action on selected future entry:",
@@ -222,31 +221,67 @@ with form_tabs[0]:
                     index=0,
                     key="action_radio"
                 )
+
+                st.session_state.future_conflict = True
+                st.session_state.selected_idx = selected_idx
                 st.session_state.action_selected = action_selected
+
+        else:
+            st.session_state.future_conflict = False
 
         submitted = st.form_submit_button("💾 Save Entry / Apply Action")
 
-    # === HANDLE ACTION ===
+    # ✅ Handle submission after form
     if submitted:
+        df = st.session_state.data.copy()
         selected_idx = st.session_state.get("selected_idx")
         action_selected = st.session_state.get("action_selected", "None")
 
-        # ✅ Apply future entry action
-        if action_selected == "Delete" and selected_idx is not None:
-            df = df.drop(index=selected_idx)
-            st.success("🗑 Deleted the selected future entry.")
+        # ✅ If future conflict exists, don't proceed unless action is taken
+        if st.session_state.get("future_conflict", False):
+            if action_selected == "Delete":
+                if selected_idx is not None:
+                    df = df.drop(index=selected_idx)
+                    st.success("🗑 Deleted the selected future entry.")
+                    st.session_state.future_conflict = False  # Now allow save
+                else:
+                    st.error("⚠ Please select a future entry to delete.")
+                    st.stop()
 
-        elif action_selected == "Deduct" and selected_idx is not None:
-            qty = int(quantity)
-            future_qty = int(df.at[selected_idx, "Quantity"])
-            if qty >= future_qty:
-                df = df.drop(index=selected_idx)
-                st.success("✔ Fully deducted and deleted future entry.")
+            elif action_selected == "Deduct":
+                if selected_idx is not None:
+                    qty = int(quantity)
+                    future_qty = int(df.at[selected_idx, "Quantity"])
+                    if qty >= future_qty:
+                        df = df.drop(index=selected_idx)
+                        st.success("✔ Fully deducted and deleted future entry.")
+                    else:
+                        df.at[selected_idx, "Quantity"] = future_qty - qty
+                        st.success(f"➖ Deducted {qty}. Remaining: {future_qty - qty}")
+                    st.session_state.future_conflict = False
+                else:
+                    st.error("⚠ Please select a future entry to deduct from.")
+                    st.stop()
+
             else:
-                df.at[selected_idx, "Quantity"] = future_qty - qty
-                st.success(f"➖ Deducted {qty}. Remaining: {future_qty - qty}")
+                st.warning("⚠ Choose an action to resolve future rotor conflict.")
+                st.stop()
 
-        # ✅ Outgoing logic
+        # ✅ Build and add new entry
+        new_entry = {
+            'Date': entry_date.strftime('%Y-%m-%d'),
+            'Size (mm)': int(rotor_size),
+            'Type': entry_type,
+            'Quantity': int(quantity),
+            'Remarks': remarks,
+            'Status': 'Current',
+            'Pending': False,
+            'ID': str(uuid4())
+        }
+
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+        # ✅ Handle Outgoing deduction from pending
         if entry_type == "Outgoing" and remarks:
             buyer_name = remarks.lower()
             size = int(rotor_size)
@@ -274,31 +309,20 @@ with form_tabs[0]:
                         qty = 0
                 df = df[df["Quantity"] > 0]
 
-        # ✅ Add new entry
-        new_entry = {
-            'Date': entry_date.strftime('%Y-%m-%d'),
-            'Size (mm)': int(rotor_size),
-            'Type': entry_type,
-            'Quantity': int(quantity),
-            'Remarks': remarks,
-            'Status': 'Current',
-            'Pending': False,
-            'ID': str(uuid4())
-        }
-
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        # ✅ Final Save
         df["Date"] = df["Date"].astype(str)
         st.session_state.data = df.reset_index(drop=True)
 
         try:
             auto_save_to_gsheet()
-            st.success("✅ Entry saved and actions applied.")
+            st.success("✅ Entry added and saved.")
         except Exception as e:
             st.error(f"❌ Save failed: {e}")
 
-        # Clean state
+        # Reset session vars
         st.session_state.selected_idx = None
         st.session_state.action_selected = "None"
+        st.session_state.future_conflict = False
 
     if st.session_state.get("last_snapshot") is not None:
         if st.button(" undo last action"):
