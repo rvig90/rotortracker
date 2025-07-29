@@ -248,6 +248,8 @@ with form_tabs[0]:
                             else:
                                 df.at[selected_idx, "Quantity"] = future_qty - qty
                                 st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
+
+                        auto_save_to_gsheet()
         
             # ✅ Outgoing logic (deduct from pending)
             if entry_type == "Outgoing" and remarks.strip():
