@@ -185,7 +185,10 @@ with form_tabs[0]:
         submitted = st.form_submit_button("➕ Add Entry")
         if submitted:
             df = st.session_state.data.copy()
-
+        
+            # Ensure date column is parsed
+            df["Date"] = pd.to_datetime(df["Date"]).dt.date
+        
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -196,57 +199,59 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
-
-            # ✅ Check for FUTURE entries for same rotor (Coming Rotors)
+        
+            # ✅ Check for future Inward entries (Coming Rotors) with same size
             if (
-                entry_type == "Inward" and
-                remarks.strip() == "" and
-                date == datetime.today().date()
+                entry_type == "Inward"
+                and remarks.strip() == ""
+                and date == datetime.today().date()
             ):
                 future_matches = df[
                     (df["Type"] == "Inward") &
-                    (pd.to_datetime(df["Date"]).dt.date > date) &
-                    (df["Size (mm)"] == int(rotor_size))
-                ]
-
+                    (df["Size (mm)"] == int(rotor_size)) &
+                    (df["Date"] > datetime.today().date())  # future dates
+                ].sort_values("Date")
+        
                 if not future_matches.empty:
-                    st.warning("⚠️ A future inward entry for this rotor size exists.")
-
+                    st.warning("⚠️ Future inward entry for this rotor size exists.")
+        
+                    st.dataframe(future_matches[["Date", "Quantity", "Remarks"]], use_container_width=True)
+        
                     action = st.radio(
-                        "What would you like to do with the previous 'Coming Rotor' entry?",
+                        "What would you like to do with the future entry?",
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                     )
-
+        
                     if action == "Delete the future entry":
                         df = df.drop(future_matches.index)
                         st.success("🗑️ Deleted future inward entry.")
                     elif action == "Deduct from the future entry":
                         match_index = future_matches.index[0]
-                        current_qty = df.loc[match_index, "Quantity"]
-                        new_qty = current_qty - int(quantity)
+                        future_qty = df.loc[match_index, "Quantity"]
+                        new_qty = future_qty - int(quantity)
                         if new_qty <= 0:
                             df = df.drop(match_index)
                             st.success("✅ Deducted and removed future entry (quantity became 0).")
                         else:
                             df.loc[match_index, "Quantity"] = new_qty
                             st.success(f"✅ Deducted quantity. New future entry qty: {new_qty}")
-
-            # ✅ Outgoing logic: Deduct from pending if remarks provided
+        
+            # ✅ Outgoing with remarks — Pending logic
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
-
+        
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
                     (df["Pending"] == True) &
                     (df["Status"] == "Current")
                 ].sort_values("Date")
-
+        
                 if not pending_match.empty:
                     st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
-
+        
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
                             break
@@ -260,15 +265,13 @@ with form_tabs[0]:
                             df.at[idx, "Quantity"] = pending_qty - qty
                             st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
-
-                    # 💡 Remove entries with 0 quantity
+        
                     df = df[df["Quantity"] > 0]
-
-            # ✅ Add final new entry
+        
+            # ✅ Add new entry
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             st.session_state.data = df.reset_index(drop=True)
-
-            # ✅ Save to Google Sheet
+        
             try:
                 auto_save_to_gsheet()
                 st.success("✅ Entry added and auto-saved.")
