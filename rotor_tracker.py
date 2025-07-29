@@ -233,8 +233,9 @@ with form_tabs[0]:
                         "What would you like to do with the future entry?",
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                     )
+                    confirm_action = st.button(" save changes")
             
-                    if action == "Delete the future entry":
+                    if confirm_action == "Delete the future entry":
                         if st.button("🗑 Confirm Delete"):
                             df = df.drop(selected_entry)
                             st.success("✅ Deleted the selected future entry.")
