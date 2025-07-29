@@ -230,7 +230,10 @@ with form_tabs[0]:
         
                    
         
-                    if st.button(" save changes"):
+                    confirm_action = st.form_submit_button(" save changes")
+                    if confirm_action:
+                    
+                    
                         if action == "Delete the future entry":
                             df = df.drop(selected_idx)
                             st.success("🗑 Deleted the selected future entry.")
