@@ -167,6 +167,10 @@ def add_entry(data_dict):
     auto_save_to_gsheet()
     st.rerun()
 
+from uuid import uuid4
+from datetime import datetime, date
+import os
+
 with form_tabs[0]:
     with st.form("current_form"):
         col1, col2 = st.columns(2)
@@ -180,7 +184,8 @@ with form_tabs[0]:
 
         submitted = st.form_submit_button("➕ Add Entry")
         if submitted:
-            # ✅ Construct new entry
+            df = st.session_state.data.copy()
+
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -191,19 +196,47 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
-            csv_path = os.path.abspath("rotordata.csv")
-            st.write("Saving to:", csv_path)
-            st.session_state["data"].to_csv("rotordata.csv", index=False)
-            st.success("Entry added!")
 
-            df = st.session_state.data.copy()
+            # ✅ Check for FUTURE entries for same rotor (Coming Rotors)
+            if (
+                entry_type == "Inward" and
+                remarks.strip() == "" and
+                date == datetime.today().date()
+            ):
+                future_matches = df[
+                    (df["Type"] == "Inward") &
+                    (pd.to_datetime(df["Date"]).dt.date > date) &
+                    (df["Size (mm)"] == int(rotor_size))
+                ]
 
+                if not future_matches.empty:
+                    st.warning("⚠️ A future inward entry for this rotor size exists.")
+
+                    action = st.radio(
+                        "What would you like to do with the previous 'Coming Rotor' entry?",
+                        ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
+                    )
+
+                    if action == "Delete the future entry":
+                        df = df.drop(future_matches.index)
+                        st.success("🗑️ Deleted future inward entry.")
+                    elif action == "Deduct from the future entry":
+                        match_index = future_matches.index[0]
+                        current_qty = df.loc[match_index, "Quantity"]
+                        new_qty = current_qty - int(quantity)
+                        if new_qty <= 0:
+                            df = df.drop(match_index)
+                            st.success("✅ Deducted and removed future entry (quantity became 0).")
+                        else:
+                            df.loc[match_index, "Quantity"] = new_qty
+                            st.success(f"✅ Deducted quantity. New future entry qty: {new_qty}")
+
+            # ✅ Outgoing logic: Deduct from pending if remarks provided
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
 
-                # 🔍 Match pending entries
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
