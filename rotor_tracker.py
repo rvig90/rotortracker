@@ -235,23 +235,23 @@ with form_tabs[0]:
                         else:
                             df.loc[match_index, "Quantity"] = new_qty
                             st.success(f"✅ Deducted quantity. New future entry qty: {new_qty}")
-        
-            # ✅ Outgoing with remarks — Pending logic
+
+            # ✅ Outgoing logic: Deduct from pending if remarks provided
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
-        
+
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
                     (df["Pending"] == True) &
                     (df["Status"] == "Current")
                 ].sort_values("Date")
-        
+
                 if not pending_match.empty:
                     st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
-        
+
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
                             break
@@ -265,13 +265,15 @@ with form_tabs[0]:
                             df.at[idx, "Quantity"] = pending_qty - qty
                             st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
-        
+
+                    # 💡 Remove entries with 0 quantity
                     df = df[df["Quantity"] > 0]
-        
-            # ✅ Add new entry
+
+            # ✅ Add final new entry
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             st.session_state.data = df.reset_index(drop=True)
-        
+
+            # ✅ Save to Google Sheet
             try:
                 auto_save_to_gsheet()
                 st.success("✅ Entry added and auto-saved.")
