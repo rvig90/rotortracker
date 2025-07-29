@@ -184,14 +184,59 @@ with form_tabs[0]:
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks")
 
-        submitted = st.form_submit_button("➕ Add Entry")
+        # These will be inside the form to capture values
+        action = None
+        selected_idx = None
+        future_matches = None
+
+        df = st.session_state.data.copy()
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+        entry_date = date
+
+        # Check for conflict only when entry is inward with empty remarks
+        if entry_type == "Inward" and remarks.strip() == "":
+            future_matches = df[
+                (df["Type"] == "Inward") &
+                (df["Size (mm)"] == int(rotor_size)) &
+                (df["Remarks"].str.strip() == "") &
+                (df["Status"].str.lower() == "future")
+            ].sort_values("Date")
+
+            if not future_matches.empty:
+                st.warning("⚠ Matching future rotor(s) found.")
+                st.dataframe(future_matches[["Date", "Quantity", "Status"]], use_container_width=True)
+
+                selected_idx = st.selectbox(
+                    "Select a future entry to act on:",
+                    options=future_matches.index,
+                    format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
+                )
+
+                action = st.radio(
+                    "What would you like to do?",
+                    ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
+                )
+
+        # ✅ Only one submit button
+        submitted = st.form_submit_button("💾 Save Entry / Apply Action")
 
         if submitted:
-            df = st.session_state.data.copy()
-        
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-            entry_date = date  # Already datetime.date from st.date_input()
-        
+            # Apply future deletion/deduction logic first
+            if action and selected_idx is not None:
+                if action == "Delete the future entry":
+                    df = df.drop(selected_idx)
+                    st.success("🗑 Deleted the selected future entry.")
+                elif action == "Deduct from the future entry":
+                    qty = int(quantity)
+                    future_qty = int(df.at[selected_idx, "Quantity"])
+                    if qty >= future_qty:
+                        df = df.drop(selected_idx)
+                        st.success("✔ Fully deducted and deleted the future entry.")
+                    else:
+                        df.at[selected_idx, "Quantity"] = future_qty - qty
+                        st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
+
+            # ✅ Always add new entry
             new_entry = {
                 'Date': entry_date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -202,54 +247,18 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
-        
-            # ✅ Inward with empty remarks — check future entries (by STATUS only)
-            if entry_type == "Inward" and remarks.strip() == "":
-                future_matches = df[
-                    (df["Type"] == "Inward") &
-                    (df["Size (mm)"] == int(rotor_size)) &
-                    (df["Remarks"].str.strip() == "") &
-                    (df["Status"].str.lower() == "future")
-                ].sort_values("Date")
-        
-                if not future_matches.empty:
-                    st.warning("⚠ Matching future rotor(s) found.")
-        
-                    st.dataframe(future_matches[["Date", "Quantity", "Status"]], use_container_width=True)
-        
-                    selected_idx = st.selectbox(
-                        "Select a future entry to act on:",
-                        options=future_matches.index,
-                        format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
-                    )
-        
-                    action = st.radio(
-                        "What would you like to do?",
-                        ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
-                    )
-        
-                   
-        
-                    confirm_action = st.form_submit_button(" save changes")
-                    if confirm_action:
-                    
-                    
-                        if action == "Delete the future entry":
-                            df = df.drop(selected_idx)
-                            st.success("🗑 Deleted the selected future entry.")
-        
-                        elif action == "Deduct from the future entry":
-                            qty = int(quantity)
-                            future_qty = int(df.at[selected_idx, "Quantity"])
-        
-                            if qty >= future_qty:
-                                df = df.drop(selected_idx)
-                                st.success("✔ Fully deducted and deleted the future entry.")
-                            else:
-                                df.at[selected_idx, "Quantity"] = future_qty - qty
-                                st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
 
-                        auto_save_to_gsheet()
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            df["Date"] = df["Date"].astype(str)
+            st.session_state.data = df.reset_index(drop=True)
+
+            try:
+                auto_save_to_gsheet()
+                st.success("✅ Entry added and auto-saved.")
+            except Exception as e:
+                st.error(f"❌ Save failed: {e}")
+
+                        
         
             # ✅ Outgoing logic (deduct from pending)
             if entry_type == "Outgoing" and remarks.strip():
