@@ -221,7 +221,7 @@ with form_tabs[0]:
                     st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
                     st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
 
-                    selected_empty = st.selectbox(
+                    selected_entry = st.selectbox(
                         "select a future entry to act on:",
                         options=future_matches.index,
                         format_func=lambda idx: f"{future_matches.at[idx, 'Data']} → Qty: {future_matches.at[idx, 'Quantity']}"
