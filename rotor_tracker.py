@@ -201,40 +201,54 @@ with form_tabs[0]:
             }
         
             # ✅ Check for future Inward entries (Coming Rotors) with same size
-            if (
-                entry_type == "Inward"
-                and remarks.strip() == ""
-                and date == datetime.today().date()
-            ):
-                future_matches = df[
-                    (df["Type"] == "Inward") &
-                    (df["Size (mm)"] == int(rotor_size)) &
-                    (df["Date"] > datetime.today().date())  # future dates
-                ].sort_values("Date")
+            # 🔍 Check for future Inward entries with same size and empty remarks
+        if (
+            entry_type == "Inward" and 
+            remarks.strip() == "" and 
+            date == datetime.today().date()
+        ):
+            # ✅ Ensure 'Date' column is datetime.date
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
         
-                if not future_matches.empty:
-                    st.warning("⚠️ Future inward entry for this rotor size exists.")
+            # 🔎 Find future entries of same size and type
+            future_matches = df[
+                (df["Type"] == "Inward") &
+                (df["Size (mm)"] == int(rotor_size)) &
+                (df["Date"] > datetime.today().date()) &  # Only future entries
+                (df["Remarks"].str.strip() == "")
+            ].sort_values("Date")
         
-                    st.dataframe(future_matches[["Date", "Quantity", "Remarks"]], use_container_width=True)
+            if not future_matches.empty:
+                st.warning("⚠️ Future inward entry for this rotor size exists.")
         
-                    action = st.radio(
-                        "What would you like to do with the future entry?",
-                        ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
-                    )
+                # Show the matched rows
+                st.dataframe(future_matches[["Date", "Quantity", "Remarks"]], use_container_width=True)
         
-                    if action == "Delete the future entry":
-                        df = df.drop(future_matches.index)
-                        st.success("🗑️ Deleted future inward entry.")
-                    elif action == "Deduct from the future entry":
-                        match_index = future_matches.index[0]
-                        future_qty = df.loc[match_index, "Quantity"]
-                        new_qty = future_qty - int(quantity)
-                        if new_qty <= 0:
-                            df = df.drop(match_index)
-                            st.success("✅ Deducted and removed future entry (quantity became 0).")
+                # Let user decide what to do
+                action = st.radio(
+                    "What would you like to do with the future entry?",
+                    ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
+                )
+        
+                if action == "Delete the future entry":
+                    df = df.drop(future_matches.index)
+                    st.success("🗑️ Deleted future inward entry.")
+        
+                elif action == "Deduct from the future entry":
+                    qty = int(quantity)
+                    for idx, row in future_matches.iterrows():
+                        if qty <= 0:
+                            break
+                        future_qty = int(row["Quantity"])
+                        if qty >= future_qty:
+                            df.at[idx, "Quantity"] = 0
+                            qty -= future_qty
                         else:
-                            df.loc[match_index, "Quantity"] = new_qty
-                            st.success(f"✅ Deducted quantity. New future entry qty: {new_qty}")
+                            df.at[idx, "Quantity"] = future_qty - qty
+                            qty = 0
+                    # Remove entries with 0 quantity
+                    df = df[df["Quantity"] > 0]
+                    st.success("➖ Deducted quantity from future entry.")
 
             # ✅ Outgoing logic: Deduct from pending if remarks provided
             if entry_type == "Outgoing" and remarks.strip():
