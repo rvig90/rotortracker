@@ -167,11 +167,14 @@ def add_entry(data_dict):
     auto_save_to_gsheet()
     st.rerun()
 
+from datetime import datetime
 from uuid import uuid4
-from datetime import datetime, date
-import os
+import pandas as pd
+import streamlit as st
 
-import pandas as pd  # Make sure this is at the top of your script
+# Ensure session keys
+if "form_submitted" not in st.session_state:
+    st.session_state.form_submitted = False
 
 with form_tabs[0]:
     with st.form("current_form"):
@@ -184,16 +187,15 @@ with form_tabs[0]:
             quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         remarks = st.text_input("📝 Remarks")
 
-        # These will be inside the form to capture values
-        action = None
-        selected_idx = None
-        future_matches = None
-
+        # For matching future rotors
         df = st.session_state.data.copy()
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
         entry_date = date
 
-        # Check for conflict only when entry is inward with empty remarks
+        selected_idx = None
+        action = None
+
+        # FUTURE MATCH FOR INWARD (NO REMARKS)
         if entry_type == "Inward" and remarks.strip() == "":
             future_matches = df[
                 (df["Type"] == "Inward") &
@@ -217,12 +219,12 @@ with form_tabs[0]:
                     ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                 )
 
-        # ✅ Only one submit button
         submitted = st.form_submit_button("💾 Save Entry / Apply Action")
+
         if submitted and not st.session_state.form_submitted:
-            st.session_state.form_submitted = True  # prevent duplicate save
-        
-            # 🔄 Apply action if any
+            st.session_state.form_submitted = True
+
+            # Apply delete/deduct action on future entry (Inward)
             if action and selected_idx is not None:
                 if action == "Delete the future entry":
                     df = df.drop(selected_idx)
@@ -236,23 +238,23 @@ with form_tabs[0]:
                     else:
                         df.at[selected_idx, "Quantity"] = future_qty - qty
                         st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
-        
-            # ✅ Outgoing logic (deduct from pending)
+
+            # Deduct from pending (Outgoing)
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
                 qty = int(quantity)
-        
+
                 pending_match = df[
                     (df["Size (mm)"] == size) &
                     (df["Remarks"].str.lower().str.contains(buyer_name)) &
                     (df["Pending"] == True) &
                     (df["Status"] == "Current")
                 ].sort_values("Date")
-        
+
                 if not pending_match.empty:
                     st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
-        
+
                     for idx, row in pending_match.iterrows():
                         if qty <= 0:
                             break
@@ -267,8 +269,8 @@ with form_tabs[0]:
                             st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
                     df = df[df["Quantity"] > 0]
-        
-            # ✅ Add new entry ONCE
+
+            # ✅ Add new entry
             new_entry = {
                 'Date': entry_date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -279,11 +281,12 @@ with form_tabs[0]:
                 'Pending': False,
                 'ID': str(uuid4())
             }
-        
+
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             df["Date"] = df["Date"].astype(str)
             st.session_state.data = df.reset_index(drop=True)
-        
+
+            # Save to Google Sheet
             try:
                 auto_save_to_gsheet()
                 st.success("✅ Entry added and auto-saved.")
