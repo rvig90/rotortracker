@@ -292,6 +292,12 @@ with form_tabs[0]:
             st.success("✅ Entry added and saved successfully.")
         except Exception as e:
             st.error(f"❌ Save failed: {e}")
+
+    if st.session_state.get("last_snapshot") is not None:
+        if st.button(" undo last action"):
+            st.session_state.data = st.session_state.last_snapshot.copy()
+            st.success(f"undid:{st.session_state.last_action_note}")
+            auto_save_to_gsheet()
 with form_tabs[1]:
     with st.form("future_form"):
         col1, col2 = st.columns(2)
