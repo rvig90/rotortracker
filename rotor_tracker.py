@@ -185,13 +185,14 @@ with form_tabs[0]:
         remarks = st.text_input("📝 Remarks")
 
         submitted = st.form_submit_button("➕ Add Entry")
+
         if submitted:
             df = st.session_state.data.copy()
-            
-            # 🛠️ Ensure 'Date' column is datetime.date
+
+            # Ensure 'Date' column is parsed for future matching
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
 
-            # ✅ Construct new entry
+            # Build the new entry dictionary
             new_entry = {
                 'Date': date.strftime('%Y-%m-%d'),
                 'Size (mm)': int(rotor_size),
@@ -203,10 +204,10 @@ with form_tabs[0]:
                 'ID': str(uuid4())
             }
 
-            # 🔎 Check for future Inward entries with same size and empty remarks
+            # ✅ Future Inward match logic
             if (
-                entry_type == "Inward" and 
-                remarks.strip() == "" and 
+                entry_type == "Inward" and
+                remarks.strip() == "" and
                 date == datetime.today().date()
             ):
                 future_matches = df[
@@ -241,11 +242,10 @@ with form_tabs[0]:
                             else:
                                 df.at[idx, "Quantity"] = future_qty - qty
                                 qty = 0
-                        # Remove zero-quantity entries
                         df = df[df["Quantity"] > 0]
                         st.success("➖ Deducted quantity from future entry.")
 
-            # 🔁 Outgoing logic: Deduct from pending entries if remarks present
+            # ✅ Outgoing logic (deduct from pending)
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
@@ -274,11 +274,13 @@ with form_tabs[0]:
                             df.at[idx, "Quantity"] = pending_qty - qty
                             st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
                             qty = 0
-
                     df = df[df["Quantity"] > 0]
 
-            # ✅ Add new entry and reset session state
+            # ✅ Add new entry to dataframe
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+            # ✅ Convert date to string before saving
+            df["Date"] = df["Date"].astype(str)
             st.session_state.data = df.reset_index(drop=True)
 
             # ✅ Save to Google Sheet
