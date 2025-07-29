@@ -224,7 +224,7 @@ with form_tabs[0]:
                     selected_entry = st.selectbox(
                         "select a future entry to act on:",
                         options=future_matches.index,
-                        format_func=lambda idx: f"{future_matches.at[idx, 'Data']} → Qty: {future_matches.at[idx, 'Quantity']}"
+                        format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
                     )
 
                     action = st.radio(
