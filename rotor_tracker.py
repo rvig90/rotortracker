@@ -218,91 +218,77 @@ with form_tabs[0]:
                 )
 
         # ✅ Only one submit button
-        submitted = st.form_submit_button("💾 Save Entry / Apply Action")
-        if submitted and not st.session_state.form_submitted:
-            st.session_state.form_submitted = True  # prevent duplicate save
-        
-            # 🔄 Apply action if any
-            if action and selected_idx is not None:
-                if action == "Delete the future entry":
-                    df = df.drop(selected_idx)
-                    st.success("🗑 Deleted the selected future entry.")
-                elif action == "Deduct from the future entry":
-                    qty = int(quantity)
-                    future_qty = int(df.at[selected_idx, "Quantity"])
-                    if qty >= future_qty:
+       submitted = st.form_submit_button("💾 Save Entry / Apply Action")
+            if submitted and not st.session_state.form_submitted:
+                st.session_state.form_submitted = True  # prevent duplicate save
+            
+                # 🔄 Apply action if any
+                if action and selected_idx is not None:
+                    if action == "Delete the future entry":
                         df = df.drop(selected_idx)
-                        st.success("✔ Fully deducted and deleted the future entry.")
-                    else:
-                        df.at[selected_idx, "Quantity"] = future_qty - qty
-                        st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
-        
-            # ✅ Add new entry
-            new_entry = {
-                'Date': entry_date.strftime('%Y-%m-%d'),
-                'Size (mm)': int(rotor_size),
-                'Type': entry_type,
-                'Quantity': int(quantity),
-                'Remarks': remarks.strip(),
-                'Status': 'Current',
-                'Pending': False,
-                'ID': str(uuid4())
-            }
-        
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            df["Date"] = df["Date"].astype(str)
-            st.session_state.data = df.reset_index(drop=True)
-        
-            try:
-                auto_save_to_gsheet()
-                st.success("✅ Entry added and auto-saved.")
-            except Exception as e:
-                st.error(f"❌ Save failed: {e}")
-        
-
-                        
-        
-            # ✅ Outgoing logic (deduct from pending)
-            if entry_type == "Outgoing" and remarks.strip():
-                buyer_name = remarks.strip().lower()
-                size = int(rotor_size)
-                qty = int(quantity)
-        
-                pending_match = df[
-                    (df["Size (mm)"] == size) &
-                    (df["Remarks"].str.lower().str.contains(buyer_name)) &
-                    (df["Pending"] == True) &
-                    (df["Status"] == "Current")
-                ].sort_values("Date")
-        
-                if not pending_match.empty:
-                    st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
-        
-                    for idx, row in pending_match.iterrows():
-                        if qty <= 0:
-                            break
-                        pending_qty = int(row["Quantity"])
-                        if qty >= pending_qty:
-                            df.at[idx, "Quantity"] = 0
-                            df.at[idx, "Pending"] = False
-                            qty -= pending_qty
-                            st.info(f"✔ Cleared {pending_qty} from pending")
+                        st.success("🗑 Deleted the selected future entry.")
+                    elif action == "Deduct from the future entry":
+                        qty = int(quantity)
+                        future_qty = int(df.at[selected_idx, "Quantity"])
+                        if qty >= future_qty:
+                            df = df.drop(selected_idx)
+                            st.success("✔ Fully deducted and deleted the future entry.")
                         else:
-                            df.at[idx, "Quantity"] = pending_qty - qty
-                            st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
-                            qty = 0
-                    df = df[df["Quantity"] > 0]
-        
-            # ✅ Add new entry
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            df["Date"] = df["Date"].astype(str)
-            st.session_state.data = df.reset_index(drop=True)
-        
-            try:
-                auto_save_to_gsheet()
-                st.success("✅ Entry added and auto-saved.")
-            except Exception as e:
-                st.error(f"❌ Save failed: {e}")
+                            df.at[selected_idx, "Quantity"] = future_qty - qty
+                            st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
+            
+                # ✅ Outgoing logic (deduct from pending)
+                if entry_type == "Outgoing" and remarks.strip():
+                    buyer_name = remarks.strip().lower()
+                    size = int(rotor_size)
+                    qty = int(quantity)
+            
+                    pending_match = df[
+                        (df["Size (mm)"] == size) &
+                        (df["Remarks"].str.lower().str.contains(buyer_name)) &
+                        (df["Pending"] == True) &
+                        (df["Status"] == "Current")
+                    ].sort_values("Date")
+            
+                    if not pending_match.empty:
+                        st.warning(f"📌 Pending found for {remarks} ({size}mm). Deducting...")
+            
+                        for idx, row in pending_match.iterrows():
+                            if qty <= 0:
+                                break
+                            pending_qty = int(row["Quantity"])
+                            if qty >= pending_qty:
+                                df.at[idx, "Quantity"] = 0
+                                df.at[idx, "Pending"] = False
+                                qty -= pending_qty
+                                st.info(f"✔ Cleared {pending_qty} from pending")
+                            else:
+                                df.at[idx, "Quantity"] = pending_qty - qty
+                                st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
+                                qty = 0
+                        df = df[df["Quantity"] > 0]
+            
+                # ✅ Add new entry ONCE
+                new_entry = {
+                    'Date': entry_date.strftime('%Y-%m-%d'),
+                    'Size (mm)': int(rotor_size),
+                    'Type': entry_type,
+                    'Quantity': int(quantity),
+                    'Remarks': remarks.strip(),
+                    'Status': 'Current',
+                    'Pending': False,
+                    'ID': str(uuid4())
+                }
+            
+                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                df["Date"] = df["Date"].astype(str)
+                st.session_state.data = df.reset_index(drop=True)
+            
+                try:
+                    auto_save_to_gsheet()
+                    st.success("✅ Entry added and auto-saved.")
+                except Exception as e:
+                    st.error(f"❌ Save failed: {e}")
 
 with form_tabs[1]:
     with st.form("future_form"):
