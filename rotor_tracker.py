@@ -217,7 +217,12 @@ with form_tabs[0]:
                     (df["Date"] > datetime.today().date()) &
                     (df["Remarks"].str.strip() == "")
                 ].sort_values("Date")
-
+                st.write("Entry Type:", entry_type)
+                st.write("Remarks (stripped):", remarks.strip())
+                st.write("Entry Date:", entry_date)
+                st.write("Today:", datetime.today().date())
+                st.write("Future Matches Found:", not future_matches.empty)
+                st.write("Future Matches:", future_matches)
                 if not future_matches.empty:
                     st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
                     st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
