@@ -207,50 +207,50 @@ with form_tabs[0]:
 
             # ✅ Inward with empty remarks → check for future entry conflict
             if (
+                
                 entry_type == "Inward" and 
                 remarks.strip() == ""
             ):
+                today = datetime.today().date()
                 future_matches = df[
                     (df["Type"] == "Inward") &
                     (df["Size (mm)"] == int(rotor_size)) &
-                   
+                    (df["Date"] > today) &  # ✅ Only future entries
                     (df["Remarks"].str.strip() == "")
                 ].sort_values("Date")
-
+            
                 if not future_matches.empty:
                     st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
                     st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
-
+            
                     selected_entry = st.selectbox(
-                        "select a future entry to act on:",
+                        "Select a future entry to act on:",
                         options=future_matches.index,
                         format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
                     )
-
+            
                     action = st.radio(
                         "What would you like to do with the future entry?",
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                     )
-
-            if action == "Delete the future entry":
-            # Ask for confirmation before deleting
-                confirm_action = st.button("Confirm Delete")
-                if confirm_action:
-                    df = df.drop(future_matches.index)
-                    st.success("■ Deleted future inward entry.")
-                    
-            elif action == "Deduct from the future entry":
-                qty = int(quantity)
-                future_qty = int(df.at[selected_entry, "Quantity"])
-                
-                confirm_action = st.button("Confirm Deduction")
-                if confirm_action:
-                    if qty >= future_qty:
-                        df = df.drop(selected_entry)  # Remove entry if deduction >= quantity
-                        st.success("■ Fully deducted and removed the entry.")
-                    else:
-                        df.at[selected_entry, "Quantity"] = future_qty - qty
-                        st.success(f"■ Deducted {qty}. Remaining quantity: {future_qty - qty}")
+            
+                    if action == "Delete the future entry":
+                        if st.button("🗑 Confirm Delete"):
+                            df = df.drop(selected_entry)
+                            st.success("✅ Deleted the selected future entry.")
+            
+                    elif action == "Deduct from the future entry":
+                        qty = int(quantity)
+                        future_qty = int(df.at[selected_entry, "Quantity"])
+                        
+                        if st.button("➖ Confirm Deduction"):
+                            if qty >= future_qty:
+                                df = df.drop(selected_entry)
+                                st.success("✅ Fully deducted and removed the entry.")
+                            else:
+                                df.at[selected_entry, "Quantity"] = future_qty - qty
+                                st.success(f"✅ Deducted {qty}. Remaining quantity: {future_qty - qty}")
+            
                 
                     
                     
