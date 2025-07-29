@@ -189,12 +189,13 @@ with form_tabs[0]:
         if submitted:
             df = st.session_state.data.copy()
 
-            # Ensure 'Date' column is parsed for future matching
+            # ✅ Ensure 'Date' column is parsed for proper filtering
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+            entry_date = date  # Already datetime.date from st.date_input()
 
-            # Build the new entry dictionary
+            # ✅ Build new entry
             new_entry = {
-                'Date': date.strftime('%Y-%m-%d'),
+                'Date': entry_date.strftime('%Y-%m-%d'),  # Save as string
                 'Size (mm)': int(rotor_size),
                 'Type': entry_type,
                 'Quantity': int(quantity),
@@ -204,53 +205,48 @@ with form_tabs[0]:
                 'ID': str(uuid4())
             }
 
-            # ✅ Future Inward match logic
-        entry_date = pd.to_datetime(date).date()  # Ensure clean comparison
+            # ✅ Inward with empty remarks → check for future entry conflict
+            if (
+                entry_type == "Inward" and 
+                remarks.strip() == "" and 
+                entry_date <= datetime.today().date()
+            ):
+                future_matches = df[
+                    (df["Type"] == "Inward") &
+                    (df["Size (mm)"] == int(rotor_size)) &
+                    (df["Date"] > datetime.today().date()) &
+                    (df["Remarks"].str.strip() == "")
+                ].sort_values("Date")
 
-# ✅ Trigger future check if today's or past Inward entry with empty remarks
-        if (
-            entry_type == "Inward" and 
-            remarks.strip() == "" and 
-            entry_date <= datetime.today().date()
-        ):
-           
-        
-            future_matches = df[
-                (df["Type"] == "Inward") &
-                (df["Size (mm)"] == int(rotor_size)) &
-                (df["Date"] > datetime.today().date()) &
-                (df["Remarks"].str.strip() == "")
-            ].sort_values("Date")
-        
-            if not future_matches.empty:
-                st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
-                st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
-        
-                action = st.radio(
-                    "What would you like to do with the future entry?",
-                    ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
-                )
-        
-                if action == "Delete the future entry":
-                    df = df.drop(future_matches.index)
-                    st.success("🗑 Deleted future inward entry.")
-        
-                elif action == "Deduct from the future entry":
-                    qty = int(quantity)
-                    for idx, row in future_matches.iterrows():
-                        if qty <= 0:
-                            break
-                        future_qty = int(row["Quantity"])
-                        if qty >= future_qty:
-                            df.at[idx, "Quantity"] = 0
-                            qty -= future_qty
-                        else:
-                            df.at[idx, "Quantity"] = future_qty - qty
-                            qty = 0
-                    df = df[df["Quantity"] > 0]
-                    st.success("➖ Deducted from future inward entry.")
+                if not future_matches.empty:
+                    st.warning("⚠ A future Inward entry for this rotor size exists with no remarks.")
+                    st.dataframe(future_matches[["Date", "Quantity"]], use_container_width=True)
 
-            # ✅ Outgoing logic (deduct from pending)
+                    action = st.radio(
+                        "What would you like to do with the future entry?",
+                        ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
+                    )
+
+                    if action == "Delete the future entry":
+                        df = df.drop(future_matches.index)
+                        st.success("🗑 Deleted future inward entry.")
+
+                    elif action == "Deduct from the future entry":
+                        qty = int(quantity)
+                        for idx, row in future_matches.iterrows():
+                            if qty <= 0:
+                                break
+                            future_qty = int(row["Quantity"])
+                            if qty >= future_qty:
+                                df.at[idx, "Quantity"] = 0
+                                qty -= future_qty
+                            else:
+                                df.at[idx, "Quantity"] = future_qty - qty
+                                qty = 0
+                        df = df[df["Quantity"] > 0]
+                        st.success("➖ Deducted from future inward entry.")
+
+            # ✅ Outgoing → deduct from pending entries
             if entry_type == "Outgoing" and remarks.strip():
                 buyer_name = remarks.strip().lower()
                 size = int(rotor_size)
@@ -281,10 +277,10 @@ with form_tabs[0]:
                             qty = 0
                     df = df[df["Quantity"] > 0]
 
-            # ✅ Add new entry to dataframe
+            # ✅ Add final new entry
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
 
-            # ✅ Convert date to string before saving
+            # ✅ Convert Date column to string for serialization
             df["Date"] = df["Date"].astype(str)
             st.session_state.data = df.reset_index(drop=True)
 
