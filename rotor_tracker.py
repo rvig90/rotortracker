@@ -213,7 +213,7 @@ with form_tabs[0]:
             remarks.strip() == "" and 
             entry_date <= datetime.today().date()
         ):
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+           
         
             future_matches = df[
                 (df["Type"] == "Inward") &
