@@ -236,7 +236,6 @@ with form_tabs[0]:
                         df = df.drop(future_matches.index)
                         st.success("🗑 Deleted future inward entry.")
 
-                   if selected_entry is not None:
                        confirm_action = st.button("Save Changes")
                     if confirm_action:
                         if action == "Delete the future entry":
