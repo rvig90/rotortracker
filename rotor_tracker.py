@@ -173,12 +173,14 @@ import pandas as pd
 import streamlit as st
 
 # Ensure session keys
+
 with form_tabs[0]:
+    st.markdown("### 📦 Current Rotor Movement")
+
     with st.form("current_form"):
-        # Inputs
         col1, col2 = st.columns(2)
         with col1:
-            date = st.date_input("📅 Date", value=datetime.today())
+            entry_date = st.date_input("📅 Date", value=datetime.today())
             rotor_size = st.number_input("📐 Rotor Size (mm)", min_value=1, step=1)
         with col2:
             entry_type = st.selectbox("🔄 Type", ["Inward", "Outgoing"])
@@ -186,25 +188,15 @@ with form_tabs[0]:
 
         remarks = st.text_input("📝 Remarks")
 
-        # Form submit
-        submitted = st.form_submit_button("💾 Save Entry / Apply Action")
-
-    if submitted and not st.session_state.get("form_submitted", False):
-        df = st.session_state.data.copy()
-        st.session_state.form_submitted = True
-        entry_date = date
-        rotor_size = int(rotor_size)
-        qty = int(quantity)
-        remarks_clean = remarks.strip()
-
-        # Save a backup before applying anything
-        st.session_state.last_snapshot = df.copy()
-        st.session_state.last_action_note = f"{entry_type} {rotor_size}mm"
-
-        # Check for future entries if Inward and no remarks
+        # Default selections
+        future_matches = pd.DataFrame()
         selected_idx = None
         action = None
-        if entry_type == "Inward" and remarks_clean == "":
+
+        df = st.session_state.data.copy()
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+
+        if entry_type == "Inward" and remarks.strip() == "":
             future_matches = df[
                 (df["Type"] == "Inward") &
                 (df["Size (mm)"] == rotor_size) &
@@ -213,68 +205,71 @@ with form_tabs[0]:
             ].sort_values("Date")
 
             if not future_matches.empty:
-                st.warning("⚠ Matching future rotor(s) found.")
+                st.warning("⚠ Found future entry for this rotor size.")
                 st.dataframe(future_matches[["Date", "Quantity", "Status"]], use_container_width=True)
 
                 selected_idx = st.selectbox(
                     "Select a future entry to act on:",
                     options=future_matches.index,
-                    format_func=lambda idx: f"{future_matches.at[idx, 'Date']} → Qty: {future_matches.at[idx, 'Quantity']}"
+                    format_func=lambda i: f"{future_matches.at[i, 'Date']} → Qty: {future_matches.at[i, 'Quantity']}"
                 )
 
-                action = st.radio(
-                    "What would you like to do?",
-                    ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
-                )
+                action = st.radio("Choose action:", [
+                    "Do nothing", "Delete the future entry", "Deduct from the future entry"
+                ])
 
-                if action == "Delete the future entry":
-                    df = df.drop(selected_idx)
-                    st.success("🗑 Deleted the selected future entry.")
+        submitted = st.form_submit_button("💾 Save Entry / Apply Action")
 
-                elif action == "Deduct from the future entry":
-                    future_qty = int(df.at[selected_idx, "Quantity"])
-                    if qty >= future_qty:
-                        df = df.drop(selected_idx)
-                        st.success("✔ Fully deducted and deleted the future entry.")
-                    else:
-                        df.at[selected_idx, "Quantity"] = future_qty - qty
-                        st.success(f"➖ Deducted {qty}, remaining: {future_qty - qty}")
+    if submitted:
+        st.session_state.last_snapshot = df.copy()  # Save undo
+        st.session_state.last_action_note = f"{entry_type} {rotor_size}mm"
 
-        # Outgoing → deduct from pending
-        if entry_type == "Outgoing" and remarks_clean:
-            buyer_name = remarks_clean.lower()
+        # ✅ Apply action before adding new entry
+        if selected_idx is not None and action:
+            if action == "Delete the future entry":
+                df = df.drop(index=selected_idx)
+                st.success("🗑 Deleted selected future entry.")
+            elif action == "Deduct from the future entry":
+                future_qty = int(df.at[selected_idx, "Quantity"])
+                if quantity >= future_qty:
+                    df = df.drop(index=selected_idx)
+                    st.success("✔ Fully deducted and removed the future entry.")
+                else:
+                    df.at[selected_idx, "Quantity"] = future_qty - quantity
+                    st.success(f"➖ Deducted {quantity}, remaining: {future_qty - quantity}")
+
+        # ✅ Outgoing — Deduct from pending
+        if entry_type == "Outgoing" and remarks.strip():
             pending_match = df[
                 (df["Size (mm)"] == rotor_size) &
-                (df["Remarks"].str.lower().str.contains(buyer_name)) &
+                (df["Remarks"].str.lower().str.contains(remarks.strip().lower())) &
                 (df["Pending"] == True) &
-                (df["Status"] == "Current")
+                (df["Status"].str.lower() == "current")
             ].sort_values("Date")
 
             if not pending_match.empty:
-                st.warning(f"📌 Pending found for {remarks_clean} ({rotor_size}mm). Deducting...")
-
+                st.warning(f"📌 Deducting from pending for {remarks}")
+                q = quantity
                 for idx, row in pending_match.iterrows():
-                    if qty <= 0:
+                    if q <= 0:
                         break
-                    pending_qty = int(row["Quantity"])
-                    if qty >= pending_qty:
+                    pqty = int(row["Quantity"])
+                    if q >= pqty:
                         df.at[idx, "Quantity"] = 0
                         df.at[idx, "Pending"] = False
-                        qty -= pending_qty
-                        st.info(f"✔ Cleared {pending_qty} from pending")
+                        q -= pqty
                     else:
-                        df.at[idx, "Quantity"] = pending_qty - qty
-                        st.info(f"➖ Deducted {qty} from pending ({pending_qty} → {pending_qty - qty})")
-                        qty = 0
+                        df.at[idx, "Quantity"] = pqty - q
+                        q = 0
                 df = df[df["Quantity"] > 0]
 
-        # Add final new entry
+        # ✅ Add final entry
         new_entry = {
             'Date': entry_date.strftime('%Y-%m-%d'),
-            'Size (mm)': rotor_size,
+            'Size (mm)': int(rotor_size),
             'Type': entry_type,
-            'Quantity': quantity,
-            'Remarks': remarks_clean,
+            'Quantity': int(quantity),
+            'Remarks': remarks.strip(),
             'Status': 'Current',
             'Pending': False,
             'ID': str(uuid4())
@@ -286,23 +281,16 @@ with form_tabs[0]:
 
         try:
             auto_save_to_gsheet()
-            st.success("✅ Entry added and auto-saved.")
+            st.success("✅ Entry saved and synced.")
         except Exception as e:
             st.error(f"❌ Save failed: {e}")
 
-# RESET form_submitted to allow next submission
-if st.session_state.get("form_submitted"):
-    if st.button("🆗 Done / New Entry"):
-        st.session_state.form_submitted = False
-
-# UNDO button
-if st.session_state.get("last_snapshot") is not None:
-    if st.button("↩ Undo Last Action"):
-        st.session_state.data = st.session_state.last_snapshot.copy()
-        st.success(f"✅ Undid: {st.session_state.last_action_note}")
-        auto_save_to_gsheet()
-        st.session_state.form_submitted = False
-
+    # 🔁 Allow undo of last save
+    if st.session_state.get("last_snapshot") is not None:
+        if st.button("↩ Undo Last Action"):
+            st.session_state.data = st.session_state.last_snapshot.copy()
+            st.success(f"↩ Undid: {st.session_state.last_action_note}")
+            auto_save_to_gsheet()
 with form_tabs[1]:
     with st.form("future_form"):
         col1, col2 = st.columns(2)
