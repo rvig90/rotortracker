@@ -232,28 +232,28 @@ with form_tabs[0]:
                         ["Do nothing", "Delete the future entry", "Deduct from the future entry"]
                     )
 
-                    if action == "Delete the future entry":
-                        df = df.drop(future_matches.index)
-                        st.success("🗑 Deleted future inward entry.")
-                        confirm_action = st.button("Save Changes")
-                    if confirm_action:
-                        if action == "Delete the future entry":
-                            df = df.drop(index=selected_entry)
-                            st.success("🗑 Deleted the selected future entry.")
+            if action == "Delete the future entry":
+            # Ask for confirmation before deleting
+            confirm_action = st.button("Confirm Delete")
+            if confirm_action:
+                df = df.drop(future_matches.index)
+                st.success("■ Deleted future inward entry.")
+                
+        elif action == "Deduct from the future entry":
+            qty = int(quantity)
+            future_qty = int(df.at[selected_entry, "Quantity"])
+            
+            confirm_action = st.button("Confirm Deduction")
+            if confirm_action:
+                if qty >= future_qty:
+                    df = df.drop(selected_entry)  # Remove entry if deduction >= quantity
+                    st.success("■ Fully deducted and removed the entry.")
+                else:
+                    df.at[selected_entry, "Quantity"] = future_qty - qty
+                    st.success(f"■ Deducted {qty}. Remaining quantity: {future_qty - qty}")
+                
                     
-                        elif action == "Deduct from the future entry":
-                            qty = int(quantity)
-                            future_qty = int(df.at[selected_entry, "Quantity"])
                     
-                            if qty >= future_qty:
-                                df.at[selected_entry, "Quantity"] = 0
-                                st.success(f"✔ Deducted all {future_qty} from the selected entry.")
-                            else:
-                                df.at[selected_entry, "Quantity"] = future_qty - qty
-                                st.success(f"➖ Deducted {qty} from the selected entry ({future_qty} → {future_qty - qty})")
-                    
-                            # Drop any rows with 0 quantity
-                            df = df[df["Quantity"] > 0]
 
             # ✅ Outgoing → deduct from pending entries
             if entry_type == "Outgoing" and remarks.strip():
