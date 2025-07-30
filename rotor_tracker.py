@@ -244,7 +244,7 @@ with form_tabs[0]:
         )
         st.session_state["selected_idx"] = selected
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         if col1.button("🗑 Delete Selected Entry"):
             st.session_state.data = st.session_state.data.drop(selected)
             st.session_state["conflict_resolved"] = True
@@ -261,6 +261,10 @@ with form_tabs[0]:
             st.session_state["conflict_resolved"] = True
             st.session_state["action_required"] = False
             st.success("✅ Deducted from future entry.")
+
+        if col3.button("Do Nothing"):
+            st.success("No Changes Have Been Made")
+            st.Stop()
 
     # Final save button — only shown if conflict is resolved and entry is ready
     if st.session_state.get("conflict_resolved") and st.session_state.get("new_entry"):
