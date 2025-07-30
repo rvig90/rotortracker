@@ -264,7 +264,7 @@ with form_tabs[0]:
 
         if col3.button("Do Nothing"):
             st.success("No Changes Have Been Made")
-            st.Stop()
+            st.stop()
 
     # Final save button — only shown if conflict is resolved and entry is ready
     if st.session_state.get("conflict_resolved") and st.session_state.get("new_entry"):
