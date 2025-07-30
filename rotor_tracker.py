@@ -846,7 +846,7 @@ with tabs[2]:
         st.info("❓ No matching entries found. Try: Buyer A June, 250mm stock, Last 5 outgoing")
 
     # CASE: "coming rotors"
-    if "coming rotors" in query:
+    if query.strip().lower() == "coming rotors":
         coming_df = st.session_state.data.copy()
         coming_df["Date"] = pd.to_datetime(coming_df["Date"], errors="coerce").dt.date
         coming_df = coming_df[
