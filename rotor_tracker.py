@@ -844,6 +844,22 @@ with tabs[2]:
         st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
     elif chat_query.strip():
         st.info("❓ No matching entries found. Try: Buyer A June, 250mm stock, Last 5 outgoing")
+
+    # CASE: "coming rotors"
+    if "coming rotors" in query:
+        coming_df = st.session_state.data.copy()
+        coming_df["Date"] = pd.to_datetime(coming_df["Date"], errors="coerce").dt.date
+        coming_df = coming_df[
+            (coming_df["Type"] == "Inward") &
+            (coming_df["Status"].str.lower() == "future")
+        ][["Date", "Size (mm)", "Quantity"]].sort_values("Date")
+
+        if not coming_df.empty:
+            st.success("📅 Coming Rotors")
+            st.dataframe(coming_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("✅ No coming rotor entries found.")
+        st.stop()
 with tabs[3]:
     import openai
     import streamlit as st
