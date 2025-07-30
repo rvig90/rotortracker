@@ -249,7 +249,7 @@ with form_tabs[0]:
             st.session_state.data = st.session_state.data.drop(selected)
             st.session_state["conflict_resolved"] = True
             st.session_state["action_required"] = False
-            st.success("✅ Selected Entry will be deleted. Please Save!.")
+            st.success("✅ Selected Entry deleted. Please Save!.")
 
         if col2.button("➖ Deduct from Selected Entry"):
             qty = st.session_state["new_entry"]["Quantity"]
@@ -260,7 +260,7 @@ with form_tabs[0]:
                 st.session_state.data.at[selected, "Quantity"] = future_qty - qty
             st.session_state["conflict_resolved"] = True
             st.session_state["action_required"] = False
-            st.success("✅ Selected Entry Will be deducted. Please Save!")
+            st.success("✅ Selected Entry deducted. Please Save!")
 
         if col3.button("Do Nothing"):
             st.session_state["conflict_resolved"] = True
