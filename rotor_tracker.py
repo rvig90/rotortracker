@@ -263,6 +263,8 @@ with form_tabs[0]:
             st.success("✅ Deducted from future entry.")
 
         if col3.button("Do Nothing"):
+            st.session_state["conflict_resolved"] = True
+            st.session_state["action_required"] = False
             st.success("No Changes Have Been Made")
             
 
