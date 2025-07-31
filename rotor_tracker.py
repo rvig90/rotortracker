@@ -465,125 +465,102 @@ with tabs[0]:
         st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
         st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)     
     
-    st.subheader("🧠 AI-Powered Reorder Suggestions (with Pending & Future Awareness)")
+    import pandas as pd
+    from prophet import Prophet
+    from datetime import datetime, timedelta
+    import streamlit as st
+    
+    st.subheader("🧠 AI-Powered 7-Day Rotor Reorder Suggestions")
     
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
     
-    # === 1. Recent Outgoing Usage ===
-    cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
+    # Filter outgoing movements
     outgoing = df[
         (df["Type"] == "Outgoing") &
         (df["Status"] == "Current") &
         (~df["Pending"]) &
-        (df["Date"] >= cutoff)
-    ].copy()
-    
-    usage = (
-        outgoing.groupby(["Date", "Size (mm)"])["Quantity"]
-        .sum()
-        .groupby("Size (mm)").mean()
-        .reset_index()
-        .rename(columns={"Quantity": "Avg Daily Usage"})
-    )
-    
-    # === 2. Current Stock (Inward - Outgoing, not pending) ===
-    current = df[
-        (df["Status"] == "Current") & (~df["Pending"])
-    ].copy()
-    current["Net"] = current.apply(
-        lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
-    )
-    stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock Now"})
-    
-    # === 3. Pending Outgoing Rotors ===
-    pending = df[(df["Status"] == "Current") & (df["Pending"])].copy()
-    pending_sum = pending.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
-    
-    # === 4. Future Inward Rotors ===
-    future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")].copy()
-    future_sum = future.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
-    
-    # === 5. Merge All Sources ===
-    df_all = usage.merge(stock_now, on="Size (mm)", how="outer") \
-                  .merge(pending_sum, on="Size (mm)", how="outer") \
-                  .merge(future_sum, on="Size (mm)", how="outer") \
-                  .fillna(0)
-    
-    # === 6. Calculations ===
-    df_all["Projected Stock"] = df_all["Stock Now"] - df_all["Pending Out"] + df_all["Coming In"]
-    df_all["Forecast (30d)"] = df_all["Avg Daily Usage"] * 30
-    df_all["Safety Buffer"] = df_all["Avg Daily Usage"] * 7
-    df_all["Target Stock"] = df_all["Forecast (30d)"] + df_all["Safety Buffer"]
-    df_all["Suggested Reorder"] = (df_all["Target Stock"] - df_all["Projected Stock"]).clip(lower=0)
-    
-    # === 7. Round All Quantities to Int ===
-    cols_to_round = [
-        "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
-        "Projected Stock", "Forecast (30d)", "Suggested Reorder"
+        (df["Date"] >= datetime.today() - timedelta(days=60))
     ]
-    for col in cols_to_round:
-        df_all[col] = df_all[col].round(0).astype(int)
     
-    # === 8. Filter and Show Reorder List ===
-    reorder = df_all[df_all["Suggested Reorder"] > 0]
+    # Forecasting function
+    def forecast_7_day_demand(df_outgoing, size):
+        df_size = df_outgoing[df_outgoing["Size (mm)"] == size]
+        daily = (
+            df_size.groupby("Date")["Quantity"]
+            .sum()
+            .reset_index()
+            .rename(columns={"Date": "ds", "Quantity": "y"})
+        )
+        if len(daily) < 10:
+            return 0
+        model = Prophet()
+        model.fit(daily)
+        future = model.make_future_dataframe(periods=7)
+        forecast = model.predict(future)
+        return int(forecast.tail(7)["yhat"].sum())
     
-    if reorder.empty:
-        st.success("✅ All rotor sizes are sufficiently stocked with pending and future accounted for.")
+    # Build forecast table
+    forecasts = []
+    for size in outgoing["Size (mm)"].unique():
+        forecast_qty = forecast_7_day_demand(outgoing, size)
+        forecasts.append({"Size (mm)": size, "Forecast (7d)": forecast_qty})
+    
+    forecast_df = pd.DataFrame(forecasts)
+    
+    if forecast_df.empty or forecast_df["Forecast (7d)"].sum() == 0:
+        st.success("✅ No reorder needed — forecasted demand is low.")
     else:
-        st.warning("🔄 The following rotor sizes may run short in the next 30 days:")
+        st.warning("🔮 Rotor sizes likely needed in next 7 days:")
         st.dataframe(
-            reorder[[
-                "Size (mm)", "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
-                "Projected Stock", "Forecast (30d)", "Suggested Reorder"
-            ]].sort_values("Suggested Reorder", ascending=False),
+            forecast_df.sort_values("Forecast (7d)", ascending=False),
             use_container_width=True,
             hide_index=True
         )
-
-    from prophet import Prophet
     
-    st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
-    
-    # Choose a rotor size
-    available_sizes = sorted(outgoing["Size (mm)"].unique())
-    selected_size = st.selectbox("Select Rotor Size to Forecast", available_sizes)
-    
-    # Filter data for selected size
-    df_size = outgoing[outgoing["Size (mm)"] == selected_size]
-    daily = df_size.groupby("Date")["Quantity"].sum().reset_index()
-    daily.columns = ["ds", "y"]
-    
-    if len(daily) < 4:
-        st.info("Not enough data to forecast this size.")
-    else:
-        m = Prophet()
-        m.fit(daily)
-    
-        future = m.make_future_dataframe(periods=180)  # Next 6 months
-        forecast = m.predict(future)
-    
-        # Monthly summary
-        forecast["Month"] = forecast["ds"].dt.to_period("M")
-        monthly = forecast.groupby("Month")["yhat"].mean().reset_index()
-        monthly.columns = ["Month", "Forecasted Quantity"]
-        monthly["Forecasted Quantity"] = monthly["Forecasted Quantity"].round(0).astype(int)
-       
-    
-        st.dataframe(monthly.tail(6), use_container_width=True)
-    
-        # Chart
-        import altair as alt
-        chart = alt.Chart(monthly.tail(6)).mark_bar().encode(
-            x=alt.X("Month:T", title="Month"),
-            y=alt.Y("Forecasted Quantity:Q", title="Forecasted Avg Quantity"),
-            tooltip=["Month", "Forecasted Quantity"]
-        ).properties(
-            title=f"Forecasted Monthly Demand for {selected_size}mm Rotor",
-            width="container",
-            height=300
-        )
-        st.altair_chart(chart, use_container_width=True)
+        from prophet import Prophet
+        
+        st.subheader("🔮 Forecasted Rotor Demand (Next 6 Months)")
+        
+        # Choose a rotor size
+        available_sizes = sorted(outgoing["Size (mm)"].unique())
+        selected_size = st.selectbox("Select Rotor Size to Forecast", available_sizes)
+        
+        # Filter data for selected size
+        df_size = outgoing[outgoing["Size (mm)"] == selected_size]
+        daily = df_size.groupby("Date")["Quantity"].sum().reset_index()
+        daily.columns = ["ds", "y"]
+        
+        if len(daily) < 4:
+            st.info("Not enough data to forecast this size.")
+        else:
+            m = Prophet()
+            m.fit(daily)
+        
+            future = m.make_future_dataframe(periods=180)  # Next 6 months
+            forecast = m.predict(future)
+        
+            # Monthly summary
+            forecast["Month"] = forecast["ds"].dt.to_period("M")
+            monthly = forecast.groupby("Month")["yhat"].mean().reset_index()
+            monthly.columns = ["Month", "Forecasted Quantity"]
+            monthly["Forecasted Quantity"] = monthly["Forecasted Quantity"].round(0).astype(int)
+           
+        
+            st.dataframe(monthly.tail(6), use_container_width=True)
+        
+            # Chart
+            import altair as alt
+            chart = alt.Chart(monthly.tail(6)).mark_bar().encode(
+                x=alt.X("Month:T", title="Month"),
+                y=alt.Y("Forecasted Quantity:Q", title="Forecasted Avg Quantity"),
+                tooltip=["Month", "Forecasted Quantity"]
+            ).properties(
+                title=f"Forecasted Monthly Demand for {selected_size}mm Rotor",
+                width="container",
+                height=300
+            )
+            st.altair_chart(chart, use_container_width=True)
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
