@@ -470,87 +470,91 @@ with tabs[0]:
     import pandas as pd
     import streamlit as st
     
-    st.subheader("🧠 AI-Powered 7-Day Reorder Suggestions (Inventory-Aware)")
     
-    # Load and prepare the data
+    st.subheader("🧠 AI-Powered Reorder Suggestions (with Pending & Future Awareness)")
+
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-    today = pd.Timestamp.today()
-    
-    # 1️⃣ Filter recent Outgoing for training Prophet (last 60 days)
+
+    # ✅ Apply Movement Log filters silently
+    if "filters" in st.session_state and st.session_state.filters:
+        filters = st.session_state.filters
+        if "start_date" in filters:
+            df = df[df["Date"] >= pd.to_datetime(filters["start_date"])]
+        if "end_date" in filters:
+            df = df[df["Date"] <= pd.to_datetime(filters["end_date"])]
+        if "size" in filters:
+            df = df[df["Size (mm)"] == filters["size"]]
+        if "type" in filters:
+            df = df[df["Type"] == filters["type"]]
+        if "remarks" in filters:
+            df = df[df["Remarks"].str.contains(filters["remarks"], case=False, na=False)]
+
+    # === 1. Recent Outgoing Usage (last 60 days) ===
+    cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
     outgoing = df[
         (df["Type"] == "Outgoing") &
         (df["Status"] == "Current") &
         (~df["Pending"]) &
-        (df["Date"] >= today - timedelta(days=60))
-    ]
-    
-    # 2️⃣ Current Stock = Inward - Outgoing (excluding pending)
-    current = df[
-        (df["Status"] == "Current") &
-        (~df["Pending"])
+        (df["Date"] >= cutoff)
     ].copy()
+
+    usage = (
+        outgoing.groupby(["Date", "Size (mm)"])["Quantity"]
+        .sum()
+        .groupby("Size (mm)").mean()
+        .reset_index()
+        .rename(columns={"Quantity": "Avg Daily Usage"})
+    )
+
+    # === 2. Current Stock (Inward - Outgoing) ===
+    current = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
     current["Net"] = current.apply(
         lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
     )
     stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock Now"})
-    
-    # 3️⃣ Pending Rotors (Outgoing)
+
+    # === 3. Pending Outgoing ===
     pending = df[(df["Status"] == "Current") & (df["Pending"])].copy()
     pending_sum = pending.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
-    
-    # 4️⃣ Coming Rotors (Future Inward)
+
+    # === 4. Future Inward ===
     future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")].copy()
     future_sum = future.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
-    
-    # 5️⃣ Forecasting next 7 days per rotor size using Prophet
-    def forecast_next_7_days(size):
-        df_size = outgoing[outgoing["Size (mm)"] == size]
-        daily = (
-            df_size.groupby("Date")["Quantity"]
-            .sum()
-            .reset_index()
-            .rename(columns={"Date": "ds", "Quantity": "y"})
-        )
-        if len(daily) < 7:
-            return 0
-        model = Prophet()
-        model.fit(daily)
-        future = model.make_future_dataframe(periods=7)
-        forecast = model.predict(future)
-        return int(forecast.tail(7)["yhat"].sum())
-    
-    # 6️⃣ Compile all sizes with forecasts
-    all_sizes = sorted(df["Size (mm)"].unique())
-    records = []
-    for size in all_sizes:
-        forecast_7d = forecast_next_7_days(size)
-        stock = int(stock_now[stock_now["Size (mm)"] == size]["Stock Now"].values[0]) if size in stock_now["Size (mm)"].values else 0
-        pending_qty = int(pending_sum[pending_sum["Size (mm)"] == size]["Pending Out"].values[0]) if size in pending_sum["Size (mm)"].values else 0
-        future_inward = int(future_sum[future_sum["Size (mm)"] == size]["Coming In"].values[0]) if size in future_sum["Size (mm)"].values else 0
-        projected = stock - pending_qty + future_inward
-        suggested = max(forecast_7d - projected, 0)
-    
-        records.append({
-            "Size (mm)": size,
-            "Forecast (7d)": forecast_7d,
-            "Stock Now": stock,
-            "Pending Out": pending_qty,
-            "Coming In": future_inward,
-            "Projected Stock": projected,
-            "Suggested Reorder": suggested
-        })
-    
-    # 7️⃣ Final DataFrame and Display
-    final_df = pd.DataFrame(records)
-    final_df = final_df[final_df["Suggested Reorder"] > 0]
-    
-    if final_df.empty:
-        st.success("✅ All rotor sizes are sufficiently stocked for the next 7 days.")
+
+    # === 5. Merge All Data ===
+    df_all = usage.merge(stock_now, on="Size (mm)", how="outer") \
+                  .merge(pending_sum, on="Size (mm)", how="outer") \
+                  .merge(future_sum, on="Size (mm)", how="outer") \
+                  .fillna(0)
+
+    # === 6. Projections ===
+    df_all["Projected Stock"] = df_all["Stock Now"] - df_all["Pending Out"] + df_all["Coming In"]
+    df_all["Forecast (7d)"] = df_all["Avg Daily Usage"] * 7
+    df_all["Safety Buffer"] = df_all["Avg Daily Usage"] * 3
+    df_all["Target Stock"] = df_all["Forecast (7d)"] + df_all["Safety Buffer"]
+    df_all["Suggested Reorder"] = (df_all["Target Stock"] - df_all["Projected Stock"]).clip(lower=0)
+
+    # === 7. Round Values ===
+    cols_to_round = [
+        "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
+        "Projected Stock", "Forecast (7d)", "Suggested Reorder"
+    ]
+    for col in cols_to_round:
+        df_all[col] = df_all[col].round(0).astype(int)
+
+    # === 8. Show Result ===
+    reorder = df_all[df_all["Suggested Reorder"] > 0]
+
+    if reorder.empty:
+        st.success("✅ All rotor sizes are sufficiently stocked for the next 7 days with pending and future accounted for.")
     else:
-        st.warning("📉 These rotor sizes may run short in the next 7 days:")
+        st.warning("⚠ These rotor sizes may need reorder soon:")
         st.dataframe(
-            final_df.sort_values("Suggested Reorder", ascending=False),
+            reorder[[
+                "Size (mm)", "Avg Daily Usage", "Stock Now", "Pending Out", "Coming In",
+                "Projected Stock", "Forecast (7d)", "Suggested Reorder"
+            ]].sort_values("Suggested Reorder", ascending=False),
             use_container_width=True,
             hide_index=True
         )
