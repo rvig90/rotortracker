@@ -802,6 +802,9 @@ with tabs[2]:
             use_container_width=True,
             hide_index=True
         )
+        missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
+        if len(missing_sizes):
+            st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
         st.stop()
 
 
