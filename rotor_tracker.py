@@ -778,7 +778,6 @@ with tabs[2]:
             st.info("✅ No coming rotor entries found.")
         st.stop()
 
-
     # === CASE: Buyer weight estimation ===
     if "weight" in query and buyer_name:
         outgoing_df = df[
@@ -804,6 +803,8 @@ with tabs[2]:
             hide_index=True
         )
         st.stop()
+
+
     missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
     
     if len(missing_sizes):
