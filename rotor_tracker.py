@@ -471,92 +471,66 @@ with tabs[0]:
     import streamlit as st
     
     
-    with st.expander("🧠 Smart Stock Risk & Reorder Assistant", expanded=True):
-        df = st.session_state.data.copy()
-        df["Date"] = pd.to_datetime(df["Date"])
-        df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
+    import streamlit as st
+import pandas as pd
+
+st.subheader("🚨 Stock Risk Alerts")
+
+# Load current data
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Remarks"] = df["Remarks"].fillna("").astype(str)
     
-        # === 1. Compute Current Stock (Inward - Outgoing, not pending)
-        current = df[(df["Status"] == "Current") & (~df["Pending"])]
-        current["Net"] = current.apply(
-            lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"],
-            axis=1
+    # ===== GROUPING STOCK METRICS =====
+    # 1. Current Stock (Inward - Outgoing, excluding Pending)
+    current_df = df[
+        (df["Status"] == "Current") & (~df["Pending"])
+    ].copy()
+    current_df["Net"] = current_df.apply(
+        lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
+    )
+    stock = current_df.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock"})
+    
+    # 2. Pending Outgoing
+    pending_df = df[(df["Pending"] == True) & (df["Status"] == "Current")]
+    pending_out = pending_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
+    
+    # 3. Future Inward
+    future_df = df[(df["Status"] == "Future") & (df["Type"] == "Inward")]
+    coming_in = future_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
+    
+    # ===== MERGE ALL SOURCES =====
+    merged = stock.merge(pending_out, on="Size (mm)", how="outer") \
+                  .merge(coming_in, on="Size (mm)", how="outer") \
+                  .fillna(0)
+    
+    # Ensure all values are integers
+    for col in ["Stock", "Pending Out", "Coming In"]:
+        merged[col] = merged[col].astype(int)
+    
+    # ===== ALERTS SECTION =====
+    
+    # 1️⃣ Low stock with no incoming rotors
+    low_stock = merged[(merged["Stock"] < 100) & (merged["Coming In"] == 0)]
+    
+    if not low_stock.empty:
+        st.warning("🟠 Low stock (less than 100) with **no incoming rotors**:")
+        st.dataframe(low_stock[["Size (mm)", "Stock"]], use_container_width=True, hide_index=True)
+    else:
+        st.success("✅ No low stock issues detected.")
+    
+    # 2️⃣ Pending orders exceed available supply (stock + incoming)
+    risky_pending = merged[merged["Pending Out"] > (merged["Stock"] + merged["Coming In"])]
+    
+    if not risky_pending.empty:
+        st.error("🔴 Pending exceeds total available rotors (Stock + Incoming):")
+        st.dataframe(
+            risky_pending[["Size (mm)", "Stock", "Coming In", "Pending Out"]],
+            use_container_width=True,
+            hide_index=True
         )
-        stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock"})
-    
-        # === 2. Pending Outgoing
-        pending = df[(df["Status"] == "Current") & (df["Type"] == "Outgoing") & (df["Pending"])]
-        pending_sum = pending.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
-    
-        # === 3. Future Inward
-        future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")]
-        future_sum = future.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
-    
-        # === 4. Average Daily Usage (Last 60 days)
-        cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
-        recent_out = df[
-            (df["Type"] == "Outgoing") &
-            (~df["Pending"]) &
-            (df["Status"] == "Current") &
-            (df["Date"] >= cutoff)
-        ]
-        usage = (
-            recent_out.groupby(["Date", "Size (mm)"])["Quantity"]
-            .sum()
-            .groupby("Size (mm)").mean()
-            .reset_index()
-            .rename(columns={"Quantity": "Avg Daily Usage"})
-        )
-    
-        # === 5. Merge All Metrics
-        merged = stock_now.merge(pending_sum, on="Size (mm)", how="outer") \
-                          .merge(future_sum, on="Size (mm)", how="outer") \
-                          .merge(usage, on="Size (mm)", how="outer") \
-                          .fillna(0)
-    
-        # === 6. Calculations
-        merged["Projected Stock"] = merged["Stock"] - merged["Pending Out"] + merged["Coming In"]
-        merged["Forecast (7d)"] = merged["Avg Daily Usage"] * 7
-        merged["Suggested Reorder"] = (merged["Forecast (7d)"] - merged["Projected Stock"]).clip(lower=0).round(0).astype(int)
-    
-        # === 7. Round key columns
-        for col in ["Stock", "Pending Out", "Coming In", "Avg Daily Usage", "Projected Stock", "Forecast (7d)"]:
-            merged[col] = merged[col].round(0).astype(int)
-    
-        # === 8. Alerts
-        low_stock = merged[(merged["Stock"] < 100) & (merged["Coming In"] == 0)]
-        risky_pending = merged[merged["Pending Out"] > merged["Coming In"]]
-    
-        if not low_stock.empty:
-            st.warning("🟠 Low stock with **no incoming rotors**:")
-            st.dataframe(low_stock[["Size (mm)", "Stock"]], use_container_width=True, hide_index=True)
-        else:
-            st.success("✅ No low stock sizes without incoming replenishment.")
-    
-        if not risky_pending.empty:
-            st.error("🔴 **Pending rotors exceed incoming** (Risk of shortage):")
-            st.dataframe(
-                risky_pending[["Size (mm)", "Pending Out", "Coming In"]],
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.success("✅ No rotor size has pending > incoming.")
-    
-        # === 9. Final Suggestions
-        reorder = merged[merged["Suggested Reorder"] > 0]
-        if not reorder.empty:
-            st.info("📦 Suggested Reorders for next 7 days:")
-            st.dataframe(
-                reorder[[
-                    "Size (mm)", "Stock", "Pending Out", "Coming In",
-                    "Avg Daily Usage", "Projected Stock", "Forecast (7d)", "Suggested Reorder"
-                ]].sort_values("Suggested Reorder", ascending=False),
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.success("🎉 No reorder needed based on current trends and future entries.")
+    else:
+        st.success("✅ All pending orders can be fulfilled with available and incoming stock.")
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
