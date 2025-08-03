@@ -650,6 +650,8 @@ with tabs[2]:
 
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
+    
+    
     df = df[df["Status"] != "Future"]  # Exclude future entries
 
     # Normalize input
@@ -684,7 +686,35 @@ with tabs[2]:
         end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
         df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
 
+    if "weight" in query and buyer_name:
+        outgoing_df = df[
+            (df["Type"] == "Outgoing") &
+            (df["Remarks"].str.lower().str.contains(buyer_name.lower()))
+        ].copy()
+    
+        if outgoing_df.empty:
+            st.info(f"No outgoing entries found for buyer: {buyer_name.title()}")
+            st.stop()
+    
+        # Calculate estimated weight
+        outgoing_df["Estimated Weight (kg)"] = outgoing_df.apply(
+            lambda row: ROTOR_WEIGHTS.get(row["Size (mm)"], 0) * row["Quantity"], axis=1
+        )
+    
+        total_weight = outgoing_df["Estimated Weight (kg)"].sum()
+    
+        st.success(f"📦 Estimated total weight for **{buyer_name.title()}**: **{total_weight:.2f} kg**")
+        st.dataframe(
+            outgoing_df[["Date", "Size (mm)", "Quantity", "Estimated Weight (kg)"]],
+            use_container_width=True,
+            hide_index=True
+        )
+        missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
+        if len(missing_sizes):
+            st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
+        st.stop()
     # CASE: 'pendings' or 'pending orders'
+    
     if re.search(r"\b(pendings|pending orders?)\b", query):
         pending_df = df[
             (df["Type"] == "Outgoing") &
@@ -779,33 +809,7 @@ with tabs[2]:
         st.stop()
 
     # === CASE: Buyer weight estimation ===
-    if "weight" in query and buyer_name:
-        outgoing_df = df[
-            (df["Type"] == "Outgoing") &
-            (df["Remarks"].str.lower().str.contains(buyer_name.lower()))
-        ].copy()
     
-        if outgoing_df.empty:
-            st.info(f"No outgoing entries found for buyer: {buyer_name.title()}")
-            st.stop()
-    
-        # Calculate estimated weight
-        outgoing_df["Estimated Weight (kg)"] = outgoing_df.apply(
-            lambda row: ROTOR_WEIGHTS.get(row["Size (mm)"], 0) * row["Quantity"], axis=1
-        )
-    
-        total_weight = outgoing_df["Estimated Weight (kg)"].sum()
-    
-        st.success(f"📦 Estimated total weight for **{buyer_name.title()}**: **{total_weight:.2f} kg**")
-        st.dataframe(
-            outgoing_df[["Date", "Size (mm)", "Quantity", "Estimated Weight (kg)"]],
-            use_container_width=True,
-            hide_index=True
-        )
-        missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
-        if len(missing_sizes):
-            st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
-        st.stop()
 
 
   
