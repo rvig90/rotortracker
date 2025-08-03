@@ -805,10 +805,7 @@ with tabs[2]:
         st.stop()
 
 
-    missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
-    
-    if len(missing_sizes):
-        st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
+  
 with tabs[3]:
     import openai
     import streamlit as st
