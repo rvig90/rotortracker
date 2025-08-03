@@ -22,7 +22,27 @@ import re
 import pandas as pd
 import os
 
+ROTOR_WEIGHT = {
+    80: 0.5,
+    100: 1,
+    110: 1.01,
+    120: 1.02,
+    125: 1.058,
+    130: 1.1,
+    140: 1.15,
+    150: 1.3,
+    160: 1.4,
+    170: 1.422,
+    180: 1.5,
+    200: 1.7,
+    225: 1.9,
+    260: 2.15,
+    2403: 1.46,
+    1803: 1,
+    2003: 1.1,
+}
 
+    
 
 
 
@@ -757,6 +777,37 @@ with tabs[2]:
         else:
             st.info("✅ No coming rotor entries found.")
         st.stop()
+
+
+    # === CASE: Buyer weight estimation ===
+    if "weight" in query and buyer_name:
+        outgoing_df = df[
+            (df["Type"] == "Outgoing") &
+            (df["Remarks"].str.lower().str.contains(buyer_name.lower()))
+        ].copy()
+    
+        if outgoing_df.empty:
+            st.info(f"No outgoing entries found for buyer: {buyer_name.title()}")
+            st.stop()
+    
+        # Calculate estimated weight
+        outgoing_df["Estimated Weight (kg)"] = outgoing_df.apply(
+            lambda row: ROTOR_WEIGHTS.get(row["Size (mm)"], 0) * row["Quantity"], axis=1
+        )
+    
+        total_weight = outgoing_df["Estimated Weight (kg)"].sum()
+    
+        st.success(f"📦 Estimated total weight for **{buyer_name.title()}**: **{total_weight:.2f} kg**")
+        st.dataframe(
+            outgoing_df[["Date", "Size (mm)", "Quantity", "Estimated Weight (kg)"]],
+            use_container_width=True,
+            hide_index=True
+        )
+        st.stop()
+        missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
+        
+        if len(missing_sizes):
+            st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
 with tabs[3]:
     import openai
     import streamlit as st
