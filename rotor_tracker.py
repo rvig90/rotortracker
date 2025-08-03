@@ -22,7 +22,7 @@ import re
 import pandas as pd
 import os
 
-ROTOR_WEIGHT = {
+ROTOR_WEIGHTS = {
     80: 0.5,
     100: 1,
     110: 1.01,
