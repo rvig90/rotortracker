@@ -271,50 +271,51 @@ with form_tabs[0]:
     # Final save button — only shown if conflict is resolved and entry is ready
     if st.session_state.get("conflict_resolved") and st.session_state.get("new_entry"):
         if st.button("💾 Save Entry"):
-            df = st.session_state.data.copy()
-            new_entry = st.session_state["new_entry"]
-
-            # Outgoing deduction from pending
-            if new_entry["Type"] == "Outgoing" and new_entry["Remarks"]:
-                buyer = new_entry["Remarks"].lower()
-                size = new_entry["Size (mm)"]
-                qty = new_entry["Quantity"]
-                pending = df[
-                    (df["Size (mm)"] == size) &
-                    (df["Remarks"].str.lower().str.contains(buyer)) &
-                    (df["Pending"] == True) &
-                    (df["Status"] == "Current")
-                ].sort_values("Date")
-                for idx, row in pending.iterrows():
-                    if qty <= 0:
-                        break
-                    pending_qty = int(row["Quantity"])
-                    if qty >= pending_qty:
-                        df.at[idx, "Quantity"] = 0
-                        df.at[idx, "Pending"] = False
-                        qty -= pending_qty
-                    else:
-                        df.at[idx, "Quantity"] = pending_qty - qty
-                        qty = 0
-                df = df[df["Quantity"] > 0]
-
-            # Append new entry
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            df["Date"] = df["Date"].astype(str)
-            st.session_state.data = df.reset_index(drop=True)
-
-            try:
-                auto_save_to_gsheet()
-                st.success("✅ Entry saved to Google Sheets.")
-            except Exception as e:
-                st.error(f"❌ Failed to save: {e}")
-
-            # Clear all session temp
-            st.session_state["new_entry"] = None
-            st.session_state["future_matches"] = None
-            st.session_state["selected_idx"] = None
-            st.session_state["conflict_resolved"] = False
-            st.session_state["action_required"] = False
+            with st.spinner("saving you entry..."):
+                df = st.session_state.data.copy()
+                new_entry = st.session_state["new_entry"]
+    
+                # Outgoing deduction from pending
+                if new_entry["Type"] == "Outgoing" and new_entry["Remarks"]:
+                    buyer = new_entry["Remarks"].lower()
+                    size = new_entry["Size (mm)"]
+                    qty = new_entry["Quantity"]
+                    pending = df[
+                        (df["Size (mm)"] == size) &
+                        (df["Remarks"].str.lower().str.contains(buyer)) &
+                        (df["Pending"] == True) &
+                        (df["Status"] == "Current")
+                    ].sort_values("Date")
+                    for idx, row in pending.iterrows():
+                        if qty <= 0:
+                            break
+                        pending_qty = int(row["Quantity"])
+                        if qty >= pending_qty:
+                            df.at[idx, "Quantity"] = 0
+                            df.at[idx, "Pending"] = False
+                            qty -= pending_qty
+                        else:
+                            df.at[idx, "Quantity"] = pending_qty - qty
+                            qty = 0
+                    df = df[df["Quantity"] > 0]
+    
+                # Append new entry
+                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                df["Date"] = df["Date"].astype(str)
+                st.session_state.data = df.reset_index(drop=True)
+    
+                try:
+                    auto_save_to_gsheet()
+                    st.success("✅ Entry saved to Google Sheets.")
+                except Exception as e:
+                    st.error(f"❌ Failed to save: {e}")
+    
+                # Clear all session temp
+                st.session_state["new_entry"] = None
+                st.session_state["future_matches"] = None
+                st.session_state["selected_idx"] = None
+                st.session_state["conflict_resolved"] = False
+                st.session_state["action_required"] = False
 
     if st.session_state.get("last_snapshot") is not None:
         if st.button(" undo last action"):
