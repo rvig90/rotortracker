@@ -22,25 +22,7 @@ import re
 import pandas as pd
 import os
 
-ROTOR_WEIGHTS = {
-    80: 0.5,
-    100: 1,
-    110: 1.01,
-    120: 1.02,
-    125: 1.058,
-    130: 1.1,
-    140: 1.15,
-    150: 1.3,
-    160: 1.4,
-    170: 1.422,
-    180: 1.5,
-    200: 1.7,
-    225: 1.9,
-    260: 2.15,
-    2403: 1.46,
-    1803: 1,
-    2003: 1.1,
-}
+
 
     
 
@@ -646,46 +628,72 @@ import pandas as pd
 
 with tabs[2]:
     st.subheader("💬 Rotor Chatbot Lite")
-    chat_query = st.text_input("Try: 'Buyer A June', '100mm last 5', 'Buyer B pending', 'Outgoing May', or '300mm stock'")
-
+    chat_query = st.text_input("Try: 'Buyer A June', '100mm last 5', 'Buyer B pending', 'Outgoing May', '300mm stock', or 'Buyer A weight'")
+    
     df = st.session_state.data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-    
-    
-    df = df[df["Status"] != "Future"]  # Exclude future entries
-
-    # Normalize input
     query = chat_query.lower()
-
-    # Extract month and optional year
+    
+    # Estimated rotor weights (kg)
+    ROTOR_WEIGHTS = {
+        80: 0.5,
+        100: 1,
+        110: 1.01,
+        120: 1.02,
+        125: 1.058,
+        130: 1.1,
+        140: 1.15,
+        150: 1.3,
+        160: 1.4,
+        170: 1.422,
+        180: 1.5,
+        200: 1.7,
+        225: 1.9,
+        260: 2.15,
+        2403: 1.46,
+        1803: 1,
+        2003: 1.1,
+        # Add more sizes as needed
+    }
+    
+    # ===== Extract Components =====
     month_match = re.search(r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b", query)
     year_match = re.search(r"(20\d{2})", query)
     month_name = month_match.group(1).capitalize() if month_match else None
     year = int(year_match.group(1)) if year_match else datetime.today().year
-
-    # Extract other keywords
+    
     rotor_match = re.search(r"(\d{2,6})\s*mm", query)
     rotor_size = int(rotor_match.group(1)) if rotor_match else None
-
+    
     last_n_match = re.search(r"last\s+(\d+)", query)
     entry_count = int(last_n_match.group(1)) if last_n_match else None
-
+    
     type_match = re.search(r"\b(inward|outgoing)\b", query)
     movement_type = type_match.group(1).capitalize() if type_match else None
-
+    
     is_pending = "pending" in query
-
-    # Remove known words to isolate possible buyer
-    cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|january|february|march|april|may|june|july|august|september|october|november|december|20\d{2})", "", query, flags=re.IGNORECASE)
+    
+    # Remove known terms to isolate buyer name
+    cleaned = re.sub(r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|weight|january|february|march|april|may|june|july|august|september|october|november|december|20\d{2})", "", query, flags=re.IGNORECASE)
     buyer_name = cleaned.strip()
-
-    # Filter for selected month
-    if month_name:
-        month_num = list(calendar.month_name).index(month_name)
-        start_date = datetime(year, month_num, 1)
-        end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
-        df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
-
+    
+    # ===== CASE: "coming rotors" =====
+    if query.strip() == "coming rotors":
+        coming_df = st.session_state.data.copy()
+        coming_df["Date"] = pd.to_datetime(coming_df["Date"], errors="coerce").dt.date
+        coming_df = coming_df[
+            (coming_df["Type"] == "Inward") &
+            (coming_df["Status"].str.lower() == "future")
+        ][["Date", "Size (mm)", "Quantity"]].sort_values("Date")
+    
+        if not coming_df.empty:
+            st.success("📅 Coming Rotors")
+            st.dataframe(coming_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("✅ No coming rotor entries found.")
+        st.stop()
+    
+    # ===== CASE: Buyer Weight Estimation =====
     if "weight" in query and buyer_name:
         outgoing_df = df[
             (df["Type"] == "Outgoing") &
@@ -696,11 +704,10 @@ with tabs[2]:
             st.info(f"No outgoing entries found for buyer: {buyer_name.title()}")
             st.stop()
     
-        # Calculate estimated weight
+        # Calculate weight
         outgoing_df["Estimated Weight (kg)"] = outgoing_df.apply(
             lambda row: ROTOR_WEIGHTS.get(row["Size (mm)"], 0) * row["Quantity"], axis=1
         )
-    
         total_weight = outgoing_df["Estimated Weight (kg)"].sum()
     
         st.success(f"📦 Estimated total weight for **{buyer_name.title()}**: **{total_weight:.2f} kg**")
@@ -709,12 +716,13 @@ with tabs[2]:
             use_container_width=True,
             hide_index=True
         )
+    
         missing_sizes = outgoing_df[~outgoing_df["Size (mm)"].isin(ROTOR_WEIGHTS.keys())]["Size (mm)"].unique()
         if len(missing_sizes):
             st.warning(f"⚠ No weight data for rotor sizes: {', '.join(map(str, missing_sizes))}")
         st.stop()
-    # CASE: 'pendings' or 'pending orders'
     
+    # ===== CASE: Pending Orders =====
     if re.search(r"\b(pendings|pending orders?)\b", query):
         pending_df = df[
             (df["Type"] == "Outgoing") &
@@ -737,28 +745,35 @@ with tabs[2]:
         else:
             st.info("✅ No pending orders found.")
         st.stop()
-
-    # === General Filter ===
+    
+    # ===== General Filters =====
+    df = df[df["Status"] != "Future"]
+    if month_name:
+        month_num = list(calendar.month_name).index(month_name)
+        start_date = datetime(year, month_num, 1)
+        end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
+        df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
+    
     filtered = df.copy()
     filters = []
-
+    
     if rotor_size:
         filtered = filtered[filtered["Size (mm)"] == rotor_size]
         filters.append(f"{rotor_size}mm")
-
+    
     if movement_type:
         filtered = filtered[filtered["Type"] == movement_type]
         filters.append(movement_type)
-
+    
     if is_pending:
         filtered = filtered[filtered["Pending"] == True]
         filters.append("Pending")
-
+    
     if buyer_name:
         filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
         filters.append(f"Buyer: {buyer_name}")
-
-    # === Display last N ===
+    
+    # ===== Show Last N Entries =====
     if entry_count:
         filtered = filtered.sort_values("Date", ascending=False).head(entry_count)
         title = f"📋 Last {entry_count} entries"
@@ -767,8 +782,8 @@ with tabs[2]:
         st.success(title)
         st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
         st.stop()
-
-    # === Display Stock ===
+    
+    # ===== Show Stock =====
     if "stock" in query and rotor_size:
         df["Net"] = df.apply(
             lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"] if not x["Pending"] else 0,
@@ -777,36 +792,20 @@ with tabs[2]:
         stock = df[df["Size (mm)"] == rotor_size]["Net"].sum()
         st.success(f"📦 Current stock for *{rotor_size}mm*: {int(stock)} units")
         st.stop()
-
+    
+    # ===== Final Output =====
     if not chat_query.strip():
         st.info("💬 Enter a query to begin.")
         st.stop()
-
-    # === Final Filtered Display ===
+    
     if not filtered.empty:
         title = f"📄 Entries"
         if filters:
             title += " for " + ", ".join(filters)
         st.success(title)
         st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-    elif chat_query.strip():
+    else:
         st.info("❓ No matching entries found. Try: Buyer A June, 250mm stock, Last 5 outgoing")
-
-    # CASE: "coming rotors"
-    if query.strip().lower() == "coming rotors":
-        coming_df = st.session_state.data.copy()
-        coming_df["Date"] = pd.to_datetime(coming_df["Date"], errors="coerce").dt.date
-        coming_df = coming_df[
-            (coming_df["Type"] == "Inward") &
-            (coming_df["Status"].str.lower() == "future")
-        ][["Date", "Size (mm)", "Quantity"]].sort_values("Date")
-
-        if not coming_df.empty:
-            st.success("📅 Coming Rotors")
-            st.dataframe(coming_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("✅ No coming rotor entries found.")
-        st.stop()
 
     # === CASE: Buyer weight estimation ===
     
