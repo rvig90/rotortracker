@@ -412,58 +412,7 @@ with tabs[0]:
     else:
         st.info("No data available yet.")
     # Stock alerts
-    st.subheader("🔔 Stock Alerts")
-
-    df = st.session_state.data.copy()
-    df["Date"] = pd.to_datetime(df["Date"])
-    
-    # Filter current entries and calculate stock
-    current = df[
-        (df["Status"] == "Current") &
-        (~df["Pending"])
-    ].copy()
-    
-    current["Net"] = current.apply(
-        lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"],
-        axis=1
-    )
-    
-    stock = current.groupby("Size (mm)")["Net"].sum().reset_index()
-    stock.columns = ["Size (mm)", "Current Stock"]
-    
-    # Get future rotors (inward)
-    future = df[
-        (df["Status"] == "Future") &
-        (df["Type"] == "Inward")
-    ].groupby("Size (mm)")["Quantity"].sum().reset_index()
-    future.columns = ["Size (mm)", "Coming Qty"]
-    
-    # Merge to identify which ones have no incoming
-    combined = pd.merge(stock, future, on="Size (mm)", how="left").fillna(0)
-    
-    # Alert if stock < 100 and no future quantity
-    alert_df = combined[
-        (combined["Current Stock"] < 100) &
-        (combined["Coming Qty"] == 0)
-    ]
-    
-    if not alert_df.empty:
-        st.warning("⚠ Low Stock Rotors with No Incoming Orders:")
-        st.dataframe(alert_df, use_container_width=True, hide_index=True)
-    else:
-        st.success("✅ All rotor sizes have sufficient stock or incoming orders.")
-
-    # Alert: Pending > 7 days
-    pending = st.session_state.data[
-        (st.session_state.data['Status'] == 'Current') &
-        (st.session_state.data['Pending'])
-    ].copy()
-    pending['Days Pending'] = (pd.Timestamp.today() - pd.to_datetime(pending['Date'])).dt.days
-    overdue = pending[pending['Days Pending'] > 7]
-
-    if not overdue.empty:
-        st.error("🚨 Overdue Pending Rotors (Pending > 7 days):")
-        st.dataframe(overdue[['Date', 'Size (mm)', 'Quantity', 'Remarks', 'Days Pending']], use_container_width=True, hide_index=True)     
+       
     
     from prophet import Prophet
     from datetime import datetime, timedelta
