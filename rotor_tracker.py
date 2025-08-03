@@ -421,65 +421,65 @@ with tabs[0]:
     
     
     import streamlit as st
-import pandas as pd
-
-st.subheader("🚨 Stock Risk Alerts")
-
-# Load current data
-df = st.session_state.data.copy()
-df["Date"] = pd.to_datetime(df["Date"])
-df["Remarks"] = df["Remarks"].fillna("").astype(str)
-
-# ===== GROUPING STOCK METRICS =====
-# 1. Current Stock (Inward - Outgoing, excluding Pending)
-current_df = df[
-    (df["Status"] == "Current") & (~df["Pending"])
-].copy()
-current_df["Net"] = current_df.apply(
-    lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
-)
-stock = current_df.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock"})
-
-# 2. Pending Outgoing
-pending_df = df[(df["Pending"] == True) & (df["Status"] == "Current")]
-pending_out = pending_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
-
-# 3. Future Inward
-future_df = df[(df["Status"] == "Future") & (df["Type"] == "Inward")]
-coming_in = future_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
-
-# ===== MERGE ALL SOURCES =====
-merged = stock.merge(pending_out, on="Size (mm)", how="outer") \
-              .merge(coming_in, on="Size (mm)", how="outer") \
-              .fillna(0)
-
-# Ensure all values are integers
-for col in ["Stock", "Pending Out", "Coming In"]:
-    merged[col] = merged[col].astype(int)
-
-# ===== ALERTS SECTION =====
-
-# 1️⃣ Low stock with no incoming rotors
-low_stock = merged[(merged["Stock"] < 100) & (merged["Coming In"] == 0)]
-
-if not low_stock.empty:
-    st.warning("🟠 Low stock (less than 100) with **no incoming rotors**:")
-    st.dataframe(low_stock[["Size (mm)", "Stock"]], use_container_width=True, hide_index=True)
-else:
-    st.success("✅ No low stock issues detected.")
-
-# 2️⃣ Pending orders exceed available supply (stock + incoming)
-risky_pending = merged[merged["Pending Out"] > (merged["Stock"] + merged["Coming In"])]
-
-if not risky_pending.empty:
-    st.error("🔴 Pending exceeds total available rotors (Stock + Incoming):")
-    st.dataframe(
-        risky_pending[["Size (mm)", "Stock", "Coming In", "Pending Out"]],
-        use_container_width=True,
-        hide_index=True
+    import pandas as pd
+    
+    st.subheader("🚨 Stock Risk Alerts")
+    
+    # Load current data
+    df = st.session_state.data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Remarks"] = df["Remarks"].fillna("").astype(str)
+    
+    # ===== GROUPING STOCK METRICS =====
+    # 1. Current Stock (Inward - Outgoing, excluding Pending)
+    current_df = df[
+        (df["Status"] == "Current") & (~df["Pending"])
+    ].copy()
+    current_df["Net"] = current_df.apply(
+        lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1
     )
-else:
-    st.success("✅ All pending orders can be fulfilled with available and incoming stock.")
+    stock = current_df.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Stock"})
+    
+    # 2. Pending Outgoing
+    pending_df = df[(df["Pending"] == True) & (df["Status"] == "Current")]
+    pending_out = pending_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Pending Out"})
+    
+    # 3. Future Inward
+    future_df = df[(df["Status"] == "Future") & (df["Type"] == "Inward")]
+    coming_in = future_df.groupby("Size (mm)")["Quantity"].sum().reset_index().rename(columns={"Quantity": "Coming In"})
+    
+    # ===== MERGE ALL SOURCES =====
+    merged = stock.merge(pending_out, on="Size (mm)", how="outer") \
+                  .merge(coming_in, on="Size (mm)", how="outer") \
+                  .fillna(0)
+    
+    # Ensure all values are integers
+    for col in ["Stock", "Pending Out", "Coming In"]:
+        merged[col] = merged[col].astype(int)
+    
+    # ===== ALERTS SECTION =====
+    
+    # 1️⃣ Low stock with no incoming rotors
+    low_stock = merged[(merged["Stock"] < 100) & (merged["Coming In"] == 0)]
+    
+    if not low_stock.empty:
+        st.warning("🟠 Low stock (less than 100) with **no incoming rotors**:")
+        st.dataframe(low_stock[["Size (mm)", "Stock"]], use_container_width=True, hide_index=True)
+    else:
+        st.success("✅ No low stock issues detected.")
+    
+    # 2️⃣ Pending orders exceed available supply (stock + incoming)
+    risky_pending = merged[merged["Pending Out"] > (merged["Stock"] + merged["Coming In"])]
+    
+    if not risky_pending.empty:
+        st.error("🔴 Pending exceeds total available rotors (Stock + Incoming):")
+        st.dataframe(
+            risky_pending[["Size (mm)", "Stock", "Coming In", "Pending Out"]],
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.success("✅ All pending orders can be fulfilled with available and incoming stock.")
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 # ====== MOVEMENT LOG WITH FIXED FILTERS ======
 with tabs[1]:
