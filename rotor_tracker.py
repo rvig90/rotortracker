@@ -635,7 +635,6 @@ with form_tabs[4]:
                 save_stator_to_sheet()
                 st.success("✅ Deleted.")
                 st.rerun()
-        
 
 with form_tabs[5]:
     st.subheader("📦 Log End Lamination Inward")
