@@ -1014,7 +1014,7 @@ with tabs[2]:
         st.stop()
 
     # === CASE: "130mm clitting left" ===
-    clitting_left_match = re.search(r"(\d{2,6})\s*mm.*clitting.*left", query)
+    clitting_left_match = re.search(r"(\d{2,6})\s*mm.*clitting.*", query)
     if clitting_left_match:
         size = int(clitting_left_match.group(1))
         
