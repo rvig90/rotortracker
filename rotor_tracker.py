@@ -456,6 +456,12 @@ with form_tabs[3]:
 
 with form_tabs[4]:
     st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
+    CLITTING_USAGE = {
+        100: 100,
+        130: 200,
+        120: 300,
+        125: 300,
+    }
     with st.form("stator_form"):
         stator_date = st.date_input("📅 Date", value=datetime.today())
         stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
