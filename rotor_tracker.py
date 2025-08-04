@@ -1013,6 +1013,25 @@ with tabs[2]:
             st.warning("⚠ Clitting stock is running low. Consider reordering.")
         st.stop()
 
+    # === CASE: "130mm clitting left" ===
+    clitting_left_match = re.search(r"(\d{2,6})\s*mm.*clitting.*left", query)
+    if clitting_left_match:
+        size = int(clitting_left_match.group(1))
+        
+        # Total clitting added
+        total_added = st.session_state.clitting_data[
+            st.session_state.clitting_data["Size (mm)"] == size
+        ].apply(lambda row: row["Bags"] * row["Weight per Bag (kg)"], axis=1).sum()
+    
+        # Total clitting used
+        total_used = st.session_state.stator_data[
+            st.session_state.stator_data["Size (mm)"] == size
+        ]["Estimated Clitting (kg)"].sum()
+    
+        remaining = total_added - total_used
+    
+        st.success(f"🔩 Remaining clitting for *{size}mm* stators: *{remaining:.2f} kg*")
+        st.stop()
   
 with tabs[3]:
     import openai
