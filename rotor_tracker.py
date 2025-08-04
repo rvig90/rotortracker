@@ -422,37 +422,43 @@ with form_tabs[2]:
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
             auto_save_to_gsheet()
             st.rerun()
-
-with form_tabs[3]:
-    st.subheader("📦 Log Clitting Inward (Bags)")
+with form_tabs[3]:  # Adjust index as per your tab structure
+    st.subheader("📦 Log Clitting Inward (by Stator Size)")
 
     with st.form("clitting_form"):
         clitting_date = st.date_input("📅 Date", value=datetime.today())
-        bags = st.number_input("🧳 Bags Received", min_value=1, step=1)
-        weight_per_bag = st.number_input("⚖ Weight per Bag (kg)", min_value=1.0, value=25.0)
-        remarks = st.text_input("📝 Remarks")
+        stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
+        bags = st.number_input("🧮 Bags", min_value=1, step=1)
+        weight_per_bag = st.number_input("⚖ Weight per Bag (kg)", value=25.0, step=0.5)
+        clitting_remarks = st.text_input("📝 Remarks")
 
-        if st.form_submit_button("➕ Add Clitting Entry"):
+        submitted = st.form_submit_button("📋 Add Clitting Stock")
+
+        if submitted:
             new_entry = {
-                "Date": clitting_date.strftime("%Y-%m-%d"),
-                "Bags": bags,
-                "Weight per Bag (kg)": weight_per_bag,
-                "Remarks": remarks.strip(),
+                "Date": clitting_date.strftime('%Y-%m-%d'),
+                "Size (mm)": int(stator_size),
+                "Bags": int(bags),
+                "Weight per Bag (kg)": float(weight_per_bag),
+                "Remarks": clitting_remarks.strip(),
                 "ID": str(uuid4())
             }
-            st.session_state.clitting_data = pd.concat(
-                [st.session_state.clitting_data, pd.DataFrame([new_entry])],
-                ignore_index=True
-            )
+
+            st.session_state.clitting_data = pd.concat([
+                st.session_state.clitting_data,
+                pd.DataFrame([new_entry])
+            ], ignore_index=True)
+
             save_clitting_to_sheet()
             st.success("✅ Clitting entry added.")
 
-    # Display log
+    # 📜 Show log below
     st.dataframe(
-        st.session_state.clitting_data[["Date", "Bags", "Weight per Bag (kg)", "Remarks"]],
+        st.session_state.clitting_data[["Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks"]],
         use_container_width=True,
         hide_index=True
     )
+
 
 with form_tabs[4]:
     st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
