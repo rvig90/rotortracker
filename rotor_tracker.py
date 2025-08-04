@@ -643,19 +643,19 @@ with form_tabs[4]:
         remaining = st.session_state[lam_df_key]["Quantity"].sum()
         if remaining < 100:
             st.warning(f"⚠️ {lamination_type} Lamination stock low: {int(remaining)} left")
-    stator_df = st.session_state.stator_data.copy()
-    if stator_df.empty:
-        st.info("No stator usage entries yet.")
-    else:
-        st.subheader("📜 Stator Usage Log")
-        for idx, row in stator_df.iterrows():
-            with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
-                st.write(f"*Estimated Clitting Used:* {row['Estimated Clitting (kg)']} kg")
-                st.write(f"*Remarks:* {row['Remarks']}")
-                if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
-                    st.session_state.stator_data = stator_df.drop(idx).reset_index(drop=True)
-                    st.success("✅ Deleted.")
-                    st.rerun()
+        stator_df = st.session_state.stator_data.copy()
+        if stator_df.empty:
+            st.info("No stator usage entries yet.")
+        else:
+            st.subheader("📜 Stator Usage Log")
+            for idx, row in stator_df.iterrows():
+                with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
+                    st.write(f"*Estimated Clitting Used:* {row['Estimated Clitting (kg)']} kg")
+                    st.write(f"*Remarks:* {row['Remarks']}")
+                    if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
+                        st.session_state.stator_data = stator_df.drop(idx).reset_index(drop=True)
+                        st.success("✅ Deleted.")
+                        st.rerun()
 
 with form_tabs[5]:
     st.subheader("📦 Log End Lamination Inward")
