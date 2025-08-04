@@ -33,7 +33,11 @@ if "stator_data" not in st.session_state:
     st.session_state.stator_data = pd.DataFrame(columns=[
         "Date", "Size (mm)", "Quantity", "Remarks", "Estimated Clitting (kg)", "ID"
     ])
+if "stator_data" not in st.session_state:
+    load_stator_from_sheet()
 
+if "clitting_data" not in st.session_state:
+    load_clitting_from_sheet()
 
     
 # ====== INITIALIZE DATA ======
@@ -524,6 +528,11 @@ with form_tabs[4]:
                 ignore_index=True
             )
             st.success(f"✅ Stator entry added. Estimated clitting used: {round(used_clitting, 2)} kg")
+            try:
+                save_stator_to_sheet()  # 🔁 Ensure this is being called
+                st.success(f"✅ Stator entry added and saved. Clitting used: {round(used_clitting, 2)} kg")
+            except Exception as e:
+                st.error(f"❌ Failed to save Stator Usage: {e}")
 
     stator_df = st.session_state.stator_data.copy()
     if stator_df.empty:
