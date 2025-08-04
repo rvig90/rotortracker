@@ -605,21 +605,7 @@ with form_tabs[4]:
                 "Lamination Type": lamination_type,  # ⬅ NEW FIELD
                 "ID": str(uuid4())
             }
-        else:
-            st.subheader("📜 Stator Usage Log")
-            for _, row in st.session_state.stator_data.iterrows():
-                with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
-                    st.write(f"*Clitting Used:* {row['Estimated Clitting (kg)']} kg")
-                    st.write(f"*Laminations Used:* {row.get('Laminations Used', 'N/A')} ({row.get('Lamination Type', 'N/A')})")
-                    st.write(f"*Remarks:* {row['Remarks']}")
-                    
-                    if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
-                        st.session_state.stator_data = st.session_state.stator_data[
-                            st.session_state.stator_data["ID"] != row["ID"]
-                        ].reset_index(drop=True)
-                        save_stator_to_sheet()
-                        st.success("✅ Deleted.")
-                        st.rerun()
+        
     
             st.session_state.stator_data = pd.concat(
                 [st.session_state.stator_data, pd.DataFrame([new_stator])],
@@ -634,6 +620,21 @@ with form_tabs[4]:
                 save_stator_to_sheet()
             except Exception as e:
                 st.error(f"❌ Failed to save Stator Usage: {e}")
+
+    st.subheader("📜 Stator Usage Log")
+    for _, row in st.session_state.stator_data.iterrows():
+        with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
+            st.write(f"*Clitting Used:* {row['Estimated Clitting (kg)']} kg")
+            st.write(f"*Laminations Used:* {row.get('Laminations Used', 'N/A')} ({row.get('Lamination Type', 'N/A')})")
+            st.write(f"*Remarks:* {row['Remarks']}")
+            
+            if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
+                st.session_state.stator_data = st.session_state.stator_data[
+                    st.session_state.stator_data["ID"] != row["ID"]
+                ].reset_index(drop=True)
+                save_stator_to_sheet()
+                st.success("✅ Deleted.")
+                st.rerun()
         
 
 with form_tabs[5]:
