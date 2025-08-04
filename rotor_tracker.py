@@ -618,6 +618,12 @@ with form_tabs[4]:
                     st.success("✅ Deleted.")
                     st.rerun()
 
+st.dataframe(
+    stator_df[["Date", "Size (mm)", "Quantity", "Estimated Clitting (kg)", "Laminations Used", "Remarks"]],
+    use_container_width=True,
+    hide_index=True
+)
+
 with form_tabs[5]:
     st.subheader("📦 Log End Lamination Inward")
 
