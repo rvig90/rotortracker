@@ -590,60 +590,59 @@ with form_tabs[4]:
         stator_remarks = st.text_input("📝 Remarks")
         submit_stator = st.form_submit_button("📋 Log Stator")
         
-
-           if submit_stator:
-                used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
-                lamination_used = int(stator_quantity) * 2
-                lam_df_key = "v4_laminations" if lamination_type == "V4" else "v3_laminations"
-            
-                # Deduct from lamination stock
-                lam_df = st.session_state[lam_df_key].copy()
-                lam_df = lam_df.sort_values("Date")
-                qty_to_deduct = lamination_used
-            
-                for idx, row in lam_df.iterrows():
-                    if qty_to_deduct <= 0:
-                        break
-                    current_qty = int(row["Quantity"])
-                    if qty_to_deduct >= current_qty:
-                        qty_to_deduct -= current_qty
-                        lam_df.at[idx, "Quantity"] = 0
-                    else:
-                        lam_df.at[idx, "Quantity"] = current_qty - qty_to_deduct
-                        qty_to_deduct = 0
-            
-                st.session_state[lam_df_key] = lam_df[lam_df["Quantity"] > 0]
-            
-                if lamination_type == "V4":
-                    save_v4_laminations_to_sheet()
-                else:
-                    save_v3_laminations_to_sheet()
-            
-                # Save stator usage log
-                new_stator = {
-                    "Date": stator_date.strftime("%Y-%m-%d"),
-                    "Size (mm)": int(stator_size),
-                    "Quantity": int(stator_quantity),
-                    "Remarks": stator_remarks.strip(),
-                    "Estimated Clitting (kg)": round(used_clitting, 2),
-                    "Laminations Used": lamination_used,
-                    "Lamination Type": lamination_type,
-                    "ID": str(uuid4())
-                }
-            
-                st.session_state.stator_data = pd.concat(
-                    [st.session_state.stator_data, pd.DataFrame([new_stator])],
-                    ignore_index=True
-                )
-            
-                save_stator_to_sheet()
-            
-                st.success(f"✅ Logged. Clitting: {used_clitting:.2f} kg | {lamination_used} {lamination_type} laminations used")
-            
-                # Alert if lamination stock low
-                remaining = st.session_state[lam_df_key]["Quantity"].sum()
-                if remaining < 100:
-                    st.warning(f"⚠️ {lamination_type} Lamination stock low: {int(remaining)} left")
+    if submit_stator:
+        used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
+        lamination_used = int(stator_quantity) * 2
+        lam_df_key = "v4_laminations" if lamination_type == "V4" else "v3_laminations"
+        
+        # Deduct from lamination stock
+        lam_df = st.session_state[lam_df_key].copy()
+        lam_df = lam_df.sort_values("Date")
+        qty_to_deduct = lamination_used
+        
+        for idx, row in lam_df.iterrows():
+            if qty_to_deduct <= 0:
+                break
+            current_qty = int(row["Quantity"])
+            if qty_to_deduct >= current_qty:
+                qty_to_deduct -= current_qty
+                lam_df.at[idx, "Quantity"] = 0
+            else:
+                lam_df.at[idx, "Quantity"] = current_qty - qty_to_deduct
+                qty_to_deduct = 0
+        
+        st.session_state[lam_df_key] = lam_df[lam_df["Quantity"] > 0]
+        
+        if lamination_type == "V4":
+            save_v4_laminations_to_sheet()
+        else:
+            save_v3_laminations_to_sheet()
+        
+        # Save stator usage log
+        new_stator = {
+            "Date": stator_date.strftime("%Y-%m-%d"),
+            "Size (mm)": int(stator_size),
+            "Quantity": int(stator_quantity),
+            "Remarks": stator_remarks.strip(),
+            "Estimated Clitting (kg)": round(used_clitting, 2),
+            "Laminations Used": lamination_used,
+            "Lamination Type": lamination_type,
+            "ID": str(uuid4())
+        }
+        
+        st.session_state.stator_data = pd.concat(
+            [st.session_state.stator_data, pd.DataFrame([new_stator])],
+            ignore_index=True
+        )
+        
+        save_stator_to_sheet()
+        
+        st.success(f"✅ Logged. Clitting: {used_clitting:.2f} kg | {lamination_used} {lamination_type} laminations used")
+        
+        # Alert if lamination stock low
+        remaining = st.session_state[lam_df_key]["Quantity"].sum()
+        if remaining < 100:
+            st.warning(f"⚠️ {lamination_type} Lamination stock low: {int(remaining)} left")
     stator_df = st.session_state.stator_data.copy()
     if stator_df.empty:
         st.info("No stator usage entries yet.")
