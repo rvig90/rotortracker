@@ -465,10 +465,10 @@ with form_tabs[3]:  # Adjust index as per your tab structure
 with form_tabs[4]:
     st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
     CLITTING_USAGE = {
-        100: 100,
-        130: 200,
-        120: 300,
-        125: 300,
+        100: 0.100,
+        130: 0.100,
+        120: 0.100,
+        125: 0.100,
     }
     with st.form("stator_form"):
         stator_date = st.date_input("📅 Date", value=datetime.today())
