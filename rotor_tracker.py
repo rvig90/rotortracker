@@ -578,22 +578,29 @@ with form_tabs[4]:
 
         if submit_stator:
             used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
+            lamination_used = int(stator_quantity) * 2  # 2 laminations per stator
+        
             new_stator = {
                 "Date": stator_date.strftime("%Y-%m-%d"),
                 "Size (mm)": int(stator_size),
                 "Quantity": int(stator_quantity),
                 "Remarks": stator_remarks.strip(),
                 "Estimated Clitting (kg)": round(used_clitting, 2),
+                "Laminations Used": lamination_used,
                 "ID": str(uuid4())
             }
+        
             st.session_state.stator_data = pd.concat(
                 [st.session_state.stator_data, pd.DataFrame([new_stator])],
                 ignore_index=True
             )
-            st.success(f"✅ Stator entry added. Estimated clitting used: {round(used_clitting, 2)} kg")
+        
+            st.success(
+                f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used}"
+            )
+        
             try:
-                save_stator_to_sheet()  # 🔁 Ensure this is being called
-                st.success(f"✅ Stator entry added and saved. Clitting used: {round(used_clitting, 2)} kg")
+                save_stator_to_sheet()
             except Exception as e:
                 st.error(f"❌ Failed to save Stator Usage: {e}")
 
