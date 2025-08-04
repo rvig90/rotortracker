@@ -584,41 +584,41 @@ with form_tabs[4]:
     }
 
     with st.form("stator_form"):
-    stator_date = st.date_input("📅 Date", value=datetime.today())
-    stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
-    stator_quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
-    lamination_type = st.selectbox("🔘 Lamination Type", options=["V3", "V4"])  # ⬅ NEW FIELD
-    stator_remarks = st.text_input("📝 Remarks")
-    submit_stator = st.form_submit_button("📋 Log Stator")
-
-    if submit_stator:
-        used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
-        lamination_used = int(stator_quantity) * 2  # 2 laminations per stator
-
-        new_stator = {
-            "Date": stator_date.strftime("%Y-%m-%d"),
-            "Size (mm)": int(stator_size),
-            "Quantity": int(stator_quantity),
-            "Remarks": stator_remarks.strip(),
-            "Estimated Clitting (kg)": round(used_clitting, 2),
-            "Laminations Used": lamination_used,
-            "Lamination Type": lamination_type,  # ⬅ NEW FIELD
-            "ID": str(uuid4())
-        }
-
-        st.session_state.stator_data = pd.concat(
-            [st.session_state.stator_data, pd.DataFrame([new_stator])],
-            ignore_index=True
-        )
-
-        st.success(
-            f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used} ({lamination_type})"
-        )
-
-        try:
-            save_stator_to_sheet()
-        except Exception as e:
-            st.error(f"❌ Failed to save Stator Usage: {e}")
+        stator_date = st.date_input("📅 Date", value=datetime.today())
+        stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
+        stator_quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
+        lamination_type = st.selectbox("🔘 Lamination Type", options=["V3", "V4"])  # ⬅ NEW FIELD
+        stator_remarks = st.text_input("📝 Remarks")
+        submit_stator = st.form_submit_button("📋 Log Stator")
+    
+        if submit_stator:
+            used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
+            lamination_used = int(stator_quantity) * 2  # 2 laminations per stator
+    
+            new_stator = {
+                "Date": stator_date.strftime("%Y-%m-%d"),
+                "Size (mm)": int(stator_size),
+                "Quantity": int(stator_quantity),
+                "Remarks": stator_remarks.strip(),
+                "Estimated Clitting (kg)": round(used_clitting, 2),
+                "Laminations Used": lamination_used,
+                "Lamination Type": lamination_type,  # ⬅ NEW FIELD
+                "ID": str(uuid4())
+            }
+    
+            st.session_state.stator_data = pd.concat(
+                [st.session_state.stator_data, pd.DataFrame([new_stator])],
+                ignore_index=True
+            )
+    
+            st.success(
+                f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used} ({lamination_type})"
+            )
+    
+            try:
+                save_stator_to_sheet()
+            except Exception as e:
+                st.error(f"❌ Failed to save Stator Usage: {e}")
         else:
             st.subheader("📜 Stator Usage Log")
             for _, row in st.session_state.stator_data.iterrows():
