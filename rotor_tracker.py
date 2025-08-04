@@ -424,7 +424,7 @@ with form_tabs[2]:
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
             auto_save_to_gsheet()
             st.rerun()
-with form_tabs[3]:  # Adjust index as per your tab structure
+with form_tabs[3]:
     st.subheader("📦 Log Clitting Inward (by Stator Size)")
 
     with st.form("clitting_form"):
@@ -433,7 +433,6 @@ with form_tabs[3]:  # Adjust index as per your tab structure
         bags = st.number_input("🧮 Bags", min_value=1, step=1)
         weight_per_bag = st.number_input("⚖ Weight per Bag (kg)", value=25.0, step=0.5)
         clitting_remarks = st.text_input("📝 Remarks")
-
         submitted = st.form_submit_button("📋 Add Clitting Stock")
 
         if submitted:
@@ -445,55 +444,45 @@ with form_tabs[3]:  # Adjust index as per your tab structure
                 "Remarks": clitting_remarks.strip(),
                 "ID": str(uuid4())
             }
-
             st.session_state.clitting_data = pd.concat([
                 st.session_state.clitting_data,
                 pd.DataFrame([new_entry])
             ], ignore_index=True)
-
             save_clitting_to_sheet()
             st.success("✅ Clitting entry added.")
-        st.subheader("📦 Clitting Inward Log")
 
-        clitting_df = st.session_state.clitting_data.copy()
-        
-        if clitting_df.empty:
-            st.info("No clitting entries yet.")
-        else:
-            for idx, row in clitting_df.iterrows():
-                with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | {row['Bags']} bag(s)"):
-                    st.write(f"*Weight/Bag:* {row['Weight per Bag (kg)']} kg")
-                    st.write(f"*Remarks:* {row['Remarks']}")
-                    if st.button("🗑 Delete Entry", key=f"delete_clitting_{row['ID']}"):
-                        st.session_state.clitting_data = clitting_df.drop(idx).reset_index(drop=True)
-                        st.success("✅ Entry deleted.")
-                        st.rerun()
-        
-
-    # 📜 Show log below
-    st.dataframe(
-        st.session_state.clitting_data[["Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks"]],
-        use_container_width=True,
-        hide_index=True
-    )
-
+    clitting_df = st.session_state.clitting_data.copy()
+    if clitting_df.empty:
+        st.info("No clitting entries yet.")
+    else:
+        st.subheader("📜 Clitting Log")
+        for idx, row in clitting_df.iterrows():
+            with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | {row['Bags']} bag(s)"):
+                st.write(f"*Weight/Bag:* {row['Weight per Bag (kg)']} kg")
+                st.write(f"*Remarks:* {row['Remarks']}")
+                if st.button("🗑 Delete", key=f"delete_clitting_{row['ID']}"):
+                    st.session_state.clitting_data = clitting_df.drop(idx).reset_index(drop=True)
+                    save_clitting_to_sheet()
+                    st.success("✅ Deleted.")
+                    st.rerun()
 
 with form_tabs[4]:
     st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
+
     CLITTING_USAGE = {
-        100: 0.100,
-        130: 0.100,
-        120: 0.100,
-        125: 0.100,
+        100: 0.04,
+        120: 0.05,
+        125: 0.05,
+        130: 0.05,
     }
+
     with st.form("stator_form"):
         stator_date = st.date_input("📅 Date", value=datetime.today())
         stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
         stator_quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
         stator_remarks = st.text_input("📝 Remarks")
-    
         submit_stator = st.form_submit_button("📋 Log Stator")
-    
+
         if submit_stator:
             used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
             new_stator = {
@@ -504,18 +493,25 @@ with form_tabs[4]:
                 "Estimated Clitting (kg)": round(used_clitting, 2),
                 "ID": str(uuid4())
             }
-    
-            st.session_state.stator_data = pd.concat([st.session_state.stator_data, pd.DataFrame([new_stator])], ignore_index=True)
+            st.session_state.stator_data = pd.concat(
+                [st.session_state.stator_data, pd.DataFrame([new_stator])],
+                ignore_index=True
+            )
             st.success(f"✅ Stator entry added. Estimated clitting used: {round(used_clitting, 2)} kg")
 
-    
-
-    # Display stator log
-    st.dataframe(
-        st.session_state.stator_data[["Date", "Size (mm)", "Quantity", "Estimated Clitting (kg)", "Remarks"]],
-        use_container_width=True,
-        hide_index=True
-    )
+    stator_df = st.session_state.stator_data.copy()
+    if stator_df.empty:
+        st.info("No stator usage entries yet.")
+    else:
+        st.subheader("📜 Stator Usage Log")
+        for idx, row in stator_df.iterrows():
+            with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
+                st.write(f"*Estimated Clitting Used:* {row['Estimated Clitting (kg)']} kg")
+                st.write(f"*Remarks:* {row['Remarks']}")
+                if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
+                    st.session_state.stator_data = stator_df.drop(idx).reset_index(drop=True)
+                    st.success("✅ Deleted.")
+                    st.rerun()
 
 # ====== STOCK SUMMARY ======
 tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
@@ -953,7 +949,29 @@ with tabs[2]:
 
     # === CASE: Buyer weight estimation ===
     
-
+    # CASE: Clitting Left or Balance
+    if re.search(r"\b(clitting (left|balance|available|remaining|stock)|how much clitting)\b", query):
+        # Total clitting received (in kg)
+        total_clitting_inward = 0
+        if "clitting_data" in st.session_state and not st.session_state.clitting_data.empty:
+            df_clit = st.session_state.clitting_data.copy()
+            total_clitting_inward = (df_clit["Bags"] * df_clit["Weight per Bag (kg)"]).sum()
+    
+        # Total clitting consumed (in kg)
+        total_clitting_used = 0
+        if "stator_data" in st.session_state and not st.session_state.stator_data.empty:
+            df_stat = st.session_state.stator_data.copy()
+            total_clitting_used = df_stat["Estimated Clitting (kg)"].sum()
+    
+        clitting_left = round(total_clitting_inward - total_clitting_used, 2)
+    
+        st.success(f"🧮 *Clitting Left:* {clitting_left} kg")
+        st.info(f"📥 Total Inward: {round(total_clitting_inward, 2)} kg | 🛠 Used: {round(total_clitting_used, 2)} kg")
+    
+        # Add warning if low
+        if clitting_left < 5:
+            st.warning("⚠ Clitting stock is running low. Consider reordering.")
+        st.stop()
 
   
 with tabs[3]:
