@@ -605,20 +605,6 @@ with form_tabs[4]:
                 "Lamination Type": lamination_type,  # ⬅ NEW FIELD
                 "ID": str(uuid4())
             }
-    
-            st.session_state.stator_data = pd.concat(
-                [st.session_state.stator_data, pd.DataFrame([new_stator])],
-                ignore_index=True
-            )
-    
-            st.success(
-                f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used} ({lamination_type})"
-            )
-    
-            try:
-                save_stator_to_sheet()
-            except Exception as e:
-                st.error(f"❌ Failed to save Stator Usage: {e}")
         else:
             st.subheader("📜 Stator Usage Log")
             for _, row in st.session_state.stator_data.iterrows():
@@ -634,6 +620,21 @@ with form_tabs[4]:
                         save_stator_to_sheet()
                         st.success("✅ Deleted.")
                         st.rerun()
+    
+            st.session_state.stator_data = pd.concat(
+                [st.session_state.stator_data, pd.DataFrame([new_stator])],
+                ignore_index=True
+            )
+    
+            st.success(
+                f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used} ({lamination_type})"
+            )
+    
+            try:
+                save_stator_to_sheet()
+            except Exception as e:
+                st.error(f"❌ Failed to save Stator Usage: {e}")
+        
 
 with form_tabs[5]:
     st.subheader("📦 Log End Lamination Inward")
