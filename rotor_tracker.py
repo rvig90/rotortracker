@@ -25,11 +25,7 @@ import os
 
 
 
-if "stator_data" not in st.session_state:
-    load_stator_from_sheet()
 
-if "clitting_data" not in st.session_state:
-    load_clitting_from_sheet()
 
     
 # ====== INITIALIZE DATA ======
@@ -228,6 +224,12 @@ def load_stator_from_sheet():
         st.session_state.stator_data = pd.DataFrame(columns=["Date", "Size (mm)", "Quantity", "Remarks", "Estimated Clitting (kg)", "ID"])
     except Exception as e:
         st.error(f"❌ Error loading stator data: {e}")
+
+if "stator_data" not in st.session_state:
+    load_stator_from_sheet()
+
+if "clitting_data" not in st.session_state:
+    load_clitting_from_sheet()
 
 # ====== MAIN APP ======
 if st.session_state.get("last_sync") == "Never":
