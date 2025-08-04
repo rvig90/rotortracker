@@ -578,8 +578,32 @@ with form_tabs[4]:
 
         if submit_stator:
             used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
-            lamination_used = int(stator_quantity) * 2  # 2 laminations per stator
+            lamination_used = int(stator_quantity) * 2
         
+            # Deduct laminations (assume V4 used for now — can adjust logic)
+            if not st.session_state.v4_laminations.empty:
+                v4 = st.session_state.v4_laminations.copy()
+                v4 = v4.sort_values("Date")
+                qty_to_deduct = lamination_used
+        
+                for idx, row in v4.iterrows():
+                    if qty_to_deduct <= 0:
+                        break
+                    current_qty = int(row["Quantity"])
+                    if qty_to_deduct >= current_qty:
+                        qty_to_deduct -= current_qty
+                        st.session_state.v4_laminations.at[idx, "Quantity"] = 0
+                    else:
+                        st.session_state.v4_laminations.at[idx, "Quantity"] = current_qty - qty_to_deduct
+                        qty_to_deduct = 0
+        
+                # Remove rows with 0
+                st.session_state.v4_laminations = st.session_state.v4_laminations[st.session_state.v4_laminations["Quantity"] > 0]
+                save_v4_laminations_to_sheet()
+            else:
+                st.warning("⚠️ No V4 laminations available for deduction.")
+        
+            # Save stator log
             new_stator = {
                 "Date": stator_date.strftime("%Y-%m-%d"),
                 "Size (mm)": int(stator_size),
@@ -594,35 +618,10 @@ with form_tabs[4]:
                 [st.session_state.stator_data, pd.DataFrame([new_stator])],
                 ignore_index=True
             )
+            save_stator_to_sheet()
         
-            st.success(
-                f"✅ Stator entry added. Clitting: {round(used_clitting, 2)} kg | Laminations: {lamination_used}"
-            )
-        
-            try:
-                save_stator_to_sheet()
-            except Exception as e:
-                st.error(f"❌ Failed to save Stator Usage: {e}")
+            st.success(f"✅ Logged. Clitting: {used_clitting:.2f} kg, Laminations used: {lamination_used}")
 
-    stator_df = st.session_state.stator_data.copy()
-    if stator_df.empty:
-        st.info("No stator usage entries yet.")
-    else:
-        st.subheader("📜 Stator Usage Log")
-        for idx, row in stator_df.iterrows():
-            with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
-                st.write(f"*Estimated Clitting Used:* {row['Estimated Clitting (kg)']} kg")
-                st.write(f"*Remarks:* {row['Remarks']}")
-                if st.button("🗑 Delete", key=f"delete_stator_{row['ID']}"):
-                    st.session_state.stator_data = stator_df.drop(idx).reset_index(drop=True)
-                    st.success("✅ Deleted.")
-                    st.rerun()
-
-st.dataframe(
-    stator_df[["Date", "Size (mm)", "Quantity", "Estimated Clitting (kg)", "Laminations Used", "Remarks"]],
-    use_container_width=True,
-    hide_index=True
-)
 
 with form_tabs[5]:
     st.subheader("📦 Log End Lamination Inward")
