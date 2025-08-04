@@ -150,6 +150,46 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 
+def save_clitting_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        # Check if 'Clitting' sheet exists, else create
+        try:
+            clitting_sheet = ss.worksheet("Clitting")
+        except gspread.WorksheetNotFound:
+            clitting_sheet = ss.add_worksheet(title="Clitting", rows="1000", cols="10")
+
+        clitting_sheet.clear()
+        df = st.session_state.clitting_data.copy()
+        if not df.empty:
+            clitting_sheet.update([df.columns.tolist()] + df.values.tolist())
+    except Exception as e:
+        st.error(f"❌ Failed to save Clitting log: {e}")
+
+def save_stator_usage_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        # Check if 'Stator Usage' sheet exists, else create
+        try:
+            stator_sheet = ss.worksheet("Stator Usage")
+        except gspread.WorksheetNotFound:
+            stator_sheet = ss.add_worksheet(title="Stator Usage", rows="1000", cols="10")
+
+        stator_sheet.clear()
+        df = st.session_state.stator_data.copy()
+        if not df.empty:
+            stator_sheet.update([df.columns.tolist()] + df.values.tolist())
+    except Exception as e:
+        st.error(f"❌ Failed to save Stator usage: {e}")
+
 # ====== MAIN APP ======
 if st.session_state.get("last_sync") == "Never":
     load_from_gsheet()
@@ -158,7 +198,13 @@ if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
 # ====== ENTRY FORMS ======
-form_tabs = st.tabs(["Current Movement", "Coming Rotors", "Pending Rotors"])
+form_tabs = st.tabs([
+    "Current Movement", 
+    "Coming Rotors", 
+    "Pending Rotors",
+    "📦 Clitting Inward",
+    "🛠 Stator Usage"
+])
 
 def add_entry(data_dict):
     data_dict['ID'] = str(uuid4())
@@ -372,6 +418,75 @@ with form_tabs[2]:
             st.session_state.data = pd.concat([st.session_state.data, new], ignore_index=True)
             auto_save_to_gsheet()
             st.rerun()
+
+with form_tabs[3]:
+    st.subheader("📦 Log Clitting Inward (Bags)")
+
+    with st.form("clitting_form"):
+        clitting_date = st.date_input("📅 Date", value=datetime.today())
+        bags = st.number_input("🧳 Bags Received", min_value=1, step=1)
+        weight_per_bag = st.number_input("⚖ Weight per Bag (kg)", min_value=1.0, value=25.0)
+        remarks = st.text_input("📝 Remarks")
+
+        if st.form_submit_button("➕ Add Clitting Entry"):
+            new_entry = {
+                "Date": clitting_date.strftime("%Y-%m-%d"),
+                "Bags": bags,
+                "Weight per Bag (kg)": weight_per_bag,
+                "Remarks": remarks.strip(),
+                "ID": str(uuid4())
+            }
+            st.session_state.clitting_data = pd.concat(
+                [st.session_state.clitting_data, pd.DataFrame([new_entry])],
+                ignore_index=True
+            )
+            save_clitting_to_sheet()
+            st.success("✅ Clitting entry added.")
+
+    # Display log
+    st.dataframe(
+        st.session_state.clitting_data[["Date", "Bags", "Weight per Bag (kg)", "Remarks"]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+with form_tabs[4]:
+    st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
+
+    with st.form("stator_form"):
+        stator_date = st.date_input("📅 Date", value=datetime.today())
+        stator_size = st.number_input("📐 Stator Size (mm)", min_value=1, step=1)
+        stator_qty = st.number_input("🔢 Quantity Made", min_value=1, step=1)
+        remarks = st.text_input("📝 Remarks")
+
+        # Clitting usage per stator (in grams)
+        usage_g_per_stator = 100
+        total_clitting_kg = (stator_qty * usage_g_per_stator) / 1000  # in kg
+
+        st.markdown(f"📊 Estimated clitting used: *{total_clitting_kg:.2f} kg*")
+
+        if st.form_submit_button("➕ Log Stator Usage"):
+            new_stator_entry = {
+                "Date": stator_date.strftime("%Y-%m-%d"),
+                "Size (mm)": stator_size,
+                "Quantity": stator_qty,
+                "Remarks": remarks.strip(),
+                "Estimated Clitting (kg)": total_clitting_kg,
+                "ID": str(uuid4())
+            }
+            st.session_state.stator_data = pd.concat(
+                [st.session_state.stator_data, pd.DataFrame([new_stator_entry])],
+                ignore_index=True
+            )
+            save_stator_usage_to_sheet()
+            st.success("✅ Stator usage logged.")
+
+    # Display stator log
+    st.dataframe(
+        st.session_state.stator_data[["Date", "Size (mm)", "Quantity", "Estimated Clitting (kg)", "Remarks"]],
+        use_container_width=True,
+        hide_index=True
+    )
 
 # ====== STOCK SUMMARY ======
 tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
