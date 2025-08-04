@@ -453,6 +453,22 @@ with form_tabs[3]:  # Adjust index as per your tab structure
 
             save_clitting_to_sheet()
             st.success("✅ Clitting entry added.")
+        st.subheader("📦 Clitting Inward Log")
+
+        clitting_df = st.session_state.clitting_data.copy()
+        
+        if clitting_df.empty:
+            st.info("No clitting entries yet.")
+        else:
+            for idx, row in clitting_df.iterrows():
+                with st.expander(f"📅 {row['Date']} | {row['Size (mm)']}mm | {row['Bags']} bag(s)"):
+                    st.write(f"*Weight/Bag:* {row['Weight per Bag (kg)']} kg")
+                    st.write(f"*Remarks:* {row['Remarks']}")
+                    if st.button("🗑 Delete Entry", key=f"delete_clitting_{row['ID']}"):
+                        st.session_state.clitting_data = clitting_df.drop(idx).reset_index(drop=True)
+                        st.success("✅ Entry deleted.")
+                        st.rerun()
+        
 
     # 📜 Show log below
     st.dataframe(
