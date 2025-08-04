@@ -24,7 +24,12 @@ import os
 
 
 
-
+if "stator_data" not in st.session_state:
+    st.session_state.stator_data = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Quantity", "Remarks", 
+        "Estimated Clitting (kg)", "Laminations Used", 
+        "Lamination Type", "ID"
+    ])
 
 
     
