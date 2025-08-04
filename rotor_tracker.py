@@ -176,25 +176,51 @@ def save_clitting_to_sheet():
     except Exception as e:
         st.error(f"❌ Failed to save Clitting log: {e}")
 
-def save_stator_usage_to_sheet():
+def save_stator_to_sheet():
     try:
         sheet = get_gsheet_connection()
         if not sheet:
             return
         ss = sheet.spreadsheet
 
-        # Check if 'Stator Usage' sheet exists, else create
+        # Try to get or create the Stator Usage sheet
         try:
-            stator_sheet = ss.worksheet("Stator Usage")
+            stator_ws = ss.worksheet("Stator Usage")
         except gspread.WorksheetNotFound:
-            stator_sheet = ss.add_worksheet(title="Stator Usage", rows="1000", cols="10")
+            stator_ws = ss.add_worksheet(title="Stator Usage", rows="1000", cols="10")
 
-        stator_sheet.clear()
+        # Save the data
         df = st.session_state.stator_data.copy()
-        if not df.empty:
-            stator_sheet.update([df.columns.tolist()] + df.values.tolist())
+        stator_ws.clear()
+        stator_ws.update([df.columns.tolist()] + df.values.tolist())
     except Exception as e:
-        st.error(f"❌ Failed to save Stator usage: {e}")
+        st.error(f"❌ Failed to save Stator Usage: {e}")
+
+def load_clitting_from_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+        clitting_ws = ss.worksheet("Clitting Log")
+        data = clitting_ws.get_all_records()
+        if data:
+            st.session_state.clitting_data = pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Error loading Clitting Log: {e}")
+
+def load_stator_from_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+        stator_ws = ss.worksheet("Stator Log")
+        data = stator_ws.get_all_records()
+        if data:
+            st.session_state.stator_data = pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Error loading Stator Log: {e}")
 
 # ====== MAIN APP ======
 if st.session_state.get("last_sync") == "Never":
