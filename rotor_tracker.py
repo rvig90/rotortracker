@@ -206,12 +206,21 @@ def load_clitting_from_sheet():
         if not sheet:
             return
         ss = sheet.spreadsheet
-        clitting_ws = ss.worksheet("Clitting Log")
-        data = clitting_ws.get_all_records()
-        if data:
-            st.session_state.clitting_data = pd.DataFrame(data)
+        try:
+            clitting_ws = ss.worksheet("Clitting")
+            records = clitting_ws.get_all_records()
+            if records:
+                st.session_state.clitting_data = pd.DataFrame(records)
+            else:
+                st.session_state.clitting_data = pd.DataFrame(columns=[
+                    "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
+                ])
+        except gspread.WorksheetNotFound:
+            st.session_state.clitting_data = pd.DataFrame(columns=[
+                "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
+            ])
     except Exception as e:
-        st.error(f"Error loading Clitting Log: {e}")
+        st.error(f"❌ Error loading clitting data: {e}")
 
 def load_stator_from_sheet():
     try:
@@ -219,12 +228,14 @@ def load_stator_from_sheet():
         if not sheet:
             return
         ss = sheet.spreadsheet
-        stator_ws = ss.worksheet("Stator Log")
-        data = stator_ws.get_all_records()
-        if data:
-            st.session_state.stator_data = pd.DataFrame(data)
+        stator_ws = ss.worksheet("Stator Usage")
+        records = stator_ws.get_all_records()
+        if records:
+            st.session_state.stator_data = pd.DataFrame(records)
+    except gspread.WorksheetNotFound:
+        st.session_state.stator_data = pd.DataFrame(columns=["Date", "Size (mm)", "Quantity", "Remarks", "Estimated Clitting (kg)", "ID"])
     except Exception as e:
-        st.error(f"Error loading Stator Log: {e}")
+        st.error(f"❌ Error loading stator data: {e}")
 
 # ====== MAIN APP ======
 if st.session_state.get("last_sync") == "Never":
