@@ -24,15 +24,7 @@ import os
 
 
 
-if "clitting_data" not in st.session_state:
-    st.session_state.clitting_data = pd.DataFrame(columns=[
-        "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
-    ])
 
-if "stator_data" not in st.session_state:
-    st.session_state.stator_data = pd.DataFrame(columns=[
-        "Date", "Size (mm)", "Quantity", "Remarks", "Estimated Clitting (kg)", "ID"
-    ])
 if "stator_data" not in st.session_state:
     load_stator_from_sheet()
 
