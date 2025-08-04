@@ -456,34 +456,29 @@ with form_tabs[3]:
 
 with form_tabs[4]:
     st.subheader("🛠 Log Stator Usage (Clitting Consumption Tracker)")
-
     with st.form("stator_form"):
         stator_date = st.date_input("📅 Date", value=datetime.today())
-        stator_size = st.number_input("📐 Stator Size (mm)", min_value=1, step=1)
-        stator_qty = st.number_input("🔢 Quantity Made", min_value=1, step=1)
-        remarks = st.text_input("📝 Remarks")
-
-        # Clitting usage per stator (in grams)
-        usage_g_per_stator = 100
-        total_clitting_kg = (stator_qty * usage_g_per_stator) / 1000  # in kg
-
-        st.markdown(f"📊 Estimated clitting used: *{total_clitting_kg:.2f} kg*")
-
-        if st.form_submit_button("➕ Log Stator Usage"):
-            new_stator_entry = {
+        stator_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
+        stator_quantity = st.number_input("🔢 Quantity", min_value=1, step=1)
+        stator_remarks = st.text_input("📝 Remarks")
+    
+        submit_stator = st.form_submit_button("📋 Log Stator")
+    
+        if submit_stator:
+            used_clitting = CLITTING_USAGE.get(stator_size, 0) * int(stator_quantity)
+            new_stator = {
                 "Date": stator_date.strftime("%Y-%m-%d"),
-                "Size (mm)": stator_size,
-                "Quantity": stator_qty,
-                "Remarks": remarks.strip(),
-                "Estimated Clitting (kg)": total_clitting_kg,
+                "Size (mm)": int(stator_size),
+                "Quantity": int(stator_quantity),
+                "Remarks": stator_remarks.strip(),
+                "Estimated Clitting (kg)": round(used_clitting, 2),
                 "ID": str(uuid4())
             }
-            st.session_state.stator_data = pd.concat(
-                [st.session_state.stator_data, pd.DataFrame([new_stator_entry])],
-                ignore_index=True
-            )
-            save_stator_usage_to_sheet()
-            st.success("✅ Stator usage logged.")
+    
+            st.session_state.stator_data = pd.concat([st.session_state.stator_data, pd.DataFrame([new_stator])], ignore_index=True)
+            st.success(f"✅ Stator entry added. Estimated clitting used: {round(used_clitting, 2)} kg")
+
+    
 
     # Display stator log
     st.dataframe(
