@@ -280,7 +280,7 @@ def load_lamination_from_sheet():
 
 
 if "lamination_data" not in st.session_state:
-    load_lamination_from_sheet():
+    load_lamination_from_sheet()
     
 if "stator_data" not in st.session_state:
     load_stator_from_sheet()
