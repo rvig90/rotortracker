@@ -188,6 +188,27 @@ def save_stator_to_sheet():
     except Exception as e:
         st.error(f"❌ Failed to save Stator Usage: {e}")
 
+def save_lamination_to_sheet(version="v4"):
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        title = "V4 Laminations" if version == "v4" else "V3 Laminations"
+        data = st.session_state.lamination_v4 if version == "v4" else st.session_state.lamination_v3
+
+        try:
+            lam_sheet = ss.worksheet(title)
+        except gspread.WorksheetNotFound:
+            lam_sheet = ss.add_worksheet(title=title, rows="1000", cols="5")
+
+        lam_sheet.clear()
+        if not data.empty:
+            lam_sheet.update([data.columns.tolist()] + data.values.tolist())
+    except Exception as e:
+        st.error(f"❌ Failed to save {version.upper()} Laminations: {e}")
+
 def load_clitting_from_sheet():
     try:
         sheet = get_gsheet_connection()
@@ -225,6 +246,42 @@ def load_stator_from_sheet():
     except Exception as e:
         st.error(f"❌ Error loading stator data: {e}")
 
+def load_lamination_from_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        # === Load V4 ===
+        try:
+            v4_ws = ss.worksheet("V4 Laminations")
+            records = v4_ws.get_all_records()
+            if records:
+                st.session_state.lamination_v4 = pd.DataFrame(records)
+            else:
+                st.session_state.lamination_v4 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+        except gspread.WorksheetNotFound:
+            st.session_state.lamination_v4 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+
+        # === Load V3 ===
+        try:
+            v3_ws = ss.worksheet("V3 Laminations")
+            records = v3_ws.get_all_records()
+            if records:
+                st.session_state.lamination_v3 = pd.DataFrame(records)
+            else:
+                st.session_state.lamination_v3 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+        except gspread.WorksheetNotFound:
+            st.session_state.lamination_v3 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+
+    except Exception as e:
+        st.error(f"❌ Error loading lamination data: {e}")
+
+
+if "lamination_data" not in st.session_state:
+    load_lamination_from_sheet():
+    
 if "stator_data" not in st.session_state:
     load_stator_from_sheet()
 
@@ -244,7 +301,8 @@ form_tabs = st.tabs([
     "Coming Rotors", 
     "Pending Rotors",
     "📦 Clitting Inward",
-    "🛠 Stator Usage"
+    "🛠 Stator Usage",
+    "📦 End Lamination Inward"
 ])
 
 def add_entry(data_dict):
@@ -552,6 +610,51 @@ with form_tabs[4]:
                     st.session_state.stator_data = stator_df.drop(idx).reset_index(drop=True)
                     st.success("✅ Deleted.")
                     st.rerun()
+
+with form_tabs[5]:
+    st.subheader("📦 Log End Lamination Inward")
+
+    with st.form("lamination_form"):
+        lam_date = st.date_input("📅 Date", value=datetime.today())
+        lam_type = st.selectbox("🧾 Lamination Type", ["V4", "V3"])
+        lam_qty = st.number_input("🔢 Quantity (Numbers)", min_value=1, step=1)
+        lam_remarks = st.text_input("📝 Remarks")
+
+        submit_lam = st.form_submit_button("📋 Add Lamination Stock")
+
+        if submit_lam:
+            new_lam = {
+                "Date": lam_date.strftime('%Y-%m-%d'),
+                "Quantity": int(lam_qty),
+                "Remarks": lam_remarks.strip(),
+                "ID": str(uuid4())
+            }
+
+            if lam_type == "V4":
+                st.session_state.lamination_v4 = pd.concat([
+                    st.session_state.lamination_v4,
+                    pd.DataFrame([new_lam])
+                ], ignore_index=True)
+                save_lamination_to_sheet("v4")
+            else:
+                st.session_state.lamination_v3 = pd.concat([
+                    st.session_state.lamination_v3,
+                    pd.DataFrame([new_lam])
+                ], ignore_index=True)
+                save_lamination_to_sheet("v3")
+
+            st.success(f"✅ {lam_type} Lamination entry added.")
+
+    # Show log
+    if lam_type == "V4":
+        df = st.session_state.lamination_v4.copy()
+    else:
+        df = st.session_state.lamination_v3.copy()
+
+    if df.empty:
+        st.info(f"No {lam_type} lamination entries yet.")
+    else:
+        st.dataframe(df[["Date", "Quantity", "Remarks"]], use_container_width=True, hide_index=True)
 
 # ====== STOCK SUMMARY ======
 tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
