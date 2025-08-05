@@ -32,11 +32,7 @@ from uuid import uuid4
 
 # === Auto-load logic ===
 def load_all_data():
-    if 'data' not in st.session_state:
-        st.session_state.data = pd.DataFrame(columns=[
-            'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
-        ])
-        load_from_gsheet()
+ 
 
     if 'stator_data' not in st.session_state:
         try:
