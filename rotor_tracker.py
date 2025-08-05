@@ -23,22 +23,6 @@ import pandas as pd
 import os
 
 
-def ensure_sheet_data_loaded():
-    # Rotor movement
-    if "data" not in st.session_state:
-        load_from_gsheet()
-
-    # Clitting
-    if "clitting_data" not in st.session_state:
-        load_clitting_from_sheet()
-
-    # Stator usage
-    if "stator_data" not in st.session_state:
-        load_stator_from_sheet()
-
-    # Laminations
-    if "lamination_v4" not in st.session_state or "lamination_v3" not in st.session_state:
-        load_lamination_from_sheet()
 
 
 
@@ -336,6 +320,22 @@ def load_lamination_from_sheet():
     except Exception as e:
         st.error(f"❌ Error loading lamination data: {e}")
 
+def ensure_sheet_data_loaded():
+    # Rotor movement
+    if "data" not in st.session_state:
+        load_from_gsheet()
+
+    # Clitting
+    if "clitting_data" not in st.session_state:
+        load_clitting_from_sheet()
+
+    # Stator usage
+    if "stator_data" not in st.session_state:
+        load_stator_from_sheet()
+
+    # Laminations
+    if "lamination_v4" not in st.session_state or "lamination_v3" not in st.session_state:
+        load_lamination_from_sheet()
 
 
 
