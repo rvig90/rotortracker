@@ -25,7 +25,48 @@ import os
 
 
 
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from uuid import uuid4
 
+# === Auto-load logic ===
+def load_all_data():
+    if 'data' not in st.session_state:
+        st.session_state.data = pd.DataFrame(columns=[
+            'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
+        ])
+        load_from_gsheet()
+
+    if 'stator_data' not in st.session_state:
+        try:
+            load_stator_from_sheet()
+        except:
+            st.session_state.stator_data = pd.DataFrame(columns=[
+                "Date", "Size (mm)", "Quantity", "Remarks", 
+                "Estimated Clitting (kg)", "Laminations Used", 
+                "Lamination Type", "ID"
+            ])
+
+    if 'clitting_data' not in st.session_state:
+        try:
+            load_clitting_from_sheet()
+        except:
+            st.session_state.clitting_data = pd.DataFrame(columns=[
+                "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
+            ])
+
+    if 'lamination_v4' not in st.session_state:
+        st.session_state.lamination_v4 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+    if 'lamination_v3' not in st.session_state:
+        st.session_state.lamination_v3 = pd.DataFrame(columns=["Date", "Quantity", "Remarks", "ID"])
+    try:
+        load_lamination_from_sheet()
+    except:
+        pass  # If error, fallback to initialized empty data above
+
+# === Run autoload on script start ===
+load_all_data()
     
 # ====== INITIALIZE DATA ======
 if 'data' not in st.session_state:
