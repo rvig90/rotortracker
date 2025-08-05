@@ -71,6 +71,34 @@ def normalize_pending_column(df):
     )
     return df
 
+# ✅ Ensure stator_data is initialized before use
+if "stator_data" not in st.session_state:
+    try:
+        # Try loading from Google Sheet first
+        load_stator_from_sheet()
+
+        # If load failed or resulted in empty, make sure it has correct columns
+        if st.session_state.stator_data.empty:
+            st.session_state.stator_data = pd.DataFrame(columns=[
+                "Date", "Size (mm)", "Quantity", "Remarks", 
+                "Estimated Clitting (kg)", "Laminations Used", 
+                "Lamination Type", "ID"
+            ])
+        else:
+            # Ensure all required columns exist in the loaded data
+            for col in ["Date", "Size (mm)", "Quantity", "Remarks", 
+                        "Estimated Clitting (kg)", "Laminations Used", 
+                        "Lamination Type", "ID"]:
+                if col not in st.session_state.stator_data.columns:
+                    st.session_state.stator_data[col] = ""
+    except Exception as e:
+        st.warning(f"⚠ Could not load stator data from sheet, using empty table. Error: {e}")
+        st.session_state.stator_data = pd.DataFrame(columns=[
+            "Date", "Size (mm)", "Quantity", "Remarks", 
+            "Estimated Clitting (kg)", "Laminations Used", 
+            "Lamination Type", "ID"
+        ])
+
 def safe_delete_entry(id_to_delete):
     try:
         df = st.session_state.data
