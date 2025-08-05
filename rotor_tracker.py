@@ -58,7 +58,7 @@ def display_logo():
         st.title("Rotor Tracker")
 
 display_logo()
-ensure_sheet_data_loaded()
+
 # ====== HELPER FUNCTIONS ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
