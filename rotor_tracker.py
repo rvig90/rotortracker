@@ -23,13 +23,23 @@ import pandas as pd
 import os
 
 
+def ensure_sheet_data_loaded():
+    # Rotor movement
+    if "data" not in st.session_state:
+        load_from_gsheet()
 
-if "stator_data" not in st.session_state:
-    st.session_state.stator_data = pd.DataFrame(columns=[
-        "Date", "Size (mm)", "Quantity", "Remarks", 
-        "Estimated Clitting (kg)", "Laminations Used", 
-        "Lamination Type", "ID"
-    ])
+    # Clitting
+    if "clitting_data" not in st.session_state:
+        load_clitting_from_sheet()
+
+    # Stator usage
+    if "stator_data" not in st.session_state:
+        load_stator_from_sheet()
+
+    # Laminations
+    if "lamination_v4" not in st.session_state or "lamination_v3" not in st.session_state:
+        load_lamination_from_sheet()
+
 
 
     
@@ -64,6 +74,7 @@ def display_logo():
         st.title("Rotor Tracker")
 
 display_logo()
+ensure_sheet_data_loaded()
 # ====== HELPER FUNCTIONS ======
 def normalize_pending_column(df):
     df['Pending'] = df['Pending'].apply(
@@ -326,14 +337,7 @@ def load_lamination_from_sheet():
         st.error(f"❌ Error loading lamination data: {e}")
 
 
-if "lamination_data" not in st.session_state:
-    load_lamination_from_sheet()
-    
-if "stator_data" not in st.session_state:
-    load_stator_from_sheet()
 
-if "clitting_data" not in st.session_state:
-    load_clitting_from_sheet()
 
 # ====== MAIN APP ======
 if st.session_state.get("last_sync") == "Never":
