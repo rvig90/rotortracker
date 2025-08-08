@@ -1355,22 +1355,31 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     # ✅ Lamination Logs (Table + Editable)
     for lam_type in ["V3", "V4"]:
         st.markdown(f"### 📄 {lam_type} Lamination Log")
+    
         lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
         lam_df = st.session_state[lam_key].copy()
-        if not lam_df.empty:
+    
+        # 🧼 Clean and validate DataFrame for editing
+        lam_df.columns = lam_df.columns.astype(str)  # Ensure column names are strings
+        if 'Date' in lam_df.columns:
+            lam_df['Date'] = lam_df['Date'].astype(str)
+    
+        try:
             edited_lam = st.data_editor(
                 lam_df,
-                key=f"edit_lam_{lam_type}",
-                num_rows="dynamic",
                 use_container_width=True,
-                column_config={
-                    "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
-                }
+                num_rows="dynamic",
+                key=f"{lam_type}_lam_editor"
             )
-            if edited_lam.equals(lam_df) is False:
+    
+            # 🧠 Save if changed
+            if not edited_lam.equals(st.session_state[lam_key]):
                 st.session_state[lam_key] = edited_lam
                 save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
-                st.success(f"✅ {lam_type} Laminations updated.")
+                st.success(f"✅ Saved changes to {lam_type} Laminations")
+    
+        except Exception as e:
+            st.error(f"❌ Error displaying {lam_type} log: {e}")
     
     st.divider()
     
