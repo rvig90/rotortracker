@@ -1266,164 +1266,174 @@ if st.session_state["lamination_v4"].empty:
 if st.session_state["stator_data"].empty:
     st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
 elif tab_choice == "🧰 Clitting + Laminations + Stators":
+    st.title("📦 Clitting + Laminations + Stator Outgoings")
 
-    st.title("🧰 Clitting + Laminations + Stators")
-
-# ✅ Paste the full working block I gave you earlier here:
-# Includes clitting form, lamination form, stator usage form, logs, deletes, auto deductions
-    with st.sidebar:
-        material_tab = st.radio("📊 Tracker Tabs", ["Rotor Tracker", "📦 Clitting + Laminations + Stators"])
+    CLITTING_USAGE = {
+        100: 0.04,
+        120: 0.05,
+        125: 0.05,
+        130: 0.05,
+    }
     
-    if material_tab == "📦 Clitting + Laminations + Stators":
-        st.title("📦 Clitting + Laminations + Stator Outgoings")
+    # ---------- Section 1: Clitting Inward ----------
+    st.subheader("📥 Clitting Inward")
     
-        CLITTING_USAGE = {
-            100: 0.04,
-            120: 0.05,
-            125: 0.05,
-            130: 0.05,
-        }
+    with st.form("clitting_form"):
+        c_date = st.date_input("📅 Date", value=datetime.today())
+        c_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
+        c_bags = st.number_input("🧮 Bags", min_value=1, step=1)
+        c_weight = st.number_input("⚖ Weight per Bag (kg)", value=25.0, step=0.5)
+        c_remarks = st.text_input("📝 Remarks")
+        if st.form_submit_button("➕ Add Clitting"):
+            entry = {
+                "Date": c_date.strftime("%Y-%m-%d"),
+                "Size (mm)": int(c_size),
+                "Bags": int(c_bags),
+                "Weight per Bag (kg)": float(c_weight),
+                "Remarks": c_remarks.strip(),
+                "ID": str(uuid4())
+            }
+            st.session_state.clitting_data = pd.concat(
+                [st.session_state.clitting_data, pd.DataFrame([entry])],
+                ignore_index=True
+            )
+            save_clitting_to_sheet()
+            st.success("✅ Clitting entry added.")
     
-        # ---------- Section 1: Clitting Inward ----------
-        st.subheader("📥 Clitting Inward")
+    # ✅ Clitting Log Table with Edit + Delete
+    st.markdown("### 📄 Clitting Log")
+    clitting_df = st.session_state.clitting_data.copy()
+    if not clitting_df.empty:
+        edited_clitting = st.data_editor(
+            clitting_df,
+            key="edit_clitting_log",
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
+            }
+        )
+        if edited_clitting.equals(clitting_df) is False:
+            st.session_state.clitting_data = edited_clitting
+            save_clitting_to_sheet()
+            st.success("✅ Clitting log updated.")
     
-        with st.form("clitting_form"):
-            c_date = st.date_input("📅 Date", value=datetime.today())
-            c_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
-            c_bags = st.number_input("🧮 Bags", min_value=1, step=1)
-            c_weight = st.number_input("⚖ Weight per Bag (kg)", value=25.0, step=0.5)
-            c_remarks = st.text_input("📝 Remarks")
-            if st.form_submit_button("➕ Add Clitting"):
-                entry = {
-                    "Date": c_date.strftime("%Y-%m-%d"),
-                    "Size (mm)": int(c_size),
-                    "Bags": int(c_bags),
-                    "Weight per Bag (kg)": float(c_weight),
-                    "Remarks": c_remarks.strip(),
-                    "ID": str(uuid4())
+    # ---------- Section 2: Laminations Inward ----------
+    st.subheader("📥 Laminations Inward (V3 / V4)")
+    
+    with st.form("lamination_form"):
+        l_date = st.date_input("📅 Date", value=datetime.today(), key="lam_date")
+        l_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"])
+        l_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
+        l_remarks = st.text_input("📝 Remarks", key="lam_remarks")
+        if st.form_submit_button("➕ Add Laminations"):
+            entry = {
+                "Date": l_date.strftime("%Y-%m-%d"),
+                "Quantity": int(l_qty),
+                "Remarks": l_remarks.strip(),
+                "ID": str(uuid4())
+            }
+            lam_key = "lamination_v3" if l_type == "V3" else "lamination_v4"
+            st.session_state[lam_key] = pd.concat(
+                [st.session_state[lam_key], pd.DataFrame([entry])],
+                ignore_index=True
+            )
+            save_lamination_to_sheet("v3" if l_type == "V3" else "v4")
+            st.success(f"✅ {l_type} Lamination entry added.")
+    
+    # ✅ Lamination Logs (Table + Editable)
+    for lam_type in ["V3", "V4"]:
+        st.markdown(f"### 📄 {lam_type} Lamination Log")
+        lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
+        lam_df = st.session_state[lam_key].copy()
+        if not lam_df.empty:
+            edited_lam = st.data_editor(
+                lam_df,
+                key=f"edit_lam_{lam_type}",
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config={
+                    "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
                 }
-                st.session_state.clitting_data = pd.concat(
-                    [st.session_state.clitting_data, pd.DataFrame([entry])],
-                    ignore_index=True
-                )
-                save_clitting_to_sheet()
-                st.success("✅ Clitting entry added.")
+            )
+            if edited_lam.equals(lam_df) is False:
+                st.session_state[lam_key] = edited_lam
+                save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
+                st.success(f"✅ {lam_type} Laminations updated.")
     
-        st.markdown("### 📄 Clitting Log")
-        for idx, row in st.session_state.clitting_data.iterrows():
-            with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | {row['Bags']} bag(s)"):
-                st.write(f"**Weight/Bag:** {row['Weight per Bag (kg)']} kg")
-                st.write(f"**Remarks:** {row['Remarks']}")
-                col1, col2 = st.columns([1, 1])
-                if col1.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
-                    st.session_state.clitting_data.drop(idx, inplace=True)
-                    st.session_state.clitting_data.reset_index(drop=True, inplace=True)
-                    save_clitting_to_sheet()
-                    st.rerun()
+    st.divider()
     
-        st.divider()
+    # ---------- Section 3: Stator Outgoings ----------
+    st.subheader("📤 Stator Outgoings")
     
-        # ---------- Section 2: Laminations Inward ----------
-        st.subheader("📥 Laminations Inward (V3 / V4)")
+    with st.form("stator_form"):
+        s_date = st.date_input("📅 Date", value=datetime.today(), key="stat_date")
+        s_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1, key="stat_size")
+        s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
+        s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
+        s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
+        if st.form_submit_button("📋 Log Stator Outgoing"):
+            clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
+            laminations_used = int(s_qty) * 2
     
-        with st.form("lamination_form"):
-            l_date = st.date_input("📅 Date", value=datetime.today(), key="lam_date")
-            l_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"])
-            l_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
-            l_remarks = st.text_input("📝 Remarks", key="lam_remarks")
-            if st.form_submit_button("➕ Add Laminations"):
-                entry = {
-                    "Date": l_date.strftime("%Y-%m-%d"),
-                    "Quantity": int(l_qty),
-                    "Remarks": l_remarks.strip(),
-                    "ID": str(uuid4())
-                }
-                key = "lamination_v3" if l_type == "V3" else "lamination_v4"
-                st.session_state[key] = pd.concat(
-                    [st.session_state[key], pd.DataFrame([entry])],
-                    ignore_index=True
-                )
-                save_lamination_to_sheet("v3" if l_type == "V3" else "v4")
-                st.success(f"✅ {l_type} Lamination entry added.")
+            new_entry = {
+                "Date": s_date.strftime("%Y-%m-%d"),
+                "Size (mm)": int(s_size),
+                "Quantity": int(s_qty),
+                "Remarks": s_remarks.strip(),
+                "Estimated Clitting (kg)": round(clitting_used, 2),
+                "Laminations Used": laminations_used,
+                "Lamination Type": s_type,
+                "ID": str(uuid4())
+            }
     
-        for lam_type in ["V3", "V4"]:
-            st.markdown(f"### 📄 {lam_type} Lamination Log")
-            lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
-            lam_df = st.session_state[lam_key]
+            st.session_state.stator_data = pd.concat(
+                [st.session_state.stator_data, pd.DataFrame([new_entry])],
+                ignore_index=True
+            )
+            save_stator_to_sheet()
+    
+            # Deduct laminations
+            lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
+            lam_df = st.session_state[lam_key].copy()
+            total_needed = laminations_used
+    
             for idx, row in lam_df.iterrows():
-                with st.expander(f"{row['Date']} | Qty: {row['Quantity']}"):
-                    st.write(f"**Remarks:** {row['Remarks']}")
-                    if st.button("🗑 Delete", key=f"del_lam_{lam_type}_{row['ID']}"):
-                        st.session_state[lan_key] = st.session_state[lam_key].drop(idx, inplace=True)
-                        st.session_state[lam_key].reset_index(drop=True, inplace=True)
-                        save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
-                        st.rerun()
+                if total_needed <= 0:
+                    break
+                available = int(row["Quantity"])
+                if total_needed >= available:
+                    total_needed -= available
+                    lam_df.at[idx, "Quantity"] = 0
+                else:
+                    lam_df.at[idx, "Quantity"] = available - total_needed
+                    total_needed = 0
     
-        st.divider()
+            lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
+            st.session_state[lam_key] = lam_df
+            save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
     
-        # ---------- Section 3: Stator Outgoings ----------
-        st.subheader("📤 Stator Outgoings")
+            st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
+            st.rerun()
     
-        with st.form("stator_form"):
-            s_date = st.date_input("📅 Date", value=datetime.today(), key="stat_date")
-            s_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1, key="stat_size")
-            s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
-            s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
-            s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
-            if st.form_submit_button("📋 Log Stator Outgoing"):
-                clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
-                laminations_used = int(s_qty) * 2
-    
-                new_entry = {
-                    "Date": s_date.strftime("%Y-%m-%d"),
-                    "Size (mm)": int(s_size),
-                    "Quantity": int(s_qty),
-                    "Remarks": s_remarks.strip(),
-                    "Estimated Clitting (kg)": round(clitting_used, 2),
-                    "Laminations Used": laminations_used,
-                    "Lamination Type": s_type,
-                    "ID": str(uuid4())
-                }
-    
-                st.session_state.stator_data = pd.concat(
-                    [st.session_state.stator_data, pd.DataFrame([new_entry])],
-                    ignore_index=True
-                )
-                save_stator_to_sheet()
-    
-                # Deduct laminations
-                lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
-                lam_df = st.session_state[lam_key].copy()
-                total_needed = laminations_used
-    
-                for idx, row in lam_df.iterrows():
-                    if total_needed <= 0:
-                        break
-                    available = int(row["Quantity"])
-                    if total_needed >= available:
-                        total_needed -= available
-                        lam_df.at[idx, "Quantity"] = 0
-                    else:
-                        lam_df.at[idx, "Quantity"] = available - total_needed
-                        total_needed = 0
-                lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
-                st.session_state[lam_key] = lam_df
-                save_lamination_to_sheet("v3" if s_type == "V3 Laminations" else "V4 Laminations")
-    
-                st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
-                st.rerun()
-    
-        st.markdown("### 📄 Stator Usage Log")
-        for idx, row in st.session_state.stator_data.iterrows():
-            with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
-                st.write(f"**Clitting Used:** {row['Estimated Clitting (kg)']} kg")
-                st.write(f"**Laminations Used:** {row['Laminations Used']} ({row['Lamination Type']})")
-                st.write(f"**Remarks:** {row['Remarks']}")
-                if st.button("🗑 Delete", key=f"del_stator_{row['ID']}"):
-                    st.session_state.stator_data.drop(idx, inplace=True)
-                    st.session_state.stator_data.reset_index(drop=True, inplace=True)
-                    save_stator_to_sheet()
-                    st.rerun()
+    # ✅ Stator Usage Log Table with Edit + Delete
+    st.markdown("### 📄 Stator Usage Log")
+    stator_df = st.session_state.stator_data.copy()
+    if not stator_df.empty:
+        edited_stator = st.data_editor(
+            stator_df,
+            key="edit_stator_log",
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
+            }
+        )
+        if edited_stator.equals(stator_df) is False:
+            st.session_state.stator_data = edited_stator
+            save_stator_to_sheet()
+            st.success("✅ Stator usage log updated.")
+
 
     # 🔌 Streamlit API endpoint for Swift
     
