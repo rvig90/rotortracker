@@ -1408,7 +1408,7 @@ if tab_choice == "🧰 Clitting + Laminations + Stators":
                         total_needed = 0
                 lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
                 st.session_state[lam_key] = lam_df
-                save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
+                save_lamination_to_sheet("v3" if s_type == "V3 Laminations" else "V4 Laminations")
     
                 st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
                 st.rerun()
