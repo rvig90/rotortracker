@@ -1310,7 +1310,7 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
         lam_df = st.session_state[lam_key].copy()
 
         for idx, row in lam_df.iterrows():
-            with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
+            with st.expander(f"{row['Date']} | Qty: {row['Quantity']}"):
                 col1, col2 = st.columns([1, 2])
                 with col1:
                     if st.button("🗑", key=f"del_lam_{lam_type}_{row['ID']}"):
