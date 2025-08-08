@@ -1140,7 +1140,26 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+def save_stator_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
 
+        # Check or create "Stator Usage" worksheet
+        try:
+            stator_ws = ss.worksheet("Stator Usage")
+        except gspread.WorksheetNotFound:
+            stator_ws = ss.add_worksheet(title="Stator Usage", rows="1000", cols="10")
+
+        # Save DataFrame to sheet
+        df = st.session_state.stator_data.copy()
+        stator_ws.clear()
+        stator_ws.update([df.columns.tolist()] + df.values.tolist())
+
+    except Exception as e:
+        st.error(f"❌ Failed to save Stator Usage: {e}")
 def get_gsheet_connection():
     scope = [
         "https://spreadsheets.google.com/feeds",
