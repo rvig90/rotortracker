@@ -1325,8 +1325,7 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     if st.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
         df = st.session_state.clitting_data
         st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
-        save_clitting_to_sheet()
-        st.rerun()
+        
     if st.button("💾 Save Edited Clitting Log"):
         try:
             # Convert back columns that need to be numeric (optional)
