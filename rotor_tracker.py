@@ -1407,13 +1407,17 @@ for idx, row in st.session_state.clitting_data.iterrows():
     total_kg = int(row["Bags"]) * float(row["Weight per Bag (kg)"])
     clitting_summary[size] = clitting_summary.get(size, 0) + total_kg
 
-# Subtract consumed clitting
+
+
 for idx, row in st.session_state.stator_data.iterrows():
-    size = int(row["Size (mm)"])
-    used = float(row["Estimated Clitting (kg)"])
-    if size in clitting_summary:
-        clitting_summary[size] -= used
-        clitting_summary[size] = max(clitting_summary[size], 0)  # no negative stock
+    try:
+        size = int(row["Size (mm)"])
+        used = float(row.get("Estimated Clitting (kg)", 0)) or 0
+        if size in clitting_summary:
+            clitting_summary[size] -= used
+            clitting_summary[size] = max(clitting_summary[size], 0)
+    except (ValueError, TypeError, KeyError):
+        continue  # Skip faulty rows silently  # no negative stock
 
 # Show clitting summary
 if clitting_summary:
