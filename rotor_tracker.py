@@ -1303,20 +1303,31 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     # ✅ Clitting Log Table with Edit + Delete
     st.markdown("### 📄 Clitting Log")
     clitting_df = st.session_state.clitting_data.copy()
-    if not clitting_df.empty:
-        edited_clitting = st.data_editor(
-            clitting_df,
-            key="edit_clitting_log",
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
-            }
-        )
-        if edited_clitting.equals(clitting_df) is False:
-            st.session_state.clitting_data = edited_clitting
-            save_clitting_to_sheet()
-            st.success("✅ Clitting log updated.")
+
+    # Ensure correct data types for editable columns
+    clitting_df["Date"] = pd.to_datetime(clitting_df["Date"], errors="coerce")
+    clitting_df["Size (mm)"] = clitting_df["Size (mm)"].astype(int)
+    clitting_df["Bags"] = clitting_df["Bags"].astype(int)
+    clitting_df["Weight per Bag (kg)"] = clitting_df["Weight per Bag (kg)"].astype(float)
+    clitting_df["Remarks"] = clitting_df["Remarks"].astype(str)
+    
+    # Do NOT allow editing of ID
+    editable_clitting_df = clitting_df.drop(columns=["ID"])
+    
+    # Now display
+    edited_clitting = st.data_editor(
+        editable_clitting_df,
+        key="edit_clitting_log",
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "Size (mm)": st.column_config.NumberColumn(step=1),
+            "Bags": st.column_config.NumberColumn(step=1),
+            "Weight per Bag (kg)": st.column_config.NumberColumn(format="%.2f", step=0.5),
+            "Remarks": st.column_config.TextColumn()
+        }
+    )
     
     # ---------- Section 2: Laminations Inward ----------
     st.subheader("📥 Laminations Inward (V3 / V4)")
