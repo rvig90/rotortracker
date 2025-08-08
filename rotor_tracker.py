@@ -1341,7 +1341,7 @@ with st.form("stator_form"):
 
     if st.form_submit_button("📋 Log Stator Outgoing"):
         size_key = int(s_size)
-        clitting_per_stator = CLITTING_USAGE.get(size_key,size_key = 0.0004)
+        clitting_per_stator = CLITTING_USAGE.get(size_key,size_key * 0.0004)
         clitting_used = clitting_per_stator * int(s_qty)
         laminations_used = int(s_qty) * 2
 
