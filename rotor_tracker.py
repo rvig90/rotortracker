@@ -1226,7 +1226,7 @@ if st.session_state["stator_data"].empty:
 
 
 
-elif tab_choice == "🧰 Clitting + Laminations + Stators":
+tab_choice == "🧰 Clitting + Laminations + Stators":
     st.title("🧰 Clitting + Laminations + Stator Outgoings")
 
     CLITTING_USAGE = {
