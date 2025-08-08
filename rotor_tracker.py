@@ -1254,6 +1254,16 @@ def load_from_sheet(sheet_title, default_columns):
     except gspread.WorksheetNotFound:
         pass
     return pd.DataFrame(columns=default_columns)
+
+def clean_for_editor(df):
+    return df.astype(str).fillna("")
+
+def save_lamination_to_sheet(l_type):
+    if l_type == "v3":
+        save_v3_laminations_to_sheet()
+    elif l_type == "v4":
+        save_v4_laminations_to_sheet()
+
 if st.session_state["clitting_data"].empty:
     st.session_state["clitting_data"] = load_from_sheet("Clitting", st.session_state["clitting_data"].columns)
 
@@ -1300,34 +1310,29 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
             save_clitting_to_sheet()
             st.success("✅ Clitting entry added.")
     
-    # ✅ Clitting Log Table with Edit + Delete
-    st.markdown("### 📄 Clitting Log")
-    clitting_df = st.session_state.clitting_data.copy()
+    
+    st.subheader("📄 Clitting Log")
 
-    # Ensure correct data types for editable columns
-    clitting_df["Date"] = pd.to_datetime(clitting_df["Date"], errors="coerce")
-    clitting_df["Size (mm)"] = clitting_df["Size (mm)"].astype(int)
-    clitting_df["Bags"] = clitting_df["Bags"].astype(int)
-    clitting_df["Weight per Bag (kg)"] = clitting_df["Weight per Bag (kg)"].astype(float)
-    clitting_df["Remarks"] = clitting_df["Remarks"].astype(str)
+    clitting_df = clean_for_editor(st.session_state["clitting_data"])
     
-    # Do NOT allow editing of ID
-    editable_clitting_df = clitting_df.drop(columns=["ID"])
-    
-    # Now display
     edited_clitting = st.data_editor(
-        editable_clitting_df,
-        key="edit_clitting_log",
-        num_rows="dynamic",
+        clitting_df,
         use_container_width=True,
-        column_config={
-            "Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
-            "Size (mm)": st.column_config.NumberColumn(step=1),
-            "Bags": st.column_config.NumberColumn(step=1),
-            "Weight per Bag (kg)": st.column_config.NumberColumn(format="%.2f", step=0.5),
-            "Remarks": st.column_config.TextColumn()
-        }
+        key="edit_clitting_log"
     )
+    
+    if st.button("💾 Save Edited Clitting Log"):
+        try:
+            # Convert back columns that need to be numeric (optional)
+            edited_clitting["Size (mm)"] = edited_clitting["Size (mm)"].astype(int)
+            edited_clitting["Bags"] = edited_clitting["Bags"].astype(int)
+            edited_clitting["Weight per Bag (kg)"] = edited_clitting["Weight per Bag (kg)"].astype(float)
+    
+            st.session_state["clitting_data"] = edited_clitting
+            save_clitting_to_sheet()
+            st.success("✅ Clitting log saved.")
+        except Exception as e:
+            st.error(f"❌ Error saving clitting log: {e}")
     
     # ---------- Section 2: Laminations Inward ----------
     st.subheader("📥 Laminations Inward (V3 / V4)")
@@ -1357,21 +1362,22 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
         st.markdown(f"### 📄 {lam_type} Lamination Log")
     
         lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
-        lam_df = st.session_state[lam_key].copy()
+        lam_df = clean_for_editor(st.session_state[lam_key])
     
-        # 🧼 Clean and validate DataFrame for editing
-        lam_df.columns = lam_df.columns.astype(str)  # Ensure column names are strings
-        if 'Date' in lam_df.columns:
-            lam_df['Date'] = lam_df['Date'].astype(str)
+        edited_lam = st.data_editor(
+            lam_df,
+            use_container_width=True,
+            key=f"edit_{lam_type.lower()}_lamination"
+        )
     
-        try:
-            edited_lam = st.data_editor(
-                lam_df,
-                use_container_width=True,
-                num_rows="dynamic",
-                key=f"{lam_type}_lam_editor"
-            )
-    
+        if st.button(f"💾 Save Edited {lam_type} Log"):
+            try:
+                edited_lam["Quantity"] = edited_lam["Quantity"].astype(int)
+                st.session_state[lam_key] = edited_lam
+                save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
+                st.success(f"✅ {lam_type} log saved.")
+            except Exception as e:
+                st.error(f"❌ Error saving {lam_type} log: {e}")
             # 🧠 Save if changed
             if not edited_lam.equals(st.session_state[lam_key]):
                 st.session_state[lam_key] = edited_lam
@@ -1436,23 +1442,28 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
             st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
             st.rerun()
     
-    # ✅ Stator Usage Log Table with Edit + Delete
-    st.markdown("### 📄 Stator Usage Log")
-    stator_df = st.session_state.stator_data.copy()
-    if not stator_df.empty:
-        edited_stator = st.data_editor(
-            stator_df,
-            key="edit_stator_log",
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "Date": st.column_config.DateColumn(format="YYYY-MM-DD")
-            }
-        )
-        if edited_stator.equals(stator_df) is False:
-            st.session_state.stator_data = edited_stator
+    st.subheader("📄 Stator Usage Log")
+
+    stator_df = clean_for_editor(st.session_state["stator_data"])
+    
+    edited_stator = st.data_editor(
+        stator_df,
+        use_container_width=True,
+        key="edit_stator_log"
+    )
+    
+    if st.button("💾 Save Edited Stator Log"):
+        try:
+            edited_stator["Size (mm)"] = edited_stator["Size (mm)"].astype(int)
+            edited_stator["Quantity"] = edited_stator["Quantity"].astype(int)
+            edited_stator["Estimated Clitting (kg)"] = edited_stator["Estimated Clitting (kg)"].astype(float)
+            edited_stator["Laminations Used"] = edited_stator["Laminations Used"].astype(int)
+    
+            st.session_state["stator_data"] = edited_stator
             save_stator_to_sheet()
-            st.success("✅ Stator usage log updated.")
+            st.success("✅ Stator log saved.")
+        except Exception as e:
+            st.error(f"❌ Error saving stator log: {e}")
 
 
     # 🔌 Streamlit API endpoint for Swift
