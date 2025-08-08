@@ -39,17 +39,7 @@ for key, cols in {
     if key not in st.session_state:
         st.session_state[key] = pd.DataFrame(columns=cols)
 
-if st.session_state["clitting_data"].empty:
-    st.session_state["clitting_data"] = load_from_sheet("Clitting", st.session_state["clitting_data"].columns)
 
-if st.session_state["lamination_v3"].empty:
-    st.session_state["lamination_v3"] = load_from_sheet("V3 Laminations", st.session_state["lamination_v3"].columns)
-
-if st.session_state["lamination_v4"].empty:
-    st.session_state["lamination_v4"] = load_from_sheet("V4 Laminations", st.session_state["lamination_v4"].columns)
-
-if st.session_state["stator_data"].empty:
-    st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
 
 
 
@@ -1146,7 +1136,17 @@ if tab_choice == "🔁 Rotor Tracker":
 
 import streamlit as st
 import json
+if st.session_state["clitting_data"].empty:
+    st.session_state["clitting_data"] = load_from_sheet("Clitting", st.session_state["clitting_data"].columns)
 
+if st.session_state["lamination_v3"].empty:
+    st.session_state["lamination_v3"] = load_from_sheet("V3 Laminations", st.session_state["lamination_v3"].columns)
+
+if st.session_state["lamination_v4"].empty:
+    st.session_state["lamination_v4"] = load_from_sheet("V4 Laminations", st.session_state["lamination_v4"].columns)
+
+if st.session_state["stator_data"].empty:
+    st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
 if tab_choice == "🧰 Clitting + Laminations + Stators":
 
     st.title("🧰 Clitting + Laminations + Stators")
