@@ -1265,7 +1265,7 @@ if st.session_state["lamination_v4"].empty:
 
 if st.session_state["stator_data"].empty:
     st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
-if tab_choice == "🧰 Clitting + Laminations + Stators":
+elif tab_choice == "🧰 Clitting + Laminations + Stators":
 
     st.title("🧰 Clitting + Laminations + Stators")
 
@@ -1356,7 +1356,7 @@ if tab_choice == "🧰 Clitting + Laminations + Stators":
                     if st.button("🗑 Delete", key=f"del_lam_{lam_type}_{row['ID']}"):
                         st.session_state[lam_key].drop(idx, inplace=True)
                         st.session_state[lam_key].reset_index(drop=True, inplace=True)
-                        save_lamination_to_sheet("v3" if lam_type == "V3 Laminations" else "V4 Laminations")
+                        save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
                         st.rerun()
     
         st.divider()
