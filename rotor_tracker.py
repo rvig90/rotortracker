@@ -1148,7 +1148,8 @@ import streamlit as st
 import json
 
 elif tab_choice == "🧰 Clitting + Laminations + Stators":
-    st.title("🧰 Clitting + Laminations + Stators")
+
+st.title("🧰 Clitting + Laminations + Stators")
 
 # ✅ Paste the full working block I gave you earlier here:
 # Includes clitting form, lamination form, stator usage form, logs, deletes, auto deductions
