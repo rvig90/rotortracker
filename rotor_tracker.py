@@ -1136,6 +1136,46 @@ if tab_choice == "🔁 Rotor Tracker":
 
 import streamlit as st
 import json
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
+
+def get_gsheet_connection():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds_dict = json.loads(st.secrets["gcp_service_account"])
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    return gspread.authorize(creds).open("Rotor Log")  # Replace with your GSheet name
+
+# Save helpers
+def save_to_sheet(dataframe, sheet_title):
+    try:
+        ss = get_gsheet_connection()
+        try:
+            ws = ss.worksheet(sheet_title)
+        except gspread.WorksheetNotFound:
+            ws = ss.add_worksheet(title=sheet_title, rows="1000", cols="20")
+        ws.clear()
+        if not dataframe.empty:
+            ws.update([dataframe.columns.tolist()] + dataframe.values.tolist())
+    except Exception as e:
+        st.error(f"❌ Error saving to {sheet_title}: {e}")
+
+# Load helpers
+def load_from_sheet(sheet_title, default_columns):
+    try:
+        ss = get_gsheet_connection()
+        ws = ss.worksheet(sheet_title)
+        records = ws.get_all_records()
+        if records:
+            return pd.DataFrame(records)
+    except gspread.WorksheetNotFound:
+        pass
+    return pd.DataFrame(columns=default_columns)
 if st.session_state["clitting_data"].empty:
     st.session_state["clitting_data"] = load_from_sheet("Clitting", st.session_state["clitting_data"].columns)
 
