@@ -1383,9 +1383,10 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
                 st.session_state[lam_key] = edited_lam
                 save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
                 st.success(f"✅ Saved changes to {lam_type} Laminations")
+
+            
     
-            except Exception as e:
-                st.error(f"❌ Error displaying {lam_type} log: {e}")
+            
     
     st.divider()
     
