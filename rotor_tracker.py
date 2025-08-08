@@ -1405,66 +1405,7 @@ for idx, row in st.session_state.stator_data.iterrows():
                 st.success("✅ Entry updated.")
 
 # ----- Inventory Summary -----
-st.divider()
-st.header("📊 Inventory Summary")
 
-# ----- Clitting Summary -----
-st.subheader("🧮 Clitting Left (in kg)")
-clitting_summary = {}
-
-# Add all inward
-for idx, row in st.session_state.clitting_data.iterrows():
-    size = int(row["Size (mm)"])
-    total_kg = int(row["Bags"]) * float(row["Weight per Bag (kg)"])
-    clitting_summary[size] = clitting_summary.get(size, 0) + total_kg
-
-# Subtract all usage
-# Subtract all usage
-for idx, row in st.session_state.stator_data.iterrows():
-    try:
-        size = int(row["Size (mm)"])
-        used = float(row.get("Estimated Clitting (kg)", 0)) or 0
-        if size in clitting_summary:
-            clitting_summary[size] -= used
-            clitting_summary[size] = max(clitting_summary[size], 0)  # no negatives
-    except (ValueError, TypeError, KeyError) as e:
-        st.warning(f"Couldn't process stator row {idx}: {e}")
-        continue
-
-# Display
-if clitting_summary:
-    for size, kg in sorted(clitting_summary.items()):
-        st.markdown(f"• **{size}mm** → `{kg:.2f} kg` left")
-else:
-    st.info("No clitting data available.")
-
-# ----- Lamination Summary -----
-st.subheader("🧩 Laminations Left (in Qty)")
-
-def lam_summary(lam_df):
-    summary = {}
-    for idx, row in lam_df.iterrows():
-        size = int(row["Size (mm)"])
-        qty = int(row["Quantity"])
-        summary[size] = summary.get(size, 0) + qty
-    return summary
-
-v3_summary = lam_summary(st.session_state["lamination_v3"])
-v4_summary = lam_summary(st.session_state["lamination_v4"])
-
-if v3_summary:
-    st.markdown("**🔹 V3 Laminations**")
-    for size, qty in sorted(v3_summary.items()):
-        st.markdown(f"• **{size}mm** → `{qty}` left")
-else:
-    st.info("No V3 lamination data available.")
-
-if v4_summary:
-    st.markdown("**🔹 V4 Laminations**")
-    for size, qty in sorted(v4_summary.items()):
-        st.markdown(f"• **{size}mm** → `{qty}` left")
-else:
-    st.info("No V4 lamination data available.")
 
 
 
