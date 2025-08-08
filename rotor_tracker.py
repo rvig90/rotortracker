@@ -26,18 +26,7 @@ import pandas as pd
 from uuid import uuid4
 
 # Session state for logs
-for key, cols in {
-    "clitting_data": ["Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"],
-    "lamination_v3": ["Date", "Quantity", "Remarks", "ID"],
-    "lamination_v4": ["Date", "Quantity", "Remarks", "ID"],
-    "stator_data": [
-        "Date", "Size (mm)", "Quantity", "Remarks", 
-        "Estimated Clitting (kg)", "Laminations Used", 
-        "Lamination Type", "ID"
-    ]
-}.items():
-    if key not in st.session_state:
-        st.session_state[key] = pd.DataFrame(columns=cols)
+
 
 
 
@@ -1140,6 +1129,39 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+import streamlit as st
+import pandas as pd
+from uuid import uuid4
+from datetime import datetime
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# ==== PAGE TABS ====
+tab_choice = st.sidebar.radio("📂 Select Page", ["Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
+
+# ==== SESSION STATE INITIALIZATION ====
+if "clitting_data" not in st.session_state:
+    st.session_state["clitting_data"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
+    ])
+
+if "lamination_v3" not in st.session_state:
+    st.session_state["lamination_v3"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Quantity", "Remarks", "ID"
+    ])
+
+if "lamination_v4" not in st.session_state:
+    st.session_state["lamination_v4"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Quantity", "Remarks", "ID"
+    ])
+
+if "stator_data" not in st.session_state:
+    st.session_state["stator_data"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Quantity", "Remarks",
+        "Estimated Clitting (kg)", "Laminations Used",
+        "Lamination Type", "ID"
+    ])
 def save_clitting_to_sheet():
     try:
         sheet = get_gsheet_connection()
@@ -1275,8 +1297,7 @@ if st.session_state["lamination_v4"].empty:
 
 if st.session_state["stator_data"].empty:
     st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
-elif tab_choice == "🧰 Clitting + Laminations + Stators":
-    st.title("📦 Clitting + Laminations + Stator Outgoings")
+
 
     CLITTING_USAGE = {
         100: 0.04,
