@@ -1442,7 +1442,7 @@ st.subheader("🧩 Laminations Left (in Qty)")
 def lam_summary(lam_df):
     summary = {}
     for idx, row in lam_df.iterrows():
-        size = int(row["Size (mm)"])
+       
         qty = int(row["Quantity"])
         summary[size] = summary.get(size, 0) + qty
     return summary
