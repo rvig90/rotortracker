@@ -160,6 +160,13 @@ if st.session_state.get("last_sync") == "Never":
 if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
+import streamlit as st
+
+# App title
+st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
+
+# Sidebar tab switch
+tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
 # ====== ENTRY FORMS ======
 form_tabs = st.tabs([
     "Current Movement", 
