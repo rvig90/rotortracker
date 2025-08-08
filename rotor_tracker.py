@@ -1138,7 +1138,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # ==== PAGE TABS ====
-tab_choice = st.sidebar.radio("📂 Select Page", ["Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
+
 
 # ==== SESSION STATE INITIALIZATION ====
 if "clitting_data" not in st.session_state:
@@ -1298,7 +1298,7 @@ if st.session_state["lamination_v4"].empty:
 if st.session_state["stator_data"].empty:
     st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
 
-
+elif tab_choice == ("🧰 Clitting + Laminations + Stators"):
     CLITTING_USAGE = {
         100: 0.04,
         120: 0.05,
