@@ -1330,70 +1330,70 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
                         st.success("✅ Entry updated.")
 
 st.divider()
-    st.subheader("📤 Stator Outgoings")
+st.subheader("📤 Stator Outgoings")
 
-    with st.form("stator_form"):
-        s_date = st.date_input("📅 Date", value=datetime.today(), key="stat_date")
-        s_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1, key="stat_size")
-        s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
-        s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
-        s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
-        if st.form_submit_button("📋 Log Stator Outgoing"):
-            clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
-            laminations_used = int(s_qty) * 2
-            new_entry = {
-                "Date": s_date.strftime("%Y-%m-%d"),
-                "Size (mm)": int(s_size),
-                "Quantity": int(s_qty),
-                "Remarks": s_remarks.strip(),
-                "Estimated Clitting (kg)": round(clitting_used, 2),
-                "Laminations Used": laminations_used,
-                "Lamination Type": s_type,
-                "ID": str(uuid4())
-            }
-            st.session_state.stator_data = pd.concat(
-                [st.session_state.stator_data, pd.DataFrame([new_entry])],
-                ignore_index=True
-            )
-            save_stator_to_sheet()
+with st.form("stator_form"):
+    s_date = st.date_input("📅 Date", value=datetime.today(), key="stat_date")
+    s_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1, key="stat_size")
+    s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
+    s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
+    s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
+    if st.form_submit_button("📋 Log Stator Outgoing"):
+        clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
+        laminations_used = int(s_qty) * 2
+        new_entry = {
+            "Date": s_date.strftime("%Y-%m-%d"),
+            "Size (mm)": int(s_size),
+            "Quantity": int(s_qty),
+            "Remarks": s_remarks.strip(),
+            "Estimated Clitting (kg)": round(clitting_used, 2),
+            "Laminations Used": laminations_used,
+            "Lamination Type": s_type,
+            "ID": str(uuid4())
+        }
+        st.session_state.stator_data = pd.concat(
+            [st.session_state.stator_data, pd.DataFrame([new_entry])],
+            ignore_index=True
+        )
+        save_stator_to_sheet()
 
-            # Deduct laminations
-            lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
-            lam_df = st.session_state[lam_key].copy()
-            total_needed = laminations_used
-            for idx, row in lam_df.iterrows():
-                if total_needed <= 0:
-                    break
-                available = int(row["Quantity"])
-                if total_needed >= available:
-                    total_needed -= available
-                    lam_df.at[idx, "Quantity"] = 0
-                else:
-                    lam_df.at[idx, "Quantity"] = available - total_needed
-                    total_needed = 0
-            lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
-            st.session_state[lam_key] = lam_df
-            save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
-            st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
-            st.rerun()
-    st.subheader("📄 Stator Usage Log")
-    for idx, row in st.session_state.stator_data.iterrows():
-        with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if st.button("🗑 Delete", key=f"del_stator_{row['ID']}"):
-                    df = st.session_state.stator_data
-                    st.session_state.stator_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
-                    save_stator_to_sheet()
-                    st.rerun()
-            with col2:
-                new_qty = st.number_input("Quantity", value=int(row["Quantity"]), key=f"qty_stator_{row['ID']}")
-                new_remarks = st.text_input("Remarks", value=row["Remarks"], key=f"rem_stator_{row['ID']}")
-                if st.button("💾 Save", key=f"save_stator_{row['ID']}"):
-                    st.session_state.stator_data.at[idx, "Quantity"] = new_qty
-                    st.session_state.stator_data.at[idx, "Remarks"] = new_remarks
-                    save_stator_to_sheet()
-                    st.success("✅ Entry updated.")
+        # Deduct laminations
+        lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
+        lam_df = st.session_state[lam_key].copy()
+        total_needed = laminations_used
+        for idx, row in lam_df.iterrows():
+            if total_needed <= 0:
+                break
+            available = int(row["Quantity"])
+            if total_needed >= available:
+                total_needed -= available
+                lam_df.at[idx, "Quantity"] = 0
+            else:
+                lam_df.at[idx, "Quantity"] = available - total_needed
+                total_needed = 0
+        lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
+        st.session_state[lam_key] = lam_df
+        save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
+        st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
+        st.rerun()
+st.subheader("📄 Stator Usage Log")
+for idx, row in st.session_state.stator_data.iterrows():
+    with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("🗑 Delete", key=f"del_stator_{row['ID']}"):
+                df = st.session_state.stator_data
+                st.session_state.stator_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
+                save_stator_to_sheet()
+                st.rerun()
+        with col2:
+            new_qty = st.number_input("Quantity", value=int(row["Quantity"]), key=f"qty_stator_{row['ID']}")
+            new_remarks = st.text_input("Remarks", value=row["Remarks"], key=f"rem_stator_{row['ID']}")
+            if st.button("💾 Save", key=f"save_stator_{row['ID']}"):
+                st.session_state.stator_data.at[idx, "Quantity"] = new_qty
+                st.session_state.stator_data.at[idx, "Remarks"] = new_remarks
+                save_stator_to_sheet()
+                st.success("✅ Entry updated.")
 
 
 
