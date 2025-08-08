@@ -1339,6 +1339,7 @@ with st.form("stator_form"):
     s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
     s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
     if st.form_submit_button("📋 Log Stator Outgoing"):
+        size_key = int(s_size)
         clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
         laminations_used = int(s_qty) * 2
         new_entry = {
