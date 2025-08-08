@@ -1302,11 +1302,7 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
                 "Weight per Bag (kg)": float(c_weight),
                 "Remarks": c_remarks.strip(),
                 "ID": str(uuid4())
-                if st.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
-                df = st.session_state.clitting_data
-                st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
-                save_clitting_to_sheet()
-                st.rerun()
+                
             }
             st.session_state.clitting_data = pd.concat(
                 [st.session_state.clitting_data, pd.DataFrame([entry])],
@@ -1326,6 +1322,11 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
         key="edit_clitting_log"
     )
     
+    if st.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
+        df = st.session_state.clitting_data
+        st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
+        save_clitting_to_sheet()
+        st.rerun()
     if st.button("💾 Save Edited Clitting Log"):
         try:
             # Convert back columns that need to be numeric (optional)
