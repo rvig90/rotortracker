@@ -1354,7 +1354,7 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
                 with st.expander(f"{row['Date']} | Qty: {row['Quantity']}"):
                     st.write(f"**Remarks:** {row['Remarks']}")
                     if st.button("🗑 Delete", key=f"del_lam_{lam_type}_{row['ID']}"):
-                        st.session_state[lam_key].drop(idx, inplace=True)
+                        st.session_state[lan_key] = st.session_state[lam_key].drop(idx, inplace=True)
                         st.session_state[lam_key].reset_index(drop=True, inplace=True)
                         save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
                         st.rerun()
