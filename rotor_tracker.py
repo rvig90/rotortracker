@@ -1338,13 +1338,15 @@ with st.form("stator_form"):
     s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
     s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
     s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
+
     if st.form_submit_button("📋 Log Stator Outgoing"):
         size_key = int(s_size)
         clitting_used = CLITTING_USAGE.get(size_key, 0) * int(s_qty)
         laminations_used = int(s_qty) * 2
+
         new_entry = {
             "Date": s_date.strftime("%Y-%m-%d"),
-            "Size (mm)": int(s_size),
+            "Size (mm)": size_key,
             "Quantity": int(s_qty),
             "Remarks": s_remarks.strip(),
             "Estimated Clitting (kg)": round(clitting_used, 2),
@@ -1352,6 +1354,7 @@ with st.form("stator_form"):
             "Lamination Type": s_type,
             "ID": str(uuid4())
         }
+
         st.session_state.stator_data = pd.concat(
             [st.session_state.stator_data, pd.DataFrame([new_entry])],
             ignore_index=True
@@ -1362,6 +1365,7 @@ with st.form("stator_form"):
         lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
         lam_df = st.session_state[lam_key].copy()
         total_needed = laminations_used
+
         for idx, row in lam_df.iterrows():
             if total_needed <= 0:
                 break
@@ -1372,11 +1376,15 @@ with st.form("stator_form"):
             else:
                 lam_df.at[idx, "Quantity"] = available - total_needed
                 total_needed = 0
+
         lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
         st.session_state[lam_key] = lam_df
         save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
+
         st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
         st.rerun()
+
+# ----- Logs -----
 st.subheader("📄 Stator Usage Log")
 for idx, row in st.session_state.stator_data.iterrows():
     with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
@@ -1396,6 +1404,7 @@ for idx, row in st.session_state.stator_data.iterrows():
                 save_stator_to_sheet()
                 st.success("✅ Entry updated.")
 
+# ----- Inventory Summary -----
 st.divider()
 st.header("📊 Inventory Summary")
 
@@ -1403,24 +1412,24 @@ st.header("📊 Inventory Summary")
 st.subheader("🧮 Clitting Left (in kg)")
 clitting_summary = {}
 
+# Add all inward
 for idx, row in st.session_state.clitting_data.iterrows():
     size = int(row["Size (mm)"])
     total_kg = int(row["Bags"]) * float(row["Weight per Bag (kg)"])
     clitting_summary[size] = clitting_summary.get(size, 0) + total_kg
 
-
-
+# Subtract all usage
 for idx, row in st.session_state.stator_data.iterrows():
     try:
         size = int(row["Size (mm)"])
         used = float(row.get("Estimated Clitting (kg)", 0)) or 0
         if size in clitting_summary:
             clitting_summary[size] -= used
-            clitting_summary[size] = max(clitting_summary[size], 0)
+            clitting_summary[size] = max(clitting_summary[size], 0)  # no negatives
     except (ValueError, TypeError, KeyError):
-        continue  # Skip faulty rows silently  # no negative stock
+        continue
 
-# Show clitting summary
+# Display
 if clitting_summary:
     for size, kg in sorted(clitting_summary.items()):
         st.markdown(f"• **{size}mm** → `{kg:.2f} kg` left")
