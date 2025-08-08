@@ -1125,20 +1125,11 @@ if tab_choice == "🔁 Rotor Tracker":
 
 import streamlit as st
 import json
-
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
-import streamlit as st
-import pandas as pd
-from uuid import uuid4
 from datetime import datetime
-import json
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
-# ==== PAGE TABS ====
-
+from uuid import uuid4
+import pandas as pd
 
 # ==== SESSION STATE INITIALIZATION ====
 if "clitting_data" not in st.session_state:
@@ -1162,96 +1153,18 @@ if "stator_data" not in st.session_state:
         "Estimated Clitting (kg)", "Laminations Used",
         "Lamination Type", "ID"
     ])
-def save_clitting_to_sheet():
-    try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
-        ss = sheet
 
-        try:
-            clitting_ws = ss.worksheet("Clitting")
-        except gspread.WorksheetNotFound:
-            clitting_ws = ss.add_worksheet(title="Clitting", rows="1000", cols="10")
-
-        df = st.session_state.clitting_data.copy()
-        clitting_ws.clear()
-        if not df.empty:
-            clitting_ws.update([df.columns.tolist()] + df.values.tolist())
-
-    except Exception as e:
-        st.error(f"❌ Failed to save Clitting data: {e}")
-
-def save_v3_laminations_to_sheet():
-    try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
-        ss = sheet
-
-        try:
-            v3_ws = ss.worksheet("V3 Laminations")
-        except gspread.WorksheetNotFound:
-            v3_ws = ss.add_worksheet(title="V3 Laminations", rows="1000", cols="10")
-
-        df = st.session_state.lamination_v3.copy()
-        v3_ws.clear()
-        if not df.empty:
-            v3_ws.update([df.columns.tolist()] + df.values.tolist())
-
-    except Exception as e:
-        st.error(f"❌ Failed to save V3 Laminations: {e}")
-
-def save_v4_laminations_to_sheet():
-    try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
-        ss = sheet
-
-        try:
-            v4_ws = ss.worksheet("V4 Laminations")
-        except gspread.WorksheetNotFound:
-            v4_ws = ss.add_worksheet(title="V4 Laminations", rows="1000", cols="10")
-
-        df = st.session_state.lamination_v4.copy()
-        v4_ws.clear()
-        if not df.empty:
-            v4_ws.update([df.columns.tolist()] + df.values.tolist())
-
-    except Exception as e:
-        st.error(f"❌ Failed to save V4 Laminations: {e}")
-def save_stator_to_sheet():
-    try:
-        sheet = get_gsheet_connection()
-        if not sheet:
-            return
-        ss = sheet
-
-        # Check or create "Stator Usage" worksheet
-        try:
-            stator_ws = ss.worksheet("Stator Usage")
-        except gspread.WorksheetNotFound:
-            stator_ws = ss.add_worksheet(title="Stator Usage", rows="1000", cols="10")
-
-        # Save DataFrame to sheet
-        df = st.session_state.stator_data.copy()
-        stator_ws.clear()
-        stator_ws.update([df.columns.tolist()] + df.values.tolist())
-
-    except Exception as e:
-        st.error(f"❌ Failed to save Stator Usage: {e}")
+# ==== GOOGLE SHEETS CONNECTION ====
 def get_gsheet_connection():
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
     creds_dict = json.loads(st.secrets["gcp_service_account"])
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    return gspread.authorize(creds).open("Rotor Log")  # Replace with your GSheet name
+    return gspread.authorize(creds).open("Rotor Log")
 
-# Save helpers
 def save_to_sheet(dataframe, sheet_title):
     try:
         ss = get_gsheet_connection()
@@ -1265,7 +1178,6 @@ def save_to_sheet(dataframe, sheet_title):
     except Exception as e:
         st.error(f"❌ Error saving to {sheet_title}: {e}")
 
-# Load helpers
 def load_from_sheet(sheet_title, default_columns):
     try:
         ss = get_gsheet_connection()
@@ -1275,10 +1187,24 @@ def load_from_sheet(sheet_title, default_columns):
             return pd.DataFrame(records)
     except gspread.WorksheetNotFound:
         pass
+    except Exception as e:
+        st.error(f"❌ Error loading from sheet '{sheet_title}': {e}")
     return pd.DataFrame(columns=default_columns)
 
 def clean_for_editor(df):
     return df.astype(str).fillna("")
+
+def save_clitting_to_sheet():
+    save_to_sheet(st.session_state.clitting_data.copy(), "Clitting")
+
+def save_v3_laminations_to_sheet():
+    save_to_sheet(st.session_state.lamination_v3.copy(), "V3 Laminations")
+
+def save_v4_laminations_to_sheet():
+    save_to_sheet(st.session_state.lamination_v4.copy(), "V4 Laminations")
+
+def save_stator_to_sheet():
+    save_to_sheet(st.session_state.stator_data.copy(), "Stator Usage")
 
 def save_lamination_to_sheet(l_type):
     if l_type == "v3":
@@ -1298,17 +1224,20 @@ if st.session_state["lamination_v4"].empty:
 if st.session_state["stator_data"].empty:
     st.session_state["stator_data"] = load_from_sheet("Stator Usage", st.session_state["stator_data"].columns)
 
-elif tab_choice == ("🧰 Clitting + Laminations + Stators"):
+tab_choice = st.sidebar.selectbox("📋 Select Tab", ["Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
+
+if tab_choice == "🧰 Clitting + Laminations + Stators":
+    st.title("🧰 Clitting + Laminations + Stator Outgoings")
+
     CLITTING_USAGE = {
         100: 0.04,
         120: 0.05,
         125: 0.05,
         130: 0.05,
     }
-    
+
     # ---------- Section 1: Clitting Inward ----------
     st.subheader("📥 Clitting Inward")
-    
     with st.form("clitting_form"):
         c_date = st.date_input("📅 Date", value=datetime.today())
         c_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1)
@@ -1323,7 +1252,6 @@ elif tab_choice == ("🧰 Clitting + Laminations + Stators"):
                 "Weight per Bag (kg)": float(c_weight),
                 "Remarks": c_remarks.strip(),
                 "ID": str(uuid4())
-                
             }
             st.session_state.clitting_data = pd.concat(
                 [st.session_state.clitting_data, pd.DataFrame([entry])],
@@ -1331,196 +1259,27 @@ elif tab_choice == ("🧰 Clitting + Laminations + Stators"):
             )
             save_clitting_to_sheet()
             st.success("✅ Clitting entry added.")
-    st.subheader("📄 Clitting Log")
 
+    st.subheader("📄 Clitting Log")
     for idx, row in st.session_state.clitting_data.iterrows():
         with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | {row['Bags']} bags"):
-            c1, c2 = st.columns([1, 2])
-            with c1:
+            col1, col2 = st.columns([1, 2])
+            with col1:
                 if st.button("🗑 Delete", key=f"del_clit_{row['ID']}"):
                     df = st.session_state.clitting_data
                     st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
                     save_clitting_to_sheet()
                     st.rerun()
-    
-            with c2:
+            with col2:
                 new_bags = st.number_input("🧮 Bags", value=int(row["Bags"]), key=f"edit_bags_{row['ID']}")
                 new_weight = st.number_input("⚖ Weight/Bag", value=float(row["Weight per Bag (kg)"]), key=f"edit_weight_{row['ID']}")
                 new_remarks = st.text_input("📝 Remarks", value=row["Remarks"], key=f"edit_remarks_{row['ID']}")
-    
                 if st.button("💾 Save", key=f"save_clit_{row['ID']}"):
                     st.session_state.clitting_data.at[idx, "Bags"] = new_bags
                     st.session_state.clitting_data.at[idx, "Weight per Bag (kg)"] = new_weight
                     st.session_state.clitting_data.at[idx, "Remarks"] = new_remarks
                     save_clitting_to_sheet()
                     st.success("✅ Entry updated.")
-    
-    
-    
-    # Delete buttons per row
-    
-    
-    # ---------- Section 2: Laminations Inward ----------
-    st.subheader("📥 Laminations Inward (V3 / V4)")
-    
-    with st.form("lamination_form"):
-        l_date = st.date_input("📅 Date", value=datetime.today(), key="lam_date")
-        l_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"])
-        l_size = st.number_input("📏 Size (mm)", min_value=1, step=1, key="lam_size")  # ✅ Add this
-        l_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
-        l_remarks = st.text_input("📝 Remarks", key="lam_remarks")
-        if st.form_submit_button("➕ Add Laminations"):
-            entry = {
-                "Date": l_date.strftime("%Y-%m-%d"),
-                "Size (mm)": int(l_size),  # ✅ Add to entry
-                "Quantity": int(l_qty),
-                "Remarks": l_remarks.strip(),
-                "ID": str(uuid4())
-            }
-            lam_key = "lamination_v3" if l_type == "V3" else "lamination_v4"
-            st.session_state[lam_key] = pd.concat(
-                [st.session_state[lam_key], pd.DataFrame([entry])],
-                ignore_index=True
-            )
-            save_lamination_to_sheet("v3" if l_type == "V3" else "v4")
-            st.success(f"✅ {l_type} Lamination entry added.")
-    
-    # ✅ Lamination Logs (Table + Editable)
-    for lam_type in ["V3", "V4"]:
-        st.markdown(f"### 📄 {lam_type} Lamination Log")
-    
-        lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
-        lam_df = st.session_state[lam_key].copy()
-    
-        if "Size (mm)" not in lam_df.columns:
-            lam_df["Size (mm)"] = ""
-    
-        edited_lam_df = st.data_editor(
-            lam_df[["Date", "Size (mm)", "Quantity", "Remarks"]],
-            use_container_width=True,
-            num_rows="dynamic",
-            key=f"edit_log_{lam_type}"
-        )
-    
-        # Save changes if any
-        if st.button(f"💾 Save Edited {lam_type} Log"):
-            try:
-                edited_lam_df["Quantity"] = edited_lam_df["Quantity"].astype(int)
-                edited_lam_df["Size (mm)"] = edited_lam_df["Size (mm)"].astype(int)
-                st.session_state[lam_key].update(edited_lam_df)
-                save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
-                st.success(f"✅ {lam_type} log saved.")
-            except Exception as e:
-                st.error(f"❌ Error saving {lam_type} log: {e}")
-    
-        # Show individual delete buttons per row
-        for idx, row in st.session_state[lam_key].iterrows():
-            col1, col2 = st.columns([6, 1])
-            with col1:
-                st.write(f"{row['Date']} | Size: {row['Size (mm)']} | Qty: {row['Quantity']} | Remarks: {row['Remarks']}")
-            with col2:
-                if st.button("🗑", key=f"del_lam_{lam_type}_{row['ID']}"):
-                    st.session_state[lam_key] = st.session_state[lam_key][st.session_state[lam_key]["ID"] != row["ID"]].reset_index(drop=True)
-                    save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
-                    st.rerun()
-
-            
-    
-            
-    
-    st.divider()
-    
-    # ---------- Section 3: Stator Outgoings ----------
-    st.subheader("📤 Stator Outgoings")
-
-    with st.form("stator_form"):
-        s_date = st.date_input("📅 Date", value=datetime.today(), key="stat_date")
-        s_size = st.number_input("📏 Stator Size (mm)", min_value=1, step=1, key="stat_size")
-        s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
-        s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
-        s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
-    
-        if st.form_submit_button("📋 Log Stator Outgoing"):
-            clitting_used = CLITTING_USAGE.get(s_size, 0) * int(s_qty)
-            laminations_used = int(s_qty) * 2
-    
-            new_entry = {
-                "Date": s_date.strftime("%Y-%m-%d"),
-                "Size (mm)": int(s_size),
-                "Quantity": int(s_qty),
-                "Remarks": s_remarks.strip(),
-                "Estimated Clitting (kg)": round(clitting_used, 2),
-                "Laminations Used": laminations_used,
-                "Lamination Type": s_type,
-                "ID": str(uuid4())
-            }
-    
-            st.session_state.stator_data = pd.concat(
-                [st.session_state.stator_data, pd.DataFrame([new_entry])],
-                ignore_index=True
-            )
-            save_stator_to_sheet()
-    
-            # Deduct laminations
-            lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
-            lam_df = st.session_state[lam_key].copy()
-            total_needed = laminations_used
-    
-            for idx, row in lam_df.iterrows():
-                if total_needed <= 0:
-                    break
-                available = int(row["Quantity"])
-                if total_needed >= available:
-                    total_needed -= available
-                    lam_df.at[idx, "Quantity"] = 0
-                else:
-                    lam_df.at[idx, "Quantity"] = available - total_needed
-                    total_needed = 0
-    
-            lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
-            st.session_state[lam_key] = lam_df
-            save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
-    
-            st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
-            st.rerun()
-    
-    st.subheader("📄 Stator Usage Log")
-
-    log_df = st.session_state.stator_data.copy()
-    
-    # Show editable fields
-    edited_stator_df = st.data_editor(
-        log_df[["Date", "Size (mm)", "Quantity", "Remarks", "Estimated Clitting (kg)", "Laminations Used", "Lamination Type"]],
-        use_container_width=True,
-        num_rows="dynamic",
-        key="edit_stator_log"
-    )
-    
-    # Save changes
-    if st.button("💾 Save Edited Stator Log"):
-        try:
-            edited_stator_df["Size (mm)"] = edited_stator_df["Size (mm)"].astype(int)
-            edited_stator_df["Quantity"] = edited_stator_df["Quantity"].astype(int)
-            edited_stator_df["Estimated Clitting (kg)"] = edited_stator_df["Estimated Clitting (kg)"].astype(float)
-            edited_stator_df["Laminations Used"] = edited_stator_df["Laminations Used"].astype(int)
-    
-            # Update session and save
-            st.session_state.stator_data.update(edited_stator_df)
-            save_stator_to_sheet()
-            st.success("✅ Stator log saved.")
-        except Exception as e:
-            st.error(f"❌ Error saving stator log: {e}")
-    
-    # Delete buttons per row
-    for idx, row in st.session_state.stator_data.iterrows():
-        col1, col2 = st.columns([6, 1])
-        with col1:
-            st.write(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']} | {row['Lamination Type']} | Clitting: {row['Estimated Clitting (kg)']} kg")
-        with col2:
-            if st.button("🗑", key=f"del_stator_{row['ID']}"):
-                st.session_state.stator_data = st.session_state.stator_data[st.session_state.stator_data["ID"] != row["ID"]].reset_index(drop=True)
-                save_stator_to_sheet()
-                st.rerun()
 
 
     # 🔌 Streamlit API endpoint for Swift
