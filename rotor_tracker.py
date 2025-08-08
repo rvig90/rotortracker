@@ -1322,22 +1322,25 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
         key="edit_clitting_log"
     )
     
-    if st.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
-        df = st.session_state.clitting_data
-        st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
-        
+    # Save edits
     if st.button("💾 Save Edited Clitting Log"):
         try:
-            # Convert back columns that need to be numeric (optional)
             edited_clitting["Size (mm)"] = edited_clitting["Size (mm)"].astype(int)
             edited_clitting["Bags"] = edited_clitting["Bags"].astype(int)
             edited_clitting["Weight per Bag (kg)"] = edited_clitting["Weight per Bag (kg)"].astype(float)
-    
             st.session_state["clitting_data"] = edited_clitting
             save_clitting_to_sheet()
             st.success("✅ Clitting log saved.")
         except Exception as e:
             st.error(f"❌ Error saving clitting log: {e}")
+    
+    # Delete buttons per row
+    for idx, row in st.session_state.clitting_data.iterrows():
+        if st.button("🗑 Delete", key=f"del_clitting_{row['ID']}"):
+            df = st.session_state.clitting_data
+            st.session_state.clitting_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
+            save_clitting_to_sheet()
+            st.rerun()
     
     # ---------- Section 2: Laminations Inward ----------
     st.subheader("📥 Laminations Inward (V3 / V4)")
@@ -1345,11 +1348,13 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     with st.form("lamination_form"):
         l_date = st.date_input("📅 Date", value=datetime.today(), key="lam_date")
         l_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"])
+        l_size = st.number_input("📏 Size (mm)", min_value=1, step=1, key="lam_size")  # ✅ Add this
         l_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
         l_remarks = st.text_input("📝 Remarks", key="lam_remarks")
         if st.form_submit_button("➕ Add Laminations"):
             entry = {
                 "Date": l_date.strftime("%Y-%m-%d"),
+                "Size (mm)": int(l_size),  # ✅ Add to entry
                 "Quantity": int(l_qty),
                 "Remarks": l_remarks.strip(),
                 "ID": str(uuid4())
@@ -1368,7 +1373,7 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     
         lam_key = "lamination_v3" if lam_type == "V3" else "lamination_v4"
         lam_df = clean_for_editor(st.session_state[lam_key])
-    
+        
         edited_lam = st.data_editor(
             lam_df,
             use_container_width=True,
@@ -1377,17 +1382,21 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     
         if st.button(f"💾 Save Edited {lam_type} Log"):
             try:
+                edited_lam["Size (mm)"] = edited_lam["Size (mm)"].astype(int)
                 edited_lam["Quantity"] = edited_lam["Quantity"].astype(int)
                 st.session_state[lam_key] = edited_lam
                 save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
                 st.success(f"✅ {lam_type} log saved.")
             except Exception as e:
                 st.error(f"❌ Error saving {lam_type} log: {e}")
-            # 🧠 Save if changed
-            if not edited_lam.equals(st.session_state[lam_key]):
-                st.session_state[lam_key] = edited_lam
+    
+        # Per row delete
+        for idx, row in st.session_state[lam_key].iterrows():
+            if st.button("🗑 Delete", key=f"del_lam_{lam_type}_{row['ID']}"):
+                df = st.session_state[lam_key]
+                st.session_state[lam_key] = df[df["ID"] != row["ID"]].reset_index(drop=True)
                 save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
-                st.success(f"✅ Saved changes to {lam_type} Laminations")
+                st.rerun()
 
             
     
@@ -1451,13 +1460,13 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
     st.subheader("📄 Stator Usage Log")
 
     stator_df = clean_for_editor(st.session_state["stator_data"])
-    
     edited_stator = st.data_editor(
         stator_df,
         use_container_width=True,
         key="edit_stator_log"
     )
     
+    # Save Edited Stator Log
     if st.button("💾 Save Edited Stator Log"):
         try:
             edited_stator["Size (mm)"] = edited_stator["Size (mm)"].astype(int)
@@ -1470,6 +1479,16 @@ elif tab_choice == "🧰 Clitting + Laminations + Stators":
             st.success("✅ Stator log saved.")
         except Exception as e:
             st.error(f"❌ Error saving stator log: {e}")
+    
+    # Delete button for each row
+    for idx, row in st.session_state.stator_data.iterrows():
+        delete_col, _ = st.columns([1, 5])
+        with delete_col:
+            if st.button("🗑 Delete", key=f"del_stator_{row['ID']}"):
+                df = st.session_state.stator_data
+                st.session_state.stator_data = df[df["ID"] != row["ID"]].reset_index(drop=True)
+                save_stator_to_sheet()
+                st.rerun()
 
 
     # 🔌 Streamlit API endpoint for Swift
