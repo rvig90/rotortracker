@@ -1145,7 +1145,7 @@ def save_clitting_to_sheet():
         sheet = get_gsheet_connection()
         if not sheet:
             return
-        ss = sheet.spreadsheet
+        ss = sheet
 
         try:
             clitting_ws = ss.worksheet("Clitting")
@@ -1165,7 +1165,7 @@ def save_v3_laminations_to_sheet():
         sheet = get_gsheet_connection()
         if not sheet:
             return
-        ss = sheet.spreadsheet
+        ss = sheet
 
         try:
             v3_ws = ss.worksheet("V3 Laminations")
@@ -1185,7 +1185,7 @@ def save_v4_laminations_to_sheet():
         sheet = get_gsheet_connection()
         if not sheet:
             return
-        ss = sheet.spreadsheet
+        ss = sheet
 
         try:
             v4_ws = ss.worksheet("V4 Laminations")
@@ -1204,7 +1204,7 @@ def save_stator_to_sheet():
         sheet = get_gsheet_connection()
         if not sheet:
             return
-        ss = sheet.spreadsheet
+        ss = sheet
 
         # Check or create "Stator Usage" worksheet
         try:
