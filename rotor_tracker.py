@@ -1376,7 +1376,6 @@ st.divider()
             save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
             st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
             st.rerun()
-
     st.subheader("📄 Stator Usage Log")
     for idx, row in st.session_state.stator_data.iterrows():
         with st.expander(f"{row['Date']} | {row['Size (mm)']}mm | Qty: {row['Quantity']}"):
