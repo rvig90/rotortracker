@@ -1140,6 +1140,65 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+def save_clitting_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        try:
+            clitting_ws = ss.worksheet("Clitting")
+        except gspread.WorksheetNotFound:
+            clitting_ws = ss.add_worksheet(title="Clitting", rows="1000", cols="10")
+
+        df = st.session_state.clitting_data.copy()
+        clitting_ws.clear()
+        if not df.empty:
+            clitting_ws.update([df.columns.tolist()] + df.values.tolist())
+
+    except Exception as e:
+        st.error(f"❌ Failed to save Clitting data: {e}")
+
+def save_v3_laminations_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        try:
+            v3_ws = ss.worksheet("V3 Laminations")
+        except gspread.WorksheetNotFound:
+            v3_ws = ss.add_worksheet(title="V3 Laminations", rows="1000", cols="10")
+
+        df = st.session_state.lamination_v3.copy()
+        v3_ws.clear()
+        if not df.empty:
+            v3_ws.update([df.columns.tolist()] + df.values.tolist())
+
+    except Exception as e:
+        st.error(f"❌ Failed to save V3 Laminations: {e}")
+
+def save_v4_laminations_to_sheet():
+    try:
+        sheet = get_gsheet_connection()
+        if not sheet:
+            return
+        ss = sheet.spreadsheet
+
+        try:
+            v4_ws = ss.worksheet("V4 Laminations")
+        except gspread.WorksheetNotFound:
+            v4_ws = ss.add_worksheet(title="V4 Laminations", rows="1000", cols="10")
+
+        df = st.session_state.lamination_v4.copy()
+        v4_ws.clear()
+        if not df.empty:
+            v4_ws.update([df.columns.tolist()] + df.values.tolist())
+
+    except Exception as e:
+        st.error(f"❌ Failed to save V4 Laminations: {e}")
 def save_stator_to_sheet():
     try:
         sheet = get_gsheet_connection()
@@ -1297,7 +1356,7 @@ if tab_choice == "🧰 Clitting + Laminations + Stators":
                     if st.button("🗑 Delete", key=f"del_lam_{lam_type}_{row['ID']}"):
                         st.session_state[lam_key].drop(idx, inplace=True)
                         st.session_state[lam_key].reset_index(drop=True, inplace=True)
-                        save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
+                        save_lamination_to_sheet("v3" if lam_type == "V3 Laminations" else "V4 Laminations")
                         st.rerun()
     
         st.divider()
