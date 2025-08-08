@@ -1139,12 +1139,12 @@ if "clitting_data" not in st.session_state:
 
 if "lamination_v3" not in st.session_state:
     st.session_state["lamination_v3"] = pd.DataFrame(columns=[
-        "Date", "Size (mm)", "Quantity", "Remarks", "ID"
+        "Date", "Quantity", "Remarks", "ID"
     ])
 
 if "lamination_v4" not in st.session_state:
     st.session_state["lamination_v4"] = pd.DataFrame(columns=[
-        "Date", "Size (mm)", "Quantity", "Remarks", "ID"
+        "Date", "Quantity", "Remarks", "ID"
     ])
 
 if "stator_data" not in st.session_state:
