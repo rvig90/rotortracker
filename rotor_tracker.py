@@ -1285,13 +1285,13 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
     with st.form("lamination_form"):
         l_date = st.date_input("📅 Date", value=datetime.today(), key="lam_date")
         l_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"])
-        l_size = st.number_input("📏 Size (mm)", min_value=1, step=1, key="lam_size")
+        
         l_qty = st.number_input("🔢 Quantity", min_value=1, step=1)
         l_remarks = st.text_input("📝 Remarks", key="lam_remarks")
         if st.form_submit_button("➕ Add Laminations"):
             entry = {
                 "Date": l_date.strftime("%Y-%m-%d"),
-                "Size (mm)": int(l_size),
+                
                 "Quantity": int(l_qty),
                 "Remarks": l_remarks.strip(),
                 "ID": str(uuid4())
@@ -1319,11 +1319,11 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
                         st.rerun()
                 with col2:
                     new_qty = st.number_input("Quantity", value=int(row["Quantity"]), key=f"qty_{row['ID']}")
-                    new_size = st.number_input("Size (mm)", value=int(row["Size (mm)"]), key=f"size_{row['ID']}")
+                    
                     new_remarks = st.text_input("Remarks", value=row["Remarks"], key=f"rem_{row['ID']}")
                     if st.button("💾 Save", key=f"save_lam_{row['ID']}"):
                         st.session_state[lam_key].at[idx, "Quantity"] = new_qty
-                        st.session_state[lam_key].at[idx, "Size (mm)"] = new_size
+                       
                         st.session_state[lam_key].at[idx, "Remarks"] = new_remarks
                         save_lamination_to_sheet("v3" if lam_type == "V3" else "v4")
                         st.success("✅ Entry updated.")
@@ -1453,14 +1453,14 @@ v4_summary = lam_summary(st.session_state["lamination_v4"])
 if v3_summary:
     st.markdown("**🔹 V3 Laminations**")
     for size, qty in sorted(v3_summary.items()):
-        st.markdown(f"• **{size}mm** → `{qty}` left")
+        st.markdown(f"•  → `{qty}` left")
 else:
     st.info("No V3 lamination data available.")
 
 if v4_summary:
     st.markdown("**🔹 V4 Laminations**")
     for size, qty in sorted(v4_summary.items()):
-        st.markdown(f"• **{size}mm** → `{qty}` left")
+        st.markdown(f"• `{qty}` left")
 else:
     st.info("No V4 lamination data available.")
 
