@@ -1462,7 +1462,7 @@ if v4_summary:
     for size, qty in sorted(v4_summary.items()):
         st.markdown(f"• **{size}mm** → `{qty}` left")
 else:
-    st.info("No V4 lamination data available.
+    st.info("No V4 lamination data available.")
 
 # ----- Inventory Summary -----
 
