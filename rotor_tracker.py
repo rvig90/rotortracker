@@ -1420,6 +1420,7 @@ for idx, row in st.session_state.clitting_data.iterrows():
     clitting_summary[size] = clitting_summary.get(size, 0) + total_kg
 
 # Subtract all usage
+# Subtract all usage
 for idx, row in st.session_state.stator_data.iterrows():
     try:
         size = int(row["Size (mm)"])
@@ -1427,7 +1428,8 @@ for idx, row in st.session_state.stator_data.iterrows():
         if size in clitting_summary:
             clitting_summary[size] -= used
             clitting_summary[size] = max(clitting_summary[size], 0)  # no negatives
-    except (ValueError, TypeError, KeyError):
+    except (ValueError, TypeError, KeyError) as e:
+        st.warning(f"Couldn't process stator row {idx}: {e}")
         continue
 
 # Display
