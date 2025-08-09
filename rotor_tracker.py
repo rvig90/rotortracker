@@ -1453,8 +1453,8 @@ def lam_summary(lam_df):
     
     return lan_df("Quantity").sum()
 
-v3_summary = lam_summary(st.session_state["lamination_v3"])
-v4_summary = lam_summary(st.session_state["lamination_v4"])
+v3_total = lam_summary(st.session_state["lamination_v3"])
+v4_total = lam_summary(st.session_state["lamination_v4"])
 
 if v3_summary:
     st.markdown("**🔹 V3 Laminations**")
