@@ -1450,12 +1450,8 @@ else:
 st.subheader("🧩 Laminations Left (in Qty)")
 
 def lam_summary(lam_df):
-    summary = {}
-    for idx, row in lam_df.iterrows():
-       
-        qty = int(row["Quantity"])
-        summary[size] = summary.get(size, 0) + qty
-    return summary
+    
+    return lan_df("Quantity").sum()
 
 v3_summary = lam_summary(st.session_state["lamination_v3"])
 v4_summary = lam_summary(st.session_state["lamination_v4"])
