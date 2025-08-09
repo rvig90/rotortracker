@@ -1451,7 +1451,7 @@ st.subheader("🧩 Laminations Left (in Qty)")
 
 def lam_summary(lam_df):
     
-    return lan_df("Quantity").sum()
+    return lam_df("Quantity").sum()
 
 v3_total = lam_summary(st.session_state["lamination_v3"])
 v4_total = lam_summary(st.session_state["lamination_v4"])
