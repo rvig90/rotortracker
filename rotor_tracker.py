@@ -1459,14 +1459,14 @@ v4_total = lam_summary(st.session_state["lamination_v4"])
 if v3_summary:
     st.markdown("**🔹 V3 Laminations**")
     for size, qty in sorted(v3_summary.items()):
-        st.markdown(f"•  `{qty}` left")
+        st.markdown(f"•  `{v3_total}` left")
 else:
     st.info("No V3 lamination data available.")
 
 if v4_summary:
     st.markdown("**🔹 V4 Laminations**")
     for size, qty in sorted(v4_summary.items()):
-        st.markdown(f"• `{qty}` left")
+        st.markdown(f"• `{v4_total}` left")
 else:
     st.info("No V4 lamination data available.")
 
