@@ -1449,24 +1449,21 @@ else:
 # ----- Lamination Summary -----
 st.subheader("🧩 Laminations Left (in Qty)")
 
+
+
 def lam_summary(lam_df):
-    
-    return lam_df("Quantity").sum()
+    return lam_df["Quantity"].sum()
 
 v3_total = lam_summary(st.session_state["lamination_v3"])
 v4_total = lam_summary(st.session_state["lamination_v4"])
 
-if v3_summary:
-    st.markdown("**🔹 V3 Laminations**")
-    for size, qty in sorted(v3_summary.items()):
-        st.markdown(f"•  `{v3_total}` left")
+if v3_total > 0:
+    st.markdown(f"**🔹 V3 Laminations** → `{v3_total}` left")
 else:
     st.info("No V3 lamination data available.")
 
-if v4_summary:
-    st.markdown("**🔹 V4 Laminations**")
-    for size, qty in sorted(v4_summary.items()):
-        st.markdown(f"• `{v4_total}` left")
+if v4_total > 0:
+    st.markdown(f"**🔹 V4 Laminations** → `{v4_total}` left")
 else:
     st.info("No V4 lamination data available.")
 
