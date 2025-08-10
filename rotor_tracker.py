@@ -722,7 +722,13 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.info("✅ No coming rotor entries found.")
             st.stop()
 
-        
+        # Prevent running chatbot logic if there's no data yet
+        if st.session_state["clitting_data"].empty and \
+           st.session_state["lamination_v3"].empty and \
+           st.session_state["lamination_v4"].empty:
+            st.info("📦 No inventory data yet. Please log clitting or laminations first.")
+        else:
+            # (Place the chatbot query handling code here)
         if query:
             query_l = query.lower()
         
