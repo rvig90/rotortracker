@@ -807,7 +807,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 else:
                     st.info("I can answer about clitting left, laminations left (V3/V4), or all stock.")
 
-                    st.stop()
+                
         
         # ===== CASE: Buyer Weight Estimation =====
         if "weight" in query and buyer_name:
