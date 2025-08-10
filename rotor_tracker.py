@@ -1440,12 +1440,32 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
             s_qty = st.number_input("🔢 Quantity", min_value=1, step=1, key="stat_qty")
             s_type = st.selectbox("🔀 Lamination Type", ["V3", "V4"], key="stat_type")
             s_remarks = st.text_input("📝 Remarks", key="stat_remarks")
-    
+        
             if st.form_submit_button("📋 Log Stator Outgoing"):
                 size_key = int(s_size)
                 clitting_used = CLITTING_USAGE.get(size_key, 0) * int(s_qty)
                 laminations_used = int(s_qty) * 2
-    
+        
+                # ==== Check clitting stock ====
+                current_clitting_stock = 0
+                for _, r in st.session_state["clitting_data"].iterrows():
+                    if int(r["Size (mm)"]) == size_key:
+                        current_clitting_stock += int(r["Bags"]) * float(r["Weight per Bag (kg)"])
+                for _, r in st.session_state["stator_data"].iterrows():
+                    if int(r["Size (mm)"]) == size_key:
+                        current_clitting_stock -= float(r.get("Estimated Clitting (kg)", 0) or 0)
+        
+                if current_clitting_stock < clitting_used:
+                    st.warning(f"⚠ Not enough clitting for size {size_key}mm. Stock: {current_clitting_stock:.2f} kg, Needed: {clitting_used:.2f} kg.")
+        
+                # ==== Check lamination stock ====
+                lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
+                current_lam_stock = st.session_state[lam_key]["Quantity"].sum()
+        
+                if current_lam_stock < laminations_used:
+                    st.warning(f"⚠ Not enough {s_type} laminations. Stock: {current_lam_stock}, Needed: {laminations_used}")
+        
+                # ==== Add entry anyway ====
                 new_entry = {
                     "Date": s_date.strftime("%Y-%m-%d"),
                     "Size (mm)": size_key,
@@ -1456,17 +1476,16 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
                     "Lamination Type": s_type,
                     "ID": str(uuid4())
                 }
-    
+        
                 st.session_state.stator_data = pd.concat(
                     [st.session_state.stator_data, pd.DataFrame([new_entry])],
                     ignore_index=True
                 )
                 save_stator_to_sheet()
-    
-                lam_key = "lamination_v3" if s_type == "V3" else "lamination_v4"
+        
+                # Deduct laminations
                 lam_df = st.session_state[lam_key].copy()
                 total_needed = laminations_used
-    
                 for idx, row in lam_df.iterrows():
                     if total_needed <= 0:
                         break
@@ -1477,14 +1496,10 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
                     else:
                         lam_df.at[idx, "Quantity"] = available - total_needed
                         total_needed = 0
-    
                 lam_df = lam_df[lam_df["Quantity"] > 0].reset_index(drop=True)
                 st.session_state[lam_key] = lam_df
-                if s_type == "V3":
-                    save_v3_laminations_to_sheet()
-                else:
-                    save_v4_laminations_to_sheet()
-    
+                save_lamination_to_sheet("v3" if s_type == "V3" else "v4")
+        
                 st.success(f"✅ Stator logged. Clitting used: {clitting_used:.2f} kg | Laminations used: {laminations_used}")
                 st.rerun()
     
