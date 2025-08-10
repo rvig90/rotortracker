@@ -729,65 +729,65 @@ if tab_choice == "🔁 Rotor Tracker":
             st.info("📦 No inventory data yet. Please log clitting or laminations first.")
         else:
             # (Place the chatbot query handling code here)
-        if query:
-            query_l = query.lower()
-        
-            # ===== Clitting Summary Calculation =====
-            cl_summary = {}
-            # Add all clitting inward
-            for _, r in st.session_state["clitting_data"].iterrows():
-                try:
-                    size = int(r["Size (mm)"])
-                    kg = int(r["Bags"]) * float(r["Weight per Bag (kg)"])
-                    cl_summary[size] = cl_summary.get(size, 0.0) + kg
-                except Exception:
-                    continue
-            # Subtract clitting used by stators
-            for _, r in st.session_state["stator_data"].iterrows():
-                try:
-                    size = int(r["Size (mm)"])
-                    used = float(r.get("Estimated Clitting (kg)", 0.0)) if r.get("Estimated Clitting (kg)", None) is not None else 0.0
-                    cl_summary[size] = cl_summary.get(size, 0.0) - used
-                except Exception:
-                    continue
-        
-            # ===== Lamination Totals =====
-            v3_total = int(st.session_state["lamination_v3"]["Quantity"].sum()) if not st.session_state["lamination_v3"].empty else 0
-            v4_total = int(st.session_state["lamination_v4"]["Quantity"].sum()) if not st.session_state["lamination_v4"].empty else 0
-        
-            # ===== Response Logic =====
-            if "clitting" in query_l:
-                if any(str(size) in query_l for size in cl_summary.keys()):
-                    found = False
-                    for size, left in cl_summary.items():
-                        if str(size) in query_l:
-                            st.success(f"🧮 Clitting left for {size}mm: {max(0, left):.2f} kg")
-                            found = True
-                    if not found:
-                        st.info("Size not found in clitting data.")
-                else:
-                    st.markdown("### Clitting left (kg)")
+            if query:
+                query_l = query.lower()
+            
+                # ===== Clitting Summary Calculation =====
+                cl_summary = {}
+                # Add all clitting inward
+                for _, r in st.session_state["clitting_data"].iterrows():
+                    try:
+                        size = int(r["Size (mm)"])
+                        kg = int(r["Bags"]) * float(r["Weight per Bag (kg)"])
+                        cl_summary[size] = cl_summary.get(size, 0.0) + kg
+                    except Exception:
+                        continue
+                # Subtract clitting used by stators
+                for _, r in st.session_state["stator_data"].iterrows():
+                    try:
+                        size = int(r["Size (mm)"])
+                        used = float(r.get("Estimated Clitting (kg)", 0.0)) if r.get("Estimated Clitting (kg)", None) is not None else 0.0
+                        cl_summary[size] = cl_summary.get(size, 0.0) - used
+                    except Exception:
+                        continue
+            
+                # ===== Lamination Totals =====
+                v3_total = int(st.session_state["lamination_v3"]["Quantity"].sum()) if not st.session_state["lamination_v3"].empty else 0
+                v4_total = int(st.session_state["lamination_v4"]["Quantity"].sum()) if not st.session_state["lamination_v4"].empty else 0
+            
+                # ===== Response Logic =====
+                if "clitting" in query_l:
+                    if any(str(size) in query_l for size in cl_summary.keys()):
+                        found = False
+                        for size, left in cl_summary.items():
+                            if str(size) in query_l:
+                                st.success(f"🧮 Clitting left for {size}mm: {max(0, left):.2f} kg")
+                                found = True
+                        if not found:
+                            st.info("Size not found in clitting data.")
+                    else:
+                        st.markdown("### Clitting left (kg)")
+                        for size, left in sorted(cl_summary.items()):
+                            st.write(f"• **{size}mm**: {max(0, left):.2f} kg")
+            
+                elif "v3" in query_l:
+                    st.success(f"🔹 V3 Laminations left: {v3_total} pcs")
+            
+                elif "v4" in query_l:
+                    st.success(f"🔹 V4 Laminations left: {v4_total} pcs")
+            
+                elif "lamination" in query_l:
+                    st.markdown(f"🔹 V3: {v3_total} pcs\n\n🔹 V4: {v4_total} pcs")
+            
+                elif "stock" in query_l or "all" in query_l:
+                    st.markdown("### Current Stock Summary")
                     for size, left in sorted(cl_summary.items()):
-                        st.write(f"• **{size}mm**: {max(0, left):.2f} kg")
-        
-            elif "v3" in query_l:
-                st.success(f"🔹 V3 Laminations left: {v3_total} pcs")
-        
-            elif "v4" in query_l:
-                st.success(f"🔹 V4 Laminations left: {v4_total} pcs")
-        
-            elif "lamination" in query_l:
-                st.markdown(f"🔹 V3: {v3_total} pcs\n\n🔹 V4: {v4_total} pcs")
-        
-            elif "stock" in query_l or "all" in query_l:
-                st.markdown("### Current Stock Summary")
-                for size, left in sorted(cl_summary.items()):
-                    st.write(f"• **{size}mm Clitting**: {max(0, left):.2f} kg")
-                st.write(f"🔹 **V3 Laminations**: {v3_total} pcs")
-                st.write(f"🔹 **V4 Laminations**: {v4_total} pcs")
-        
-            else:
-                st.info("I can answer about clitting left, laminations left (V3/V4), or all stock.")
+                        st.write(f"• **{size}mm Clitting**: {max(0, left):.2f} kg")
+                    st.write(f"🔹 **V3 Laminations**: {v3_total} pcs")
+                    st.write(f"🔹 **V4 Laminations**: {v4_total} pcs")
+            
+                else:
+                    st.info("I can answer about clitting left, laminations left (V3/V4), or all stock.")
         
         # ===== CASE: Buyer Weight Estimation =====
         if "weight" in query and buyer_name:
