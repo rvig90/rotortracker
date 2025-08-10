@@ -27,7 +27,25 @@ from uuid import uuid4
 
 # Session state for logs
 
-
+# Ensure session state dataframes exist before chatbot
+if "clitting_data" not in st.session_state:
+    st.session_state["clitting_data"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Bags", "Weight per Bag (kg)", "Remarks", "ID"
+    ])
+if "lamination_v3" not in st.session_state:
+    st.session_state["lamination_v3"] = pd.DataFrame(columns=[
+        "Date", "Quantity", "Remarks", "ID"
+    ])
+if "lamination_v4" not in st.session_state:
+    st.session_state["lamination_v4"] = pd.DataFrame(columns=[
+        "Date", "Quantity", "Remarks", "ID"
+    ])
+if "stator_data" not in st.session_state:
+    st.session_state["stator_data"] = pd.DataFrame(columns=[
+        "Date", "Size (mm)", "Quantity", "Remarks",
+        "Estimated Clitting (kg)", "Laminations Used",
+        "Lamination Type", "ID"
+    ])
 
 
 
