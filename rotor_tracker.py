@@ -1567,10 +1567,10 @@ if tab_choice == "💰 Costing":
     st.markdown("Enter the current rates below. Defaults are pre-filled from your Siri Shortcut.")
 
     # === Default Editable Inputs ===
-    steel_rate = st.number_input("Steel Rate (₹/kg)", value=54.0, step=0.5)
-    scrap_rate = st.number_input("Scrap Rate (₹/kg)", value=35.0, step=0.5)
-    ppl_rate = st.number_input("PPL Rate (₹/kg)", value=110.0, step=0.5)
-    die_cast_rate = st.number_input("Aluminium Die Casting Rate (₹/kg)", value=310.0, step=0.5)
+    steel_rate = st.number_input("Steel Rate (₹/kg)", value=60000.0, step=0.5)
+    scrap_rate = st.number_input("Scrap Rate (₹/kg)", value=36.0, step=0.5)
+    ppl_rate = st.number_input("PPL Rate (₹/kg)", value=7000.0, step=0.5)
+    die_cast_rate = st.number_input("Aluminium Die Casting Rate (₹/kg)", value=80.0, step=0.5)
 
     st.divider()
 
@@ -1588,7 +1588,7 @@ if tab_choice == "💰 Costing":
     loose_rate = steel_rate + (ppl_rate * 0.2) - (scrap_rate * 0.1)
 
     # Die cast rate (example formula)
-    die_cast_total = steel_rate + ppl_rate + (die_cast_rate * 0.05)
+    die_cast_total = ((steel_rate - ((scrap_rate * 514)) + ppl_rate) / 123 
 
     # === Output ===
     st.subheader("📊 Calculated Costs")
