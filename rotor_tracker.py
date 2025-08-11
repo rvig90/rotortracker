@@ -191,7 +191,7 @@ import streamlit as st
 st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
 
 # Sidebar tab switch
-tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
+tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators", "💰 Costing"])
 
 if tab_choice == "🔁 Rotor Tracker":
     st.title("🔁 Rotor Tracker")
@@ -1558,6 +1558,49 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
     
         st.markdown(f"**🔹 V3 Laminations** → `{v3_total}` left" if v3_total > 0 else "No V3 lamination data available.")
         st.markdown(f"**🔹 V4 Laminations** → `{v4_total}` left" if v4_total > 0 else "No V4 lamination data available.")
+
+
+    # ===== Costing Tab =====
+if tab_choice == "💰 Costing":
+    st.title("💰 Costing Calculator (V4)")
+
+    st.markdown("Enter the current rates below. Defaults are pre-filled from your Siri Shortcut.")
+
+    # === Default Editable Inputs ===
+    steel_rate = st.number_input("Steel Rate (₹/kg)", value=54.0, step=0.5)
+    scrap_rate = st.number_input("Scrap Rate (₹/kg)", value=35.0, step=0.5)
+    ppl_rate = st.number_input("PPL Rate (₹/kg)", value=110.0, step=0.5)
+    die_cast_rate = st.number_input("Aluminium Die Casting Rate (₹/kg)", value=310.0, step=0.5)
+
+    st.divider()
+
+    # === Calculation Logic (Translated from Siri Shortcut) ===
+    # Pentagon: 28 mm bore, 6 gm weight
+    pentagon_weight_kg = 6 / 1000
+    pentagon_cost = pentagon_weight_kg * die_cast_rate
+
+    # Gol: 24 mm bore, 8 gm weight
+    gol_weight_kg = 8 / 1000
+    gol_cost = gol_weight_kg * die_cast_rate
+
+    # Loose rate (example formula from your shortcut logic)
+    # Loose rate = Steel + PPL + Scrap adjustment
+    loose_rate = steel_rate + (ppl_rate * 0.2) - (scrap_rate * 0.1)
+
+    # Die cast rate (example formula)
+    die_cast_total = steel_rate + ppl_rate + (die_cast_rate * 0.05)
+
+    # === Output ===
+    st.subheader("📊 Calculated Costs")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Pentagon (28 mm / 6 gm)", f"₹{pentagon_cost:.2f}")
+        st.metric("Gol (24 mm / 8 gm)", f"₹{gol_cost:.2f}")
+    with col2:
+        st.metric("Loose Rate", f"₹{loose_rate:.2f}")
+        st.metric("Die Cast Rate", f"₹{die_cast_total:.2f}")
+
+    st.caption("📝 Pentagon: 28 mm bore, 6 gm | Gol: 24 mm bore, 8 gm")
 
 # ----- Inventory Summary -----
 
