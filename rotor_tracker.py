@@ -1577,11 +1577,11 @@ if tab_choice == "💰 Costing":
     # === Calculation Logic (Translated from Siri Shortcut) ===
     # Pentagon: 28 mm bore, 6 gm weight
     pentagon_weight_kg = 6 / 1000
-    pentagon_cost = pentagon_weight_kg * die_cast_rate
+    pentagon_cost = loose_rate + 2
 
     # Gol: 24 mm bore, 8 gm weight
     gol_weight_kg = 8 / 1000
-    gol_cost = gol_weight_kg * die_cast_rate
+    gol_cost = loose_rate
 
     # Loose rate (example formula from your shortcut logic)
     # Loose rate = Steel + PPL + Scrap adjustment
