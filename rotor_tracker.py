@@ -1585,7 +1585,7 @@ if tab_choice == "💰 Costing":
 
     # Loose rate (example formula from your shortcut logic)
     # Loose rate = Steel + PPL + Scrap adjustment
-    loose_rate = (steel_rate - ((scrap_rate * 514) + (ppl_rate + 1800))) / 495
+    loose_rate = (((steel_rate - ((scrap_rate * 514)) + (ppl_rate + 1800)))) / 495
 
     # Die cast rate (example formula)
     die_cast_total = ((((steel_rate - (scrap_rate * 514)) + (ppl_rate + 1800))) / (123) + (die_cast_rate)) / 130
