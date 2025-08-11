@@ -926,7 +926,7 @@ if tab_choice == "🔁 Rotor Tracker":
         # === CASE: Buyer weight estimation ===
         
         # CASE: Clitting Left or Balance
-        if re.search(r"\b(clitting (left|balance|available|remaining|stock)|how much clitting)\b", query):
+        if re.search(r"\b(clitting (left|balance|available|remaining)|how much clitting)\b", query):
             # Total clitting received (in kg)
             total_clitting_inward = 0
             if "clitting_data" in st.session_state and not st.session_state.clitting_data.empty:
