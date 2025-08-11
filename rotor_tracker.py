@@ -1575,13 +1575,7 @@ if tab_choice == "💰 Costing":
     st.divider()
 
     # === Calculation Logic (Translated from Siri Shortcut) ===
-    # Pentagon: 28 mm bore, 6 gm weight
-    pentagon_weight_kg = 6 / 1000
-    pentagon_cost = loose_rate + 2
-
-    # Gol: 24 mm bore, 8 gm weight
-    gol_weight_kg = 8 / 1000
-    gol_cost = loose_rate
+    
 
     # Loose rate (example formula from your shortcut logic)
     # Loose rate = Steel + PPL + Scrap adjustment
@@ -1589,6 +1583,14 @@ if tab_choice == "💰 Costing":
 
     # Die cast rate (example formula)
     die_cast_total = ((((steel_rate - (scrap_rate * 514)) + (ppl_rate + 1800))) / (123) + (die_cast_rate)) / 130
+
+    # Pentagon: 28 mm bore, 6 gm weight
+    pentagon_weight_kg = 6 / 1000
+    pentagon_cost = loose_rate + 2
+
+    # Gol: 24 mm bore, 8 gm weight
+    gol_weight_kg = 8 / 1000
+    gol_cost = loose_rate - 2
 
     # === Output ===
     st.subheader("📊 Calculated Costs")
