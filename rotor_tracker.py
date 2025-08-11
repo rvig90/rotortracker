@@ -1573,36 +1573,37 @@ if tab_choice == "💰 Costing":
     die_cast_rate = st.number_input("Aluminium Die Casting Rate (₹/kg)", value=80.0)
 
     st.divider()
-
-    # === Calculation Logic (Translated from Siri Shortcut) ===
+    if st.button(" Calculate cost"):
+        
+        # === Calculation Logic (Translated from Siri Shortcut) ===
+        
     
-
-    # Loose rate (example formula from your shortcut logic)
-    # Loose rate = Steel + PPL + Scrap adjustment
-    loose_rate = (((steel_rate - ((scrap_rate * 514)) + (ppl_rate + 1800)))) / 495
-
-    # Die cast rate (example formula)
-    die_cast_total = ((((steel_rate - (scrap_rate * 514)) + (ppl_rate + 1800))) / (123) + (die_cast_rate)) / 130
-
-    # Pentagon: 28 mm bore, 6 gm weight
-    pentagon_weight_kg = 6 / 1000
-    pentagon_cost = loose_rate + 2
-
-    # Gol: 24 mm bore, 8 gm weight
-    gol_weight_kg = 8 / 1000
-    gol_cost = loose_rate - 2
-
-    # === Output ===
-    st.subheader("📊 Calculated Costs")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Pentagon (28 mm / 6 gm)", f"₹{pentagon_cost:.2f}")
-        st.metric("Gol (24 mm / 8 gm)", f"₹{gol_cost:.2f}")
-    with col2:
-        st.metric("Loose Rate", f"₹{loose_rate:.2f}")
-        st.metric("Die Cast Rate", f"₹{die_cast_total:.2f}")
-
-    st.caption("📝 Pentagon: 28 mm bore, 6 gm | Gol: 24 mm bore, 8 gm")
+        # Loose rate (example formula from your shortcut logic)
+        # Loose rate = Steel + PPL + Scrap adjustment
+        loose_rate = (((steel_rate - ((scrap_rate * 514)) + (ppl_rate + 1800)))) / 495
+    
+        # Die cast rate (example formula)
+        die_cast_total = ((((steel_rate - (scrap_rate * 514)) + (ppl_rate + 1800))) / (123) + (die_cast_rate)) / 130
+    
+        # Pentagon: 28 mm bore, 6 gm weight
+        pentagon_weight_kg = 6 / 1000
+        pentagon_cost = loose_rate + 2
+    
+        # Gol: 24 mm bore, 8 gm weight
+        gol_weight_kg = 8 / 1000
+        gol_cost = loose_rate - 2
+    
+        # === Output ===
+        st.subheader("📊 Calculated Costs")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Pentagon (28 mm / 6 gm)", f"₹{pentagon_cost:.2f}")
+            st.metric("Gol (24 mm / 8 gm)", f"₹{gol_cost:.2f}")
+        with col2:
+            st.metric("Loose Rate", f"₹{loose_rate:.2f}")
+            st.metric("Die Cast Rate", f"₹{die_cast_total:.2f}")
+    
+        st.caption("📝 Pentagon: 28 mm bore, 6 gm | Gol: 24 mm bore, 8 gm")
 
 # ----- Inventory Summary -----
 
