@@ -191,7 +191,7 @@ import streamlit as st
 st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
 
 # Sidebar tab switch
-tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators", "💰 Costing"])
+tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
 
 if tab_choice == "🔁 Rotor Tracker":
     st.title("🔁 Rotor Tracker")
@@ -1524,86 +1524,7 @@ if tab_choice == ("🧰 Clitting + Laminations + Stators"):
                         st.success("✅ Entry updated.")
     
     # ---------- TAB 4: Summary ----------
-    with tab4:
-        st.header("📊 Inventory Summary")
-    
-        # Clitting Summary
-        st.subheader("🧮 Clitting Left (in kg)")
-        clitting_summary = {}
-        for idx, row in st.session_state.clitting_data.iterrows():
-            size = int(row["Size (mm)"])
-            total_kg = int(row["Bags"]) * float(row["Weight per Bag (kg)"])
-            clitting_summary[size] = clitting_summary.get(size, 0) + total_kg
-    
-        for idx, row in st.session_state.stator_data.iterrows():
-            try:
-                size = int(row["Size (mm)"])
-                used = float(row.get("Estimated Clitting (kg)", 0)) or 0
-                if size in clitting_summary:
-                    clitting_summary[size] -= used
-                    clitting_summary[size] = max(clitting_summary[size], 0)
-            except:
-                continue
-    
-        if clitting_summary:
-            for size, kg in sorted(clitting_summary.items()):
-                st.markdown(f"• **{size}mm** → `{kg:.2f} kg` left")
-        else:
-            st.info("No clitting data available.")
-    
-        # Lamination Summary
-        st.subheader("🧩 Laminations Left (in Qty)")
-        v3_total = st.session_state["lamination_v3"]["Quantity"].sum()
-        v4_total = st.session_state["lamination_v4"]["Quantity"].sum()
-    
-        st.markdown(f"**🔹 V3 Laminations** → `{v3_total}` left" if v3_total > 0 else "No V3 lamination data available.")
-        st.markdown(f"**🔹 V4 Laminations** → `{v4_total}` left" if v4_total > 0 else "No V4 lamination data available.")
-
-
-    # ===== Costing Tab =====
-if tab_choice == "💰 Costing":
-    st.title("💰 Costing Calculator (V4)")
-
-    st.markdown("Enter the current rates below. Defaults are pre-filled from your Siri Shortcut.")
-
-    # === Default Editable Inputs ===
-    steel_rate = st.number_input("Steel Rate (₹/kg)", value=60000.0)
-    scrap_rate = st.number_input("Scrap Rate (₹/kg)", value=36.0)
-    ppl_rate = st.number_input("PPL Rate (₹/kg)", value=7000.0)
-    die_cast_rate = st.number_input("Aluminium Die Casting Rate (₹/kg)", value=80.0)
-
-    st.divider()
-    if st.button(" Calculate cost"):
-        
-        # === Calculation Logic (Translated from Siri Shortcut) ===
-        
-    
-        # Loose rate (example formula from your shortcut logic)
-        # Loose rate = Steel + PPL + Scrap adjustment
-        loose_rate = (((steel_rate - ((scrap_rate * 514)) + (ppl_rate + 1800)))) / 495
-    
-        # Die cast rate (example formula)
-        die_cast_total = ((((steel_rate - (scrap_rate * 514)) + (ppl_rate + 1800))) / (123) + (die_cast_rate)) / 130
-    
-        # Pentagon: 28 mm bore, 6 gm weight
-        pentagon_weight_kg = 6 / 1000
-        pentagon_cost = loose_rate + 2
-    
-        # Gol: 24 mm bore, 8 gm weight
-        gol_weight_kg = 8 / 1000
-        gol_cost = loose_rate - 2
-    
-        # === Output ===
-        st.subheader("📊 Calculated Costs")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Pentagon (28 mm / 6 gm)", f"₹{pentagon_cost:.2f}")
-            st.metric("Gol (24 mm / 8 gm)", f"₹{gol_cost:.2f}")
-        with col2:
-            st.metric("Loose Rate", f"₹{loose_rate:.2f}")
-            st.metric("Die Cast Rate", f"₹{die_cast_total:.2f}")
-    
-        st.caption("📝 Pentagon: 28 mm bore, 6 gm | Gol: 24 mm bore, 8 gm")
+   
 
 # ----- Inventory Summary -----
 
