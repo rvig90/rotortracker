@@ -839,13 +839,17 @@ if tab_choice == "🔁 Rotor Tracker":
             st.stop()
         
         # ===== CASE: Pending Orders =====
+        import re
+
         if re.search(r"\b(pendings|pending orders?)\b", query):
             pending_df = df[
                 (df["Type"] == "Outgoing") &
                 (df["Pending"] == True)
             ]
+        
             if not pending_df.empty:
                 st.success("📬 Pending Orders Grouped by Buyer and Rotor Size")
+        
                 grouped = (
                     pending_df.groupby(["Remarks", "Size (mm)"])["Quantity"]
                     .sum()
@@ -857,9 +861,47 @@ if tab_choice == "🔁 Rotor Tracker":
                     })
                     .sort_values(["Buyer", "Rotor Size (mm)"])
                 )
-                st.dataframe(grouped, use_container_width=True, hide_index=True)
+        
+                # ---- Show editable grouped table ----
+                edited_grouped = st.data_editor(
+                    grouped,
+                    use_container_width=True,
+                    hide_index=True,
+                    key="pending_orders_editor"
+                )
+        
+                # ---- Save button only if changes ----
+                if not edited_grouped.equals(grouped):
+                    if st.button("💾 Save Changes", key="save_pending_orders"):
+                        # Map edits back to original df
+                        for idx, row in edited_grouped.iterrows():
+                            buyer = row["Buyer"]
+                            size = row["Rotor Size (mm)"]
+                            new_qty = row["Pending Quantity"]
+        
+                            mask = (df["Remarks"] == buyer) & \
+                                   (df["Size (mm)"] == size) & \
+                                   (df["Type"] == "Outgoing") & \
+                                   (df["Pending"] == True)
+        
+                            # Adjust all matching rows to match grouped qty
+                            total_current = df.loc[mask, "Quantity"].sum()
+                            diff = new_qty - total_current
+        
+                            if diff != 0:
+                                # Apply difference to the first matching row
+                                first_idx = df.loc[mask].index[0]
+                                df.at[first_idx, "Quantity"] += diff
+        
+                        # Update session + save to GSheet
+                        st.session_state.stator = df
+                        save_to_sheet(df, SHEET_STATOR)
+        
+                        st.success("✅ Pending orders updated!")
+        
             else:
                 st.info("✅ No pending orders found.")
+        
             st.stop()
         
         # ===== General Filters =====
