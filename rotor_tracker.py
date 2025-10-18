@@ -15,7 +15,7 @@ from prophet import Prophet
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from forecast_utils import forecast_with_xgboost
-import OpenAI
+
 from langchain_experimental.agents import create_pandas_dataframe_agent
 import openai
 import re
