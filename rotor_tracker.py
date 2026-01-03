@@ -839,7 +839,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.stop()
         
         # ===== CASE: Pending Orders =====
-       import re
+        import re
         from rapidfuzz import process, fuzz
         
         def auto_detect_buyer(query, buyers):
