@@ -694,18 +694,30 @@ if tab_choice == "🔁 Rotor Tracker":
         
         def auto_detect_buyer(query, buyers):
             q = query.lower()
+        
+            # remove intent words
             for w in [
                 "pending", "pendings", "order", "orders",
                 "due", "amount", "how", "much", "is", "for"
             ]:
                 q = q.replace(w, "")
+        
             q = q.strip()
         
+            # ❌ block meaningless inputs
+            if q in ["", "buyer", "buyers", "party", "customer", "client"]:
+                return None
+        
+            # decide cutoff dynamically
+            cutoff = 60 if len(q.split()) == 1 else 70
+        
             match = process.extractOne(
-                q, buyers,
+                q,
+                buyers,
                 scorer=fuzz.partial_ratio,
-                score_cutoff=65
+                score_cutoff=cutoff
             )
+        
             return match[0] if match else None
         
         
