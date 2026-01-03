@@ -839,68 +839,80 @@ if tab_choice == "🔁 Rotor Tracker":
             st.stop()
         
         # ===== CASE: Pending Orders =====
-        import re
-
-        if re.search(r"\b(pendings|pending orders?)\b", query):
+       import re
+        from rapidfuzz import process, fuzz
+        
+        def auto_detect_buyer(query, buyers):
+            query = query.lower()
+        
+            # remove common words
+            for word in ["pending", "pendings", "order", "orders", "due", "amount", "how", "much", "is", "for"]:
+                query = query.replace(word, "")
+        
+            query = query.strip()
+        
+            match = process.extractOne(
+                query,
+                buyers,
+                scorer=fuzz.partial_ratio,
+                score_cutoff=70
+            )
+        
+            return match[0] if match else None
+        
+        
+        # ------------------ CHAT QUERY ------------------
+        if re.search(r"\b(pending|pendings|pending orders?)\b", query):
+        
+            buyers_list = df["Remarks"].dropna().unique().tolist()
+            buyer = auto_detect_buyer(query, buyers_list)
+        
+            if not buyer:
+                st.warning("❌ Buyer not detected. Please type buyer name clearly.")
+                st.stop()
+        
             pending_df = df[
                 (df["Type"] == "Outgoing") &
-                (df["Pending"] == True)
-            ]
+                (df["Pending"] == True) &
+                (df["Remarks"] == buyer)
+            ].copy()
         
-            if not pending_df.empty:
-                st.success("📬 Pending Orders Grouped by Buyer and Rotor Size")
+            if pending_df.empty:
+                st.info(f"✅ No pending orders found for **{buyer}**")
+                st.stop()
         
-                grouped = (
-                    pending_df.groupby(["Remarks", "Size (mm)"])["Quantity"]
-                    .sum()
-                    .reset_index()
-                    .rename(columns={
-                        "Remarks": "Buyer",
-                        "Size (mm)": "Rotor Size (mm)",
-                        "Quantity": "Pending Quantity"
-                    })
-                    .sort_values(["Buyer", "Rotor Size (mm)"])
-                )
+            # -------- Calculate Estimated Value --------
+            pending_df["Estimated Value"] = pending_df["Quantity"] * 3.8
         
-                # ---- Show editable grouped table ----
-                edited_grouped = st.data_editor(
-                    grouped,
-                    use_container_width=True,
-                    hide_index=True,
-                    key="pending_orders_editor"
-                )
+            total_estimated_value = pending_df["Estimated Value"].sum()
         
-                # ---- Save button only if changes ----
-                if not edited_grouped.equals(grouped):
-                    if st.button("💾 Save Changes", key="save_pending_orders"):
-                        # Map edits back to original df
-                        for idx, row in edited_grouped.iterrows():
-                            buyer = row["Buyer"]
-                            size = row["Rotor Size (mm)"]
-                            new_qty = row["Pending Quantity"]
+            st.success(
+                f"📌 Pending Orders for **{buyer}**  \n"
+                f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
+            )
         
-                            mask = (df["Remarks"] == buyer) & \
-                                   (df["Size (mm)"] == size) & \
-                                   (df["Type"] == "Outgoing") & \
-                                   (df["Pending"] == True)
+            # -------- Group by Buyer + Size --------
+            grouped = (
+                pending_df
+                .groupby(["Remarks", "Size (mm)"], as_index=False)
+                .agg({
+                    "Quantity": "sum",
+                    "Estimated Value": "sum"
+                })
+                .rename(columns={
+                    "Remarks": "Buyer",
+                    "Size (mm)": "Rotor Size (mm)",
+                    "Quantity": "Pending Quantity"
+                })
+                .sort_values("Rotor Size (mm)")
+            )
         
-                            # Adjust all matching rows to match grouped qty
-                            total_current = df.loc[mask, "Quantity"].sum()
-                            diff = new_qty - total_current
-        
-                            if diff != 0:
-                                # Apply difference to the first matching row
-                                first_idx = df.loc[mask].index[0]
-                                df.at[first_idx, "Quantity"] += diff
-        
-                        # Update session + save to GSheet
-                        st.session_state.stator = df
-                        save_to_sheet(df, SHEET_STATOR)
-        
-                        st.success("✅ Pending orders updated!")
-        
-            else:
-                st.info("✅ No pending orders found.")
+            # -------- Display table --------
+            st.dataframe(
+                grouped,
+                use_container_width=True,
+                hide_index=True
+            )
         
             st.stop()
         
