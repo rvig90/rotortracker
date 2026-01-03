@@ -839,20 +839,23 @@ if tab_choice == "🔁 Rotor Tracker":
             st.stop()
         
         # ===== CASE: Pending Orders =====
+        # ===== CASE: Pending Orders (Buyer auto-detect + estimation) =====
         import re
         from rapidfuzz import process, fuzz
         
         def auto_detect_buyer(query, buyers):
-            query = query.lower()
+            q = query.lower()
         
-            # remove common words
-            for word in ["pending", "pendings", "order", "orders", "due", "amount", "how", "much", "is", "for"]:
-                query = query.replace(word, "")
+            for word in [
+                "pending", "pendings", "order", "orders",
+                "due", "amount", "how", "much", "is", "for"
+            ]:
+                q = q.replace(word, "")
         
-            query = query.strip()
+            q = q.strip()
         
             match = process.extractOne(
-                query,
+                q,
                 buyers,
                 scorer=fuzz.partial_ratio,
                 score_cutoff=70
@@ -861,10 +864,16 @@ if tab_choice == "🔁 Rotor Tracker":
             return match[0] if match else None
         
         
-        # ------------------ CHAT QUERY ------------------
         if re.search(r"\b(pending|pendings|pending orders?)\b", query):
         
-            buyers_list = df["Remarks"].dropna().unique().tolist()
+            buyers_list = (
+                df["Remarks"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+        
             buyer = auto_detect_buyer(query, buyers_list)
         
             if not buyer:
@@ -874,42 +883,52 @@ if tab_choice == "🔁 Rotor Tracker":
             pending_df = df[
                 (df["Type"] == "Outgoing") &
                 (df["Pending"] == True) &
-                (df["Remarks"] == buyer)
+                (df["Remarks"].str.lower() == buyer.lower())
             ].copy()
         
             if pending_df.empty:
                 st.info(f"✅ No pending orders found for **{buyer}**")
                 st.stop()
         
-            # -------- Calculate Estimated Value --------
-            pending_df["Estimated Value"] = (
-            pending_df["Size (mm)"] * pending_df["Quantity"] * 3.8)
+            # ---- Ensure numeric safety ----
+            pending_df["Size (mm)"] = pd.to_numeric(
+                pending_df["Size (mm)"], errors="coerce"
+            )
+            pending_df["Quantity"] = pd.to_numeric(
+                pending_df["Quantity"], errors="coerce"
+            )
         
+            pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
+        
+            # ---- Estimate = Size × Quantity × 3.8 ----
+            pending_df["Estimated Value"] = (
+                pending_df["Size (mm)"] *
+                pending_df["Quantity"] *
+                3.8
+            )
         
             total_estimated_value = pending_df["Estimated Value"].sum()
         
             st.success(
-                f"📌 Pending Orders for **{buyer}**  \n"
+                f"📌 Pending Orders for **{buyer}**\n\n"
                 f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
             )
         
-            # -------- Group by Buyer + Size --------
+            # ---- Group by Size ----
             grouped = (
                 pending_df
-                .groupby(["Remarks", "Size (mm)"], as_index=False)
+                .groupby("Size (mm)", as_index=False)
                 .agg({
                     "Quantity": "sum",
                     "Estimated Value": "sum"
                 })
                 .rename(columns={
-                    "Remarks": "Buyer",
                     "Size (mm)": "Rotor Size (mm)",
                     "Quantity": "Pending Quantity"
                 })
                 .sort_values("Rotor Size (mm)")
             )
         
-            # -------- Display table --------
             st.dataframe(
                 grouped,
                 use_container_width=True,
