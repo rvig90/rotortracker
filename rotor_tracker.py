@@ -882,7 +882,9 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.stop()
         
             # -------- Calculate Estimated Value --------
-            pending_df["Estimated Value"] = pending_df["Quantity"] * 3.8
+            pending_df["Estimated Value"] = (
+            pending_df["Size (mm)"] * pending_df["Quantity"] * 3.8)
+        
         
             total_estimated_value = pending_df["Estimated Value"].sum()
         
