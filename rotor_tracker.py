@@ -840,102 +840,79 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # ===== CASE: Pending Orders =====
         # ===== CASE: Pending Orders (Buyer auto-detect + estimation) =====
-            import re
-            from rapidfuzz import process, fuzz
-            
-            def auto_detect_buyer(query, buyers):
-                q = query.lower()
-            
-                for word in [
-                    "pending", "pendings", "order", "orders",
-                    "due", "amount", "how", "much", "is", "for"
-                ]:
-                    q = q.replace(word, "")
-            
-                q = q.strip()
-            
-                match = process.extractOne(
-                    q,
-                    buyers,
-                    scorer=fuzz.partial_ratio,
-                    score_cutoff=70
-                )
-            
-                return match[0] if match else None
-            
-            
-            if re.search(r"\b(pending|pendings|pending orders?)\b", query):
-            
-                buyers_list = (
-                    df["Remarks"]
-                    .dropna()
-                    .astype(str)
-                    .unique()
-                    .tolist()
-                )
-            
-                buyer = auto_detect_buyer(query, buyers_list)
-            
-                if not buyer:
-                    st.warning("❌ Buyer not detected. Please type buyer name clearly.")
-                    st.stop()
-            
-                pending_df = df[
-                    (df["Type"] == "Outgoing") &
-                    (df["Pending"] == True) &
-                    (df["Remarks"].str.lower() == buyer.lower())
-                ].copy()
-            
-                if pending_df.empty:
-                    st.info(f"✅ No pending orders found for **{buyer}**")
-                    st.stop()
-            
-                # ---- Ensure numeric safety ----
-                pending_df["Size (mm)"] = pd.to_numeric(
-                    pending_df["Size (mm)"], errors="coerce"
-                )
-                pending_df["Quantity"] = pd.to_numeric(
-                    pending_df["Quantity"], errors="coerce"
-                )
-            
-                pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-            
-                # ---- Estimate = Size × Quantity × 3.8 ----
-                pending_df["Estimated Value"] = (
-                    pending_df["Size (mm)"] *
-                    pending_df["Quantity"] *
-                    3.8
-                )
-            
-                total_estimated_value = pending_df["Estimated Value"].sum()
-            
-                st.success(
-                    f"📌 Pending Orders for **{buyer}**\n\n"
-                    f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
-                )
-            
-                # ---- Group by Size ----
-                grouped = (
-                    pending_df
-                    .groupby("Size (mm)", as_index=False)
-                    .agg({
-                        "Quantity": "sum",
-                        "Estimated Value": "sum"
-                    })
-                    .rename(columns={
-                        "Size (mm)": "Rotor Size (mm)",
-                        "Quantity": "Pending Quantity"
-                    })
-                    .sort_values("Rotor Size (mm)")
-                )
-            
-                st.dataframe(
-                    grouped,
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
+        query = chat_query.lower()
+
+        # ================== PENDING ORDERS (RUN FIRST) ==================
+        import re
+        from rapidfuzz import process, fuzz
+        
+        def auto_detect_buyer(query, buyers):
+            q = query.lower()
+            for w in ["pending", "pendings", "order", "orders", "due", "amount", "how", "much", "is", "for"]:
+                q = q.replace(w, "")
+            q = q.strip()
+        
+            match = process.extractOne(
+                q, buyers,
+                scorer=fuzz.partial_ratio,
+                score_cutoff=65   # slightly relaxed
+            )
+            return match[0] if match else None
+        
+        
+        if "pending" in query:
+            st.write("🧪 DEBUG: Pending block triggered")  # <-- DEBUG LINE
+        
+            buyers_list = df["Remarks"].dropna().astype(str).unique().tolist()
+            buyer = auto_detect_buyer(query, buyers_list)
+        
+            st.write("🧪 DEBUG buyer detected:", buyer)  # <-- DEBUG LINE
+        
+            if not buyer:
+                st.warning("Buyer not detected")
                 st.stop()
+        
+            pending_df = df[
+                (df["Type"] == "Outgoing") &
+                (df["Pending"] == True) &
+                (df["Remarks"].str.lower() == buyer.lower())
+            ].copy()
+        
+            st.write("🧪 DEBUG rows found:", len(pending_df))  # <-- DEBUG LINE
+        
+            if pending_df.empty:
+                st.info(f"No pending found for {buyer}")
+                st.stop()
+        
+            pending_df["Size (mm)"] = pd.to_numeric(pending_df["Size (mm)"], errors="coerce")
+            pending_df["Quantity"] = pd.to_numeric(pending_df["Quantity"], errors="coerce")
+        
+            pending_df["Estimated Value"] = (
+                pending_df["Size (mm)"] * pending_df["Quantity"] * 3.8
+            )
+        
+            total = pending_df["Estimated Value"].sum()
+        
+            st.success(
+                f"📌 Pending Orders for **{buyer}**\n\n"
+                f"💰 TOTAL ESTIMATED VALUE: ₹{total:,.2f}"
+            )
+        
+            grouped = (
+                pending_df
+                .groupby("Size (mm)", as_index=False)
+                .agg({
+                    "Quantity": "sum",
+                    "Estimated Value": "sum"
+                })
+                .rename(columns={
+                    "Size (mm)": "Rotor Size (mm)",
+                    "Quantity": "Pending Quantity"
+                })
+            )
+        
+            st.dataframe(grouped, use_container_width=True, hide_index=True)
+            st.stop()
         
         # ===== General Filters =====
         df = df[df["Status"] != "Future"]
