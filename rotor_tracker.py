@@ -690,7 +690,8 @@ if tab_choice == "🔁 Rotor Tracker":
         # ===== PENDING FIRST =====
         # =========================
 # ===== CASE: Pending Orders with Estimated Value =====
-import re
+
+        import re
 
         if re.search(r"\b(pending|pendings|pending orders?)\b", query):
         
