@@ -11,15 +11,10 @@ import io
 import requests
 from uuid import uuid4
 import altair as alt
-
-from sklearn.metrics import mean_squared_error
-from forecast_utils import forecast_with_xgboost
 import re
 
 
-import openai
 
-import pandas as pd
 import os
 st.set_page_config(page_title="rotor + stator tracker",
                    layout="wide:
