@@ -768,43 +768,31 @@ if tab_choice == "🔁 Rotor Tracker":
           use_container_width=True,
           hide_index=True
           )
-        
-        
+        stop()
         
 
-        st.stop()    # =========================
-      # ===== OTHER CHATBOT =====
-      # =========================
-      
-      # Estimated rotor weights (kg)
-       
 
-        # ===== Extract Components =====
   
-  month_match = re.search(
-    
-      
-    r"\b(january|february|march|april|may|june|july|august|"
-      r"september|october|november|december)\b", query
-    )
-  
-  month_name = month_match.group(1).capitalize() if month_match else None
-    
-  rotor_match = re.search(r"(\d{2,6})\s*mm", query)
-  rotor_size = int(rotor_match.group(1)) if rotor_match else None
+        month_match = re.search(
+          r"\b(january|february|march|april|may|june|july|august|"
+          r"september|october|november|december)\b", query
+          )
+        month_name = month_match.group(1).capitalize() if month_match else None
+        rotor_match = re.search(r"(\d{2,6})\s*mm", query)
+        rotor_size = int(rotor_match.group(1)) if rotor_match else None
+        
     
     # Remove known terms to isolate buyer
-  cleaned = re.sub(
-    
-    r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|weight|"
-    r"january|february|march|april|may|june|july|august|"
-    r"september|october|november|december|20\d{2})",
-        "",
-    
-    query,
-    flags=re.IGNORECASE
-    )
-    buyer_name = cleaned.strip()
+        cleaned = re.sub(
+          r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|weight|"
+          r"january|february|march|april|may|june|july|august|"
+          r"september|october|november|december|20\d{2})",
+          "",
+          query,
+          flags=re.IGNORECASE
+          )
+          buyer_name = cleaned.strip()
+
     
     # ===== Buyer Weight Estimation =====
     if "weight" in query and buyer_name:
