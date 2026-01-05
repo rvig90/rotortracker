@@ -12,7 +12,14 @@ import requests
 from uuid import uuid4
 import altair as alt
 import re
-
+import sys
+import traceback
+try:
+  pass
+except Exception:
+  st.error("app crashed please restart,")
+  st.text(traceback.formal.exc())
+  sys.exit()
 
 
 import os
