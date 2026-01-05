@@ -15,10 +15,11 @@ from prophet import Prophet
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from forecast_utils import forecast_with_xgboost
+import re
 
 
 import openai
-import re
+
 import pandas as pd
 import os
 
@@ -987,7 +988,7 @@ if tab_choice == "🔁 Rotor Tracker":
                    
       
     with tabs[4]: 
-        import re
+        
     
         st.subheader("💬 Ask RotorBot Lite")
         
