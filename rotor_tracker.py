@@ -668,10 +668,6 @@ if tab_choice == "🔁 Rotor Tracker":
                             st.session_state.editing = None
                             st.rerun()
     # === TAB 3: Rotor Trend ===
-    import re
-    import calendar
-    from datetime import datetime
-    import pandas as pd
             
         with tabs[2]:
             st.subheader("💬 Rotor Chatbot Lite")
@@ -697,9 +693,6 @@ if tab_choice == "🔁 Rotor Tracker":
         
             query = chat_query.lower().strip()
         
-            # =====================================================
-            # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
-            # =====================================================
             # =====================================================
             # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
             # =====================================================
