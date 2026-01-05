@@ -686,14 +686,14 @@ if tab_choice == "🔁 Rotor Tracker":
             # ---- Safety guards ----
             if df.empty or "Remarks" not in df.columns:
                 st.info("📦 No data available yet.")
-                st.stop()
+                
         
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             df["Remarks"] = df["Remarks"].astype(str)
             df["Type"] = df["Type"].astype(str)
         
             query = chat_query.lower().strip()
-            import re
+            
             # =====================================================
             # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
             # =====================================================
