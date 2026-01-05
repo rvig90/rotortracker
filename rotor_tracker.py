@@ -896,51 +896,11 @@ if tab_choice == "🔁 Rotor Tracker":
     
         # === CASE: Buyer weight estimation ===
         
-        # CASE: Clitting Left or Balance
-        if re.search(r"\b(clitting (left|balance|available|remaining)|how much clitting)\b", query):
-            # Total clitting received (in kg)
-            total_clitting_inward = 0
-            if "clitting_data" in st.session_state and not st.session_state.clitting_data.empty:
-                df_clit = st.session_state.clitting_data.copy()
-                total_clitting_inward = (df_clit["Bags"] * df_clit["Weight per Bag (kg)"]).sum()
-        
-            # Total clitting consumed (in kg)
-            total_clitting_used = 0
-            if "stator_data" in st.session_state and not st.session_state.stator_data.empty:
-                df_stat = st.session_state.stator_data.copy()
-                total_clitting_used = df_stat["Estimated Clitting (kg)"].sum()
-        
-            clitting_left = round(total_clitting_inward - total_clitting_used, 2)
-        
-            st.success(f"🧮 *Clitting Left:* {clitting_left} kg")
-            st.info(f"📥 Total Inward: {round(total_clitting_inward, 2)} kg | 🛠 Used: {round(total_clitting_used, 2)} kg")
-        
-            # Add warning if low
-            if clitting_left < 5:
-                st.warning("⚠ Clitting stock is running low. Consider reordering.")
-            st.stop()
+      
           
           
     
-        # === CASE: "130mm clitting left" ===
-          clitting_left_match = re.search(r"(\d{2,6})\s*mm.*clitting.*", query)
-          if clitting_left_match:
-              size = int(clitting_left_match.group(1))
-              
-              # Total clitting added
-              total_added = st.session_state.clitting_data[
-                  st.session_state.clitting_data["Size (mm)"] == size
-              ].apply(lambda row: row["Bags"] * row["Weight per Bag (kg)"], axis=1).sum()
-          
-              # Total clitting used
-              total_used = st.session_state.stator_data[
-                  st.session_state.stator_data["Size (mm)"] == size
-              ]["Estimated Clitting (kg)"].sum()
-          
-              remaining = total_added - total_used
-          
-              st.success(f"🔩 Remaining clitting for *{size}mm* stators: *{remaining:.2f} kg*")
-              st.stop()        
+               
         
       
     
