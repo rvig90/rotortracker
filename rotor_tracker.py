@@ -693,7 +693,7 @@ if tab_choice == "🔁 Rotor Tracker":
             df["Type"] = df["Type"].astype(str)
         
             query = chat_query.lower().strip()
-        
+            import re
             # =====================================================
             # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
             # =====================================================
