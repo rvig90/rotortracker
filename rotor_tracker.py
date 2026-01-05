@@ -791,7 +791,8 @@ if tab_choice == "🔁 Rotor Tracker":
           query,
           flags=re.IGNORECASE
           )
-          buyer_name = cleaned.strip()
+        
+        buyer_name = cleaned.strip()
 
     
     # ===== Buyer Weight Estimation =====
