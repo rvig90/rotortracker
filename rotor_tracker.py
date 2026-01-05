@@ -23,9 +23,6 @@ except Exception:
 
 
 import os
-st.set_page_config(page_title="rotor + stator tracker",
-                   layout="wide:
-                  )
 
 from uuid import uuid4
 
