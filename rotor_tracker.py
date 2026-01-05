@@ -657,124 +657,184 @@ if tab_choice == "🔁 Rotor Tracker":
                             st.rerun()
     # === TAB 3: Rotor Trend ===
     with tabs[2]:
+        
       
       
-      import re
-      import pandas as pd
-      
-      st.subheader("💬 Rotor Chatbot Lite")
-      
-      chat_query = st.text_input(
-          "Type: ravi pending | buyer a pending | pending"
-      )
-      
-      if not chat_query:
-          st.stop()
-      
-      # ======================
-      # DATA PREP
-      # ======================
-      df = st.session_state.data.copy()
-      
-      required_cols = ["Remarks", "Type", "Size (mm)", "Quantity"]
-      if df.empty or not all(c in df.columns for c in required_cols):
-          st.info("📦 No data available yet.")
-          st.stop()
-      
-      df["Remarks"] = df["Remarks"].astype(str)
-      df["Type"] = df["Type"].astype(str)
-      df["Size (mm)"] = pd.to_numeric(df["Size (mm)"], errors="coerce")
-      df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
-      
-      query = chat_query.lower().strip()
-      
-      # ======================
-      # PENDING DETECTION
-      # ======================
-      if "pending" in query:
-      
-          # ---- All buyers list ----
-          buyers = df["Remarks"].dropna().unique().tolist()
-      
-          # ---- Detect buyer ----
-          buyer = None
-          for b in buyers:
-              if b.lower() in query:
-                  buyer = b
-                  break
-      
-          # ---- If buyer not typed, show ALL buyers pending ----
-          pending_df = df[df["Type"].str.lower() == "outgoing"].copy()
-      
-          if buyer:
-              pending_df = pending_df[
-                  pending_df["Remarks"].str.lower() == buyer.lower()
-              ]
-      
-          if pending_df.empty:
-              st.warning("❌ No pending outgoing entries found.")
-              st.stop()
-      
-          pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-      
-          RATE_PER_MM = 3.8
-          pending_df["Estimated Value"] = (
-              pending_df["Size (mm)"] *
-              pending_df["Quantity"] *
-              RATE_PER_MM
-          )
-      
-          total_value = pending_df["Estimated Value"].sum()
-      
-          # ======================
-          # SUMMARY MESSAGE
-          # ======================
-          if buyer:
-              st.success(
-                  f"📌 Pending Orders for **{buyer}**\n\n"
-                  f"💰 Total Estimated Value: ₹{total_value:,.2f}"
-              )
-          else:
-              st.success(
-                  f"📌 Pending Orders (ALL BUYERS)\n\n"
-                  f"💰 Total Estimated Value: ₹{total_value:,.2f}"
-              )
-      
-          # ======================
-          # GROUPED TABLE
-          # ======================
-          grouped = (
-              pending_df
-              .groupby(["Remarks", "Size (mm)"], as_index=False)
-              .agg({
-                  "Quantity": "sum",
-                  "Estimated Value": "sum"
-              })
-              .rename(columns={
-                  "Remarks": "Buyer",
-                  "Size (mm)": "Rotor Size (mm)",
-                  "Quantity": "Pending Quantity"
-              })
-              .sort_values(["Buyer", "Rotor Size (mm)"])
-          )
-      
-          st.dataframe(
-              grouped,
-              use_container_width=True,
-              hide_index=True
-          )
-      
-          st.stop()
-      
-      # ======================
-      # DEFAULT HELP
-      # ======================
-      st.info(
-          "💡 Try:\n"
-          "- pending\n"
-          "- ravi pending\n"
-          "- buyer a pending"
-      )
+        import pandas as pd
+        import calendar
+        from datetime import datetime
+        
+        st.subheader("💬 Rotor Chatbot Lite")
+        
+        chat_query = st.text_input(
+            "Examples: ravi pending | ravi january | outgoing february | incoming may | coming rotors june"
+        )
+        
+        if not chat_query:
+            st.stop()
+        
+        # =========================
+        # DATA PREPARATION
+        # =========================
+        df = st.session_state.data.copy()
+        
+        required_cols = ["Remarks", "Type", "Size (mm)", "Quantity", "Status", "Date"]
+        if df.empty or not all(c in df.columns for c in required_cols):
+            st.info("📦 No data available yet.")
+            st.stop()
+        
+        df["Remarks"] = df["Remarks"].astype(str)
+        df["Type"] = df["Type"].astype(str)
+        df["Status"] = df["Status"].astype(str)
+        df["Size (mm)"] = pd.to_numeric(df["Size (mm)"], errors="coerce")
+        df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        
+        query = chat_query.lower().strip()
+        
+        RATE_PER_MM = 3.8
+        CURRENT_YEAR = datetime.now().year
+        
+        # =========================
+        # MONTH DETECTION
+        # =========================
+        month_name = None
+        month_num = None
+        
+        for i, m in enumerate(calendar.month_name):
+            if m and m.lower() in query:
+                month_name = m
+                month_num = i
+                break
+        
+        # =========================
+        # BUYER AUTO-DETECTION
+        # =========================
+        buyers = df["Remarks"].dropna().unique().tolist()
+        buyer = None
+        
+        for b in buyers:
+            if b.lower() in query:
+                buyer = b
+                break
+        
+        # =========================
+        # MOVEMENT TYPE DETECTION
+        # =========================
+        movement = None
+        
+        if "pending" in query:
+            movement = "pending"
+        elif "incoming" in query or "inward" in query:
+            movement = "incoming"
+        elif "outgoing" in query:
+            movement = "outgoing"
+        elif "coming" in query:
+            movement = "coming"
+        
+        # Default behaviour:
+        # If buyer + month is given but no movement → show ALL movements
+        show_all_movements = movement is None
+        
+        # =========================
+        # FILTER DATA
+        # =========================
+        filtered = df.copy()
+        
+        # Buyer filter
+        if buyer:
+            filtered = filtered[filtered["Remarks"].str.lower() == buyer.lower()]
+        
+        # Movement filter
+        if not show_all_movements:
+            if movement == "pending":
+                filtered = filtered[filtered["Type"].str.lower() == "outgoing"]
+        
+            elif movement == "incoming":
+                filtered = filtered[filtered["Type"].str.lower() == "inward"]
+        
+            elif movement == "outgoing":
+                filtered = filtered[filtered["Type"].str.lower() == "outgoing"]
+        
+            elif movement == "coming":
+                filtered = filtered[filtered["Status"].str.lower() == "future"]
+        
+        # Month filter
+        if month_num:
+            start_date = datetime(CURRENT_YEAR, month_num, 1)
+            end_date = datetime(
+                CURRENT_YEAR,
+                month_num,
+                calendar.monthrange(CURRENT_YEAR, month_num)[1]
+            )
+            filtered = filtered[
+                (filtered["Date"] >= start_date) &
+                (filtered["Date"] <= end_date)
+            ]
+        
+        filtered = filtered.dropna(subset=["Size (mm)", "Quantity"])
+        
+        if filtered.empty:
+            st.warning("❌ No matching records found.")
+            st.stop()
+        
+        # =========================
+        # ESTIMATION
+        # =========================
+        filtered["Estimated Value"] = (
+            filtered["Size (mm)"] *
+            filtered["Quantity"] *
+            RATE_PER_MM
+        )
+        
+        total_value = filtered["Estimated Value"].sum()
+        
+        # =========================
+        # TITLE
+        # =========================
+        title_parts = ["📌"]
+        
+        if buyer:
+            title_parts.append(buyer)
+        
+        if movement:
+            title_parts.append(movement.capitalize())
+        else:
+            title_parts.append("All Movements")
+        
+        if month_name:
+            title_parts.append(month_name)
+        
+        title = " – ".join(title_parts)
+        
+        st.success(
+            f"{title}\n\n"
+            f"💰 Total Estimated Value: ₹{total_value:,.2f}"
+        )
+        
+        # =========================
+        # GROUPED OUTPUT
+        # =========================
+        grouped = (
+            filtered
+            .groupby(["Remarks", "Size (mm)"], as_index=False)
+            .agg({
+                "Quantity": "sum",
+                "Estimated Value": "sum"
+            })
+            .rename(columns={
+                "Remarks": "Buyer",
+                "Size (mm)": "Rotor Size (mm)",
+                "Quantity": "Quantity"
+            })
+            .sort_values(["Buyer", "Rotor Size (mm)"])
+        )
+        
+        st.dataframe(
+            grouped,
+            use_container_width=True,
+            hide_index=True
+        )
     
         # === CASE: Buyer weight estimation ===
         
