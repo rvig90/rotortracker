@@ -689,57 +689,27 @@ if tab_choice == "🔁 Rotor Tracker":
         # =========================
         # ===== PENDING FIRST =====
         # =========================
-from rapidfuzz import process, fuzz
+# ===== CASE: Pending Orders with Estimated Value =====
         import re
+
+        if re.search(r"\b(pending|pendings|pending orders?)\b", query):
         
-        def auto_detect_buyer(query, buyers):
-            q = query.lower()
+            # ---- Auto-detect buyer using substring match ----
+            buyers = df["Remarks"].dropna().unique().tolist()
+            buyer = None
         
-            # remove intent words
-            for w in [
-                "pending", "pendings", "order", "orders",
-                "due", "amount", "how", "much", "is", "for"
-            ]:
-                q = q.replace(w, "")
-        
-            q = q.strip()
-        
-            # ❌ block meaningless inputs
-            if q in ["", "buyer", "buyers", "party", "customer", "client"]:
-                return None
-        
-            # decide cutoff dynamically
-            cutoff = 60 if len(q.split()) == 1 else 70
-        
-            match = process.extractOne(
-                q,
-                buyers,
-                scorer=fuzz.partial_ratio,
-                score_cutoff=cutoff
-            )
-        
-            return match[0] if match else None
-        
-        
-        if query and "pending" in query:
-        
-            buyers_list = (
-                df["Remarks"]
-                .dropna()
-                .astype(str)
-                .unique()
-                .tolist()
-            )
-        
-            buyer = auto_detect_buyer(query, buyers_list)
+            for b in buyers:
+                if b.lower() in query.lower():
+                    buyer = b
+                    break
         
             if not buyer:
-                st.warning("❌ Buyer not detected. Please type buyer name clearly.")
+                st.warning("❌ Buyer not detected. Please type buyer name clearly (e.g. 'tri pending').")
                 st.stop()
         
+            # ---- Treat all outgoing of buyer as pending ----
             pending_df = df[
                 (df["Type"] == "Outgoing") &
-                (df["Pending"] == True) &
                 (df["Remarks"].str.lower() == buyer.lower())
             ].copy()
         
@@ -747,20 +717,10 @@ from rapidfuzz import process, fuzz
                 st.info(f"✅ No pending orders found for **{buyer}**")
                 st.stop()
         
-            # ---- Numeric safety ----
-            pending_df["Size (mm)"] = pd.to_numeric(
-                pending_df["Size (mm)"], errors="coerce"
-            )
-            pending_df["Quantity"] = pd.to_numeric(
-                pending_df["Quantity"], errors="coerce"
-            )
-        
-            pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-        
-            # ---- Estimate = Size × Quantity × 3.8 ----
+            # ---- Estimated Value Calculation ----
             pending_df["Estimated Value"] = (
-                pending_df["Size (mm)"] *
-                pending_df["Quantity"] *
+                pending_df["Size (mm)"].astype(float) *
+                pending_df["Quantity"].astype(float) *
                 3.8
             )
         
@@ -771,14 +731,16 @@ from rapidfuzz import process, fuzz
                 f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
             )
         
+            # ---- Grouped Summary ----
             grouped = (
                 pending_df
-                .groupby("Size (mm)", as_index=False)
+                .groupby(["Remarks", "Size (mm)"], as_index=False)
                 .agg({
                     "Quantity": "sum",
                     "Estimated Value": "sum"
                 })
                 .rename(columns={
+                    "Remarks": "Buyer",
                     "Size (mm)": "Rotor Size (mm)",
                     "Quantity": "Pending Quantity"
                 })
