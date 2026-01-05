@@ -768,7 +768,7 @@ if tab_choice == "🔁 Rotor Tracker":
           use_container_width=True,
           hide_index=True
           )
-        stop()
+        
         
 
 
