@@ -672,7 +672,7 @@ if tab_choice == "🔁 Rotor Tracker":
     import calendar
     from datetime import datetime
     import pandas as pd
-    
+            
         with tabs[2]:
             st.subheader("💬 Rotor Chatbot Lite")
         
@@ -700,76 +700,75 @@ if tab_choice == "🔁 Rotor Tracker":
             # =====================================================
             # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
             # =====================================================
-            if re.search(r"\b(pending|pendings|pending orders?)\b", query):
-        
-                # ---- Detect buyer by substring match ----
-                buyers = df["Remarks"].dropna().unique().tolist()
+            # =====================================================
+            # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
+            # =====================================================
+            if re.search(r"\bpending\b", query):
+            
+                # ---- Normalize remarks ----
+                df["Remarks_clean"] = df["Remarks"].str.lower().str.strip()
+            
+                # ---- Extract possible buyer words from query ----
+                words = query.split()
+                stop_words = {"pending", "order", "orders", "outgoing", "estimate", "value"}
+                buyer_words = [w for w in words if w not in stop_words]
+            
+                # ---- Detect buyer by PARTIAL MATCH ----
                 buyer = None
-        
-                for b in buyers:
-                    if b.lower() in query:
-                        buyer = b
+                for bw in buyer_words:
+                    match = df[df["Remarks_clean"].str.contains(bw, na=False)]
+                    if not match.empty:
+                        buyer = match.iloc[0]["Remarks"]
                         break
-        
+            
                 if not buyer:
-                    st.warning("❌ Buyer not detected. Try typing full buyer name (e.g. 'tri pending').")
+                    st.warning("❌ Buyer not detected. Try: **'Ravi pending'** or **'Tri pending'**")
                     st.stop()
-        
-                # ---- Treat ALL outgoing of buyer as pending ----
+            
+                # ---- Pending Outgoing ONLY ----
                 pending_df = df[
                     (df["Type"].str.lower() == "outgoing") &
+                    (df["Pending"] == True) &
                     (df["Remarks"].str.lower() == buyer.lower())
                 ].copy()
-        
+            
                 if pending_df.empty:
-                    st.info(f"✅ No outgoing entries found for **{buyer}**")
+                    st.info(f"✅ No pending orders for **{buyer}**")
                     st.stop()
-        
+            
                 # ---- Numeric safety ----
                 pending_df["Size (mm)"] = pd.to_numeric(pending_df["Size (mm)"], errors="coerce")
                 pending_df["Quantity"] = pd.to_numeric(pending_df["Quantity"], errors="coerce")
-        
                 pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-        
+            
                 # ---- Estimated Value ----
-                RATE_PER_MM = 3.8  # ₹ per mm (your logic)
-        
+                RATE_PER_MM = 3.8  # ₹ per mm
+            
                 pending_df["Estimated Value"] = (
                     pending_df["Size (mm)"] *
                     pending_df["Quantity"] *
                     RATE_PER_MM
                 )
-        
+            
                 total_estimated_value = pending_df["Estimated Value"].sum()
-        
+            
                 st.success(
                     f"📌 Pending Orders for **{buyer}**\n\n"
                     f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
                 )
-        
-                # ---- Grouped Summary ----
+            
                 grouped = (
                     pending_df
-                    .groupby(["Remarks", "Size (mm)"], as_index=False)
+                    .groupby("Size (mm)", as_index=False)
                     .agg({
                         "Quantity": "sum",
                         "Estimated Value": "sum"
                     })
-                    .rename(columns={
-                        "Remarks": "Buyer",
-                        "Size (mm)": "Rotor Size (mm)",
-                        "Quantity": "Pending Quantity"
-                    })
-                    .sort_values("Rotor Size (mm)")
+                    .sort_values("Size (mm)")
                 )
-        
-                st.dataframe(
-                grouped,
-                use_container_width=True,
-                hide_index=True
-            )
-    
-            st.stop()    # =========================
+            
+                st.dataframe(grouped, use_container_width=True, hide_index=True)
+                st.stop()    # =========================
         # ===== OTHER CHATBOT =====
         # =========================
         
