@@ -12,14 +12,6 @@ import requests
 from uuid import uuid4
 import altair as alt
 import re
-import sys
-import traceback
-try:
-  pass
-except Exception:
-  st.error("app crashed please restart,")
-  st.text(traceback.formal.exc())
-  sys.exit()
 
 
 import os
@@ -667,22 +659,25 @@ if tab_choice == "🔁 Rotor Tracker":
     with tabs[2]:
       
       
+      import re
+      import pandas as pd
+      
       st.subheader("💬 Rotor Chatbot Lite")
       
-
       chat_query = st.text_input(
-          "Try: 'Ravi pending', 'Buyer A pending', '100mm pending'"
+          "Type: ravi pending | buyer a pending | pending"
       )
       
       if not chat_query:
           st.stop()
       
-      # =========================
+      # ======================
       # DATA PREP
-      # =========================
+      # ======================
       df = st.session_state.data.copy()
       
-      if df.empty or "Remarks" not in df.columns:
+      required_cols = ["Remarks", "Type", "Size (mm)", "Quantity"]
+      if df.empty or not all(c in df.columns for c in required_cols):
           st.info("📦 No data available yet.")
           st.stop()
       
@@ -693,37 +688,35 @@ if tab_choice == "🔁 Rotor Tracker":
       
       query = chat_query.lower().strip()
       
-      # =========================
-      # PENDING ORDERS + ESTIMATE
-      # =========================
-      if re.search(r"\b(pending|pendings|pending orders?)\b", query):
+      # ======================
+      # PENDING DETECTION
+      # ======================
+      if "pending" in query:
       
-          # ---- Auto detect buyer ----
+          # ---- All buyers list ----
           buyers = df["Remarks"].dropna().unique().tolist()
-          buyer = None
       
+          # ---- Detect buyer ----
+          buyer = None
           for b in buyers:
               if b.lower() in query:
                   buyer = b
                   break
       
-          if not buyer:
-              st.warning("❌ Buyer not detected. Example: 'Ravi pending'")
-              st.stop()
+          # ---- If buyer not typed, show ALL buyers pending ----
+          pending_df = df[df["Type"].str.lower() == "outgoing"].copy()
       
-          # ---- Outgoing treated as pending ----
-          pending_df = df[
-              (df["Type"].str.lower() == "outgoing") &
-              (df["Remarks"].str.lower() == buyer.lower())
-          ].copy()
+          if buyer:
+              pending_df = pending_df[
+                  pending_df["Remarks"].str.lower() == buyer.lower()
+              ]
       
           if pending_df.empty:
-              st.info(f"✅ No pending orders found for **{buyer}**")
+              st.warning("❌ No pending outgoing entries found.")
               st.stop()
       
           pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
       
-          # ---- Estimate calculation ----
           RATE_PER_MM = 3.8
           pending_df["Estimated Value"] = (
               pending_df["Size (mm)"] *
@@ -733,12 +726,23 @@ if tab_choice == "🔁 Rotor Tracker":
       
           total_value = pending_df["Estimated Value"].sum()
       
-          st.success(
-              f"📌 Pending Orders for **{buyer}**\n\n"
-              f"💰 **TOTAL ESTIMATED VALUE: ₹{total_value:,.2f}**"
-          )
+          # ======================
+          # SUMMARY MESSAGE
+          # ======================
+          if buyer:
+              st.success(
+                  f"📌 Pending Orders for **{buyer}**\n\n"
+                  f"💰 Total Estimated Value: ₹{total_value:,.2f}"
+              )
+          else:
+              st.success(
+                  f"📌 Pending Orders (ALL BUYERS)\n\n"
+                  f"💰 Total Estimated Value: ₹{total_value:,.2f}"
+              )
       
-          # ---- Grouped view ----
+          # ======================
+          # GROUPED TABLE
+          # ======================
           grouped = (
               pending_df
               .groupby(["Remarks", "Size (mm)"], as_index=False)
@@ -751,7 +755,7 @@ if tab_choice == "🔁 Rotor Tracker":
                   "Size (mm)": "Rotor Size (mm)",
                   "Quantity": "Pending Quantity"
               })
-              .sort_values("Rotor Size (mm)")
+              .sort_values(["Buyer", "Rotor Size (mm)"])
           )
       
           st.dataframe(
@@ -762,14 +766,14 @@ if tab_choice == "🔁 Rotor Tracker":
       
           st.stop()
       
-      # =========================
-      # FALLBACK
-      # =========================
+      # ======================
+      # DEFAULT HELP
+      # ======================
       st.info(
-          "💡 Try queries like:\n"
-          "- Ravi pending\n"
-          "- Buyer A pending\n"
-          "- 100mm pending"
+          "💡 Try:\n"
+          "- pending\n"
+          "- ravi pending\n"
+          "- buyer a pending"
       )
     
         # === CASE: Buyer weight estimation ===
