@@ -689,7 +689,7 @@ if tab_choice == "🔁 Rotor Tracker":
         # =========================
         # ===== PENDING FIRST =====
         # =========================
-        from rapidfuzz import process, fuzz
+from rapidfuzz import process, fuzz
         import re
         
         def auto_detect_buyer(query, buyers):
