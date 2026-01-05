@@ -668,230 +668,109 @@ if tab_choice == "🔁 Rotor Tracker":
       
       
       st.subheader("💬 Rotor Chatbot Lite")
+      
 
-
-  
       chat_query = st.text_input(
-          "Try: 'Buyer A June', '100mm last 5', 'Buyer B pending', "
-          "'Outgoing May', '300mm stock', or 'Buyer A weight'"
+          "Try: 'Ravi pending', 'Buyer A pending', '100mm pending'"
       )
-  
+      
       if not chat_query:
           st.stop()
-        
-        
-  
-  
+      
+      # =========================
+      # DATA PREP
+      # =========================
       df = st.session_state.data.copy()
-  
-      # ---- Safety guards ----
+      
       if df.empty or "Remarks" not in df.columns:
           st.info("📦 No data available yet.")
           st.stop()
-  
-      df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+      
       df["Remarks"] = df["Remarks"].astype(str)
       df["Type"] = df["Type"].astype(str)
-  
+      df["Size (mm)"] = pd.to_numeric(df["Size (mm)"], errors="coerce")
+      df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
+      
       query = chat_query.lower().strip()
-  
-      # =====================================================
-      # ===== CASE: PENDING ORDERS + ESTIMATED VALUE ========
-      # =====================================================
+      
+      # =========================
+      # PENDING ORDERS + ESTIMATE
+      # =========================
       if re.search(r"\b(pending|pendings|pending orders?)\b", query):
-        
-  
-          # ---- Detect buyer by substring match ----
-        buyers = df["Remarks"].dropna().unique().tolist()
-        buyer = None
-
-        for b in buyers:
-            if b.lower() in query:
-                buyer = b
-                break
-
-        if not buyer:
-            st.warning("❌ Buyer not detected. Try typing full buyer name (e.g. 'tri pending').")
-            st.stop()
-
-        # ---- Treat ALL outgoing of buyer as pending ----
-        pending_df = df[
-            (df["Type"].str.lower() == "outgoing") &
-            (df["Remarks"].str.lower() == buyer.lower())
-        ].copy()
-
-        if pending_df.empty:
-            st.info(f"✅ No outgoing entries found for **{buyer}**")
-            st.stop()
-
-        # ---- Numeric safety ----
-        pending_df["Size (mm)"] = pd.to_numeric(pending_df["Size (mm)"], errors="coerce")
-        pending_df["Quantity"] = pd.to_numeric(pending_df["Quantity"], errors="coerce")
-
-        pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-
-        # ---- Estimated Value ----
-        RATE_PER_MM = 3.8  # ₹ per mm (your logic)
-
-        pending_df["Estimated Value"] = (
-            pending_df["Size (mm)"] *
-            pending_df["Quantity"] *
-            RATE_PER_MM
-        )
-
-        total_estimated_value = pending_df["Estimated Value"].sum()
-
-        st.success(
-            f"📌 Pending Orders for **{buyer}**\n\n"
-            f"💰 **TOTAL ESTIMATED VALUE: ₹{total_estimated_value:,.2f}**"
-        )
-
-        # ---- Grouped Summary ----
-        grouped = (
-            pending_df
-            .groupby(["Remarks", "Size (mm)"], as_index=False)
-            .agg({
-                "Quantity": "sum",
-                "Estimated Value": "sum"
-            })
-            .rename(columns={
-                "Remarks": "Buyer",
-                "Size (mm)": "Rotor Size (mm)",
-                "Quantity": "Pending Quantity"
-            })
-            .sort_values("Rotor Size (mm)")
-        )
-
-        st.dataframe(
-          
-          grouped,
-          use_container_width=True,
-          hide_index=True
+      
+          # ---- Auto detect buyer ----
+          buyers = df["Remarks"].dropna().unique().tolist()
+          buyer = None
+      
+          for b in buyers:
+              if b.lower() in query:
+                  buyer = b
+                  break
+      
+          if not buyer:
+              st.warning("❌ Buyer not detected. Example: 'Ravi pending'")
+              st.stop()
+      
+          # ---- Outgoing treated as pending ----
+          pending_df = df[
+              (df["Type"].str.lower() == "outgoing") &
+              (df["Remarks"].str.lower() == buyer.lower())
+          ].copy()
+      
+          if pending_df.empty:
+              st.info(f"✅ No pending orders found for **{buyer}**")
+              st.stop()
+      
+          pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
+      
+          # ---- Estimate calculation ----
+          RATE_PER_MM = 3.8
+          pending_df["Estimated Value"] = (
+              pending_df["Size (mm)"] *
+              pending_df["Quantity"] *
+              RATE_PER_MM
           )
-        
-        
-
-
-  
-        month_match = re.search(
-          r"\b(january|february|march|april|may|june|july|august|"
-          r"september|october|november|december)\b", query
+      
+          total_value = pending_df["Estimated Value"].sum()
+      
+          st.success(
+              f"📌 Pending Orders for **{buyer}**\n\n"
+              f"💰 **TOTAL ESTIMATED VALUE: ₹{total_value:,.2f}**"
           )
-        month_name = month_match.group(1).capitalize() if month_match else None
-        rotor_match = re.search(r"(\d{2,6})\s*mm", query)
-        rotor_size = int(rotor_match.group(1)) if rotor_match else None
-        
-    
-    # Remove known terms to isolate buyer
-        cleaned = re.sub(
-          r"(last\s*\d+|inward|outgoing|pending|\d{2,6}mm|stock|weight|"
-          r"january|february|march|april|may|june|july|august|"
-          r"september|october|november|december|20\d{2})",
-          "",
-          query,
-          flags=re.IGNORECASE
+      
+          # ---- Grouped view ----
+          grouped = (
+              pending_df
+              .groupby(["Remarks", "Size (mm)"], as_index=False)
+              .agg({
+                  "Quantity": "sum",
+                  "Estimated Value": "sum"
+              })
+              .rename(columns={
+                  "Remarks": "Buyer",
+                  "Size (mm)": "Rotor Size (mm)",
+                  "Quantity": "Pending Quantity"
+              })
+              .sort_values("Rotor Size (mm)")
           )
-        
-        buyer_name = cleaned.strip()
-
-    
-    # ===== Buyer Weight Estimation =====
-    if "weight" in query and buyer_name:
-    
-        outgoing_df = df[
-            (df["Type"] == "Outgoing") &
-            (df["Remarks"].str.lower().str.contains(buyer_name.lower()))
-        ].copy()
-    
-        if outgoing_df.empty:
-            st.info(f"No outgoing entries found for buyer: {buyer_name.title()}")
-            st.stop()
-    
-        outgoing_df["Estimated Weight (kg)"] = outgoing_df.apply(
-            lambda r: ROTOR_WEIGHTS.get(r["Size (mm)"], 0) * r["Quantity"],
-            axis=1
-        )
-    
-        total_weight = outgoing_df["Estimated Weight (kg)"].sum()
-    
-        st.success(
-            f"📦 Estimated total weight for **{buyer_name.title()}**: "
-            f"**{total_weight:.2f} kg**"
-        )
-    
-        st.dataframe(
-            outgoing_df[["Date", "Size (mm)", "Quantity", "Estimated Weight (kg)"]],
-            use_container_width=True,
-            hide_index=True
-        )
-    
-        st.stop()
-        
-        st.info(
-            "I can answer about pending orders, buyer weight, clitting stock, "
-            "and lamination stock."
-        )
-        
-        # ===== General Filters =====
-        df = df[df["Status"] != "Future"]
-        if month_name:
-            month_num = list(calendar.month_name).index(month_name)
-            start_date = datetime(year, month_num, 1)
-            end_date = datetime(year, month_num, calendar.monthrange(year, month_num)[1])
-            df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
-        
-        filtered = df.copy()
-        filters = []
-        
-        if rotor_size:
-            filtered = filtered[filtered["Size (mm)"] == rotor_size]
-            filters.append(f"{rotor_size}mm")
-        
-        if movement_type:
-            filtered = filtered[filtered["Type"] == movement_type]
-            filters.append(movement_type)
-        
-        if is_pending:
-            filtered = filtered[filtered["Pending"] == True]
-            filters.append("Pending")
-        
-        if buyer_name:
-            filtered = filtered[filtered["Remarks"].str.contains(buyer_name, case=False, na=False)]
-            filters.append(f"Buyer: {buyer_name}")
-        
-        # ===== Show Last N Entries =====
-        if entry_count:
-            filtered = filtered.sort_values("Date", ascending=False).head(entry_count)
-            title = f"📋 Last {entry_count} entries"
-            if filters:
-                title += " for " + ", ".join(filters)
-            st.success(title)
-            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-            st.stop()
-        
-        # ===== Show Stock =====
-        if "stock" in query and rotor_size:
-            df["Net"] = df.apply(
-                lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"] if not x["Pending"] else 0,
-                axis=1
-            )
-            stock = df[df["Size (mm)"] == rotor_size]["Net"].sum()
-            st.success(f"📦 Current stock for *{rotor_size}mm*: {int(stock)} units")
-            st.stop()
-        
-        # ===== Final Output =====
-        if not chat_query.strip():
-            st.info("💬 Enter a query to begin.")
-            st.stop()
-        
-        if not filtered.empty:
-            title = f"📄 Entries"
-            if filters:
-                title += " for " + ", ".join(filters)
-            st.success(title)
-            st.dataframe(filtered[["Date", "Size (mm)", "Type", "Quantity", "Remarks", "Pending"]], use_container_width=True)
-        else:
-            st.info("❓ No matching entries found. Try: Buyer A June, 250mm stock, Last 5 outgoing")
+      
+          st.dataframe(
+              grouped,
+              use_container_width=True,
+              hide_index=True
+          )
+      
+          st.stop()
+      
+      # =========================
+      # FALLBACK
+      # =========================
+      st.info(
+          "💡 Try queries like:\n"
+          "- Ravi pending\n"
+          "- Buyer A pending\n"
+          "- 100mm pending"
+      )
     
         # === CASE: Buyer weight estimation ===
         
