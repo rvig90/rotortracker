@@ -690,10 +690,8 @@ if tab_choice == "🔁 Rotor Tracker":
         # ===== PENDING FIRST =====
         # =========================
 # ===== CASE: Pending Orders with Estimated Value =====
-
         if re.search(r"\b(pending|pendings|pending orders?)\b", query):
-        
-            # ---- Auto-detect buyer using substring match ----
+         # ---- Auto-detect buyer using substring match ----
             buyers = df["Remarks"].dropna().unique().tolist()
             buyer = None
         
