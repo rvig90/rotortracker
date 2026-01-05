@@ -21,7 +21,10 @@ except Exception:
   st.text(traceback.formal.exc())
   sys.exit()
 
-
+month_match = re.search(
+            r"\b(january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\b", query
+        )
 import os
 ROTOR_WEIGHTS = { 80: 0.5, 100: 1, 110: 1.01, 120: 1.02, 125: 1.058, 130: 1.1, 140: 1.15, 150: 1.3, 160: 1.4, 170: 1.422, 180: 1.5, 200: 1.7, 225: 1.9, 260: 2.15, 2403: 1.46, 1803: 1, 2003: 1.1 }
 from uuid import uuid4
@@ -771,10 +774,7 @@ if tab_choice == "🔁 Rotor Tracker":
        
         
         # ===== Extract Components =====
-        month_match = re.search(
-            r"\b(january|february|march|april|may|june|july|august|"
-            r"september|october|november|december)\b", query
-        )
+        
         month_name = month_match.group(1).capitalize() if month_match else None
         
         rotor_match = re.search(r"(\d{2,6})\s*mm", query)
