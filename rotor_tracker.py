@@ -212,10 +212,7 @@ if tab_choice == "🔁 Rotor Tracker":
         auto_save_to_gsheet()
         st.rerun()
     
-    from datetime import datetime
-    from uuid import uuid4
-    import pandas as pd
-    import streamlit as st
+    
     
     # Ensure session keys
     
@@ -467,8 +464,6 @@ if tab_choice == "🔁 Rotor Tracker":
         import streamlit as st
         
         
-        import streamlit as st
-        import pandas as pd
         
         st.subheader("🚨 Stock Risk Alerts")
         
