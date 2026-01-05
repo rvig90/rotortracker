@@ -669,86 +669,68 @@ if tab_choice == "🔁 Rotor Tracker":
                             st.session_state.editing = None
                             st.rerun()
     # === TAB 3: Rotor Trend ===
-    with tabs[2]:
-        st.subheader("💬 Rotor Chatbot Lite")
+        with tabs[2]:
+            st.subheader("💬 Rotor Chatbot Lite")
     
-        chat_query = st.text_input("Type: ravi pending, tri pending")
-    
-        if not chat_query:
-            st.stop()
-    
-        df = st.session_state.data.copy()
-    
-        # ---- Basic safety ----
-        if df.empty or "Remarks" not in df.columns:
-            st.info("📦 No data available")
-            st.stop()
-    
-        df["Remarks"] = df["Remarks"].astype(str)
-        df["Type"] = df["Type"].astype(str)
-    
-        query = chat_query.lower().strip()
-    
-        # ===============================
-        # ===== PENDING + ESTIMATE =====
-        # ===============================
-        if "pending" in query:
-    
-            # ---- Detect buyer (simple & reliable) ----
-            buyer = None
-            for b in df["Remarks"].unique():
-                if b.lower() in query:
-                    buyer = b
-                    break
-    
-            if not buyer:
-                st.warning("❌ Buyer not detected. Try: **ravi pending**")
+            chat_query = st.text_input("Type: ravi pending, tri pending")
+        
+            if not chat_query:
                 st.stop()
-    
-            # ---- Filter pending outgoing ----
-            pending_df = df[
-                (df["Type"].str.lower() == "outgoing") &
-                (df["Pending"] == True) &
-                (df["Remarks"].str.lower() == buyer.lower())
-            ].copy()
-    
-            if pending_df.empty:
-                st.info(f"✅ No pending orders for **{buyer}**")
+        
+            df = st.session_state.data.copy()
+            if df.empty:
+                st.info("No data available")
                 st.stop()
-    
-            # ---- Numeric safety ----
-            pending_df["Size (mm)"] = pd.to_numeric(pending_df["Size (mm)"], errors="coerce")
-            pending_df["Quantity"] = pd.to_numeric(pending_df["Quantity"], errors="coerce")
-            pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
-    
-            # ---- Estimate ----
-            pending_df["Estimated Value"] = (
-                pending_df["Size (mm)"] *
-                pending_df["Quantity"] *
-                3.8
-            )
-    
-            total_value = pending_df["Estimated Value"].sum()
-    
-            st.success(
-                f"📌 Pending Orders for **{buyer}**\n\n"
-                f"💰 **TOTAL ESTIMATED VALUE: ₹{total_value:,.2f}**"
-            )
-    
-            summary = (
-                pending_df
-                .groupby("Size (mm)", as_index=False)
-                .agg({
+        
+            df["Remarks"] = df["Remarks"].astype(str)
+            df["Type"] = df["Type"].astype(str)
+        
+            query = chat_query.lower().strip()
+        
+            if "pending" in query:
+                buyer = None
+                for b in df["Remarks"].unique():
+                    if b.lower() in query:
+                        buyer = b
+                        break
+        
+                if not buyer:
+                    st.warning("❌ Buyer not detected. Example: ravi pending")
+                    st.stop()
+        
+                pending_df = df[
+                    (df["Type"].str.lower() == "outgoing") &
+                    (df["Pending"] == True) &
+                    (df["Remarks"].str.lower() == buyer.lower())
+                ].copy()
+        
+                if pending_df.empty:
+                    st.info(f"✅ No pending orders for **{buyer}**")
+                    st.stop()
+        
+                pending_df["Size (mm)"] = pd.to_numeric(pending_df["Size (mm)"], errors="coerce")
+                pending_df["Quantity"] = pd.to_numeric(pending_df["Quantity"], errors="coerce")
+                pending_df = pending_df.dropna(subset=["Size (mm)", "Quantity"])
+        
+                pending_df["Estimated Value"] = (
+                    pending_df["Size (mm)"] *
+                    pending_df["Quantity"] *
+                    3.8
+                )
+        
+                total_value = pending_df["Estimated Value"].sum()
+        
+                st.success(
+                    f"📌 Pending Orders for **{buyer}**\n\n"
+                    f"💰 TOTAL ESTIMATED VALUE: ₹{total_value:,.2f}"
+                )
+        
+                summary = pending_df.groupby("Size (mm)", as_index=False).agg({
                     "Quantity": "sum",
                     "Estimated Value": "sum"
                 })
-                .sort_values("Size (mm)")
-            )
-    
-            st.dataframe(summary, use_container_width=True, hide_index=True)
-            st.stop()
-    
-        st.info("Try typing: **ravi pending**")            
+        
+                st.dataframe(summary, use_container_width=True, hide_index=True)            
         
       
     with tabs[3]:
