@@ -11,8 +11,7 @@ import io
 import requests
 from uuid import uuid4
 import altair as alt
-from prophet import Prophet
-import xgboost as xgb
+
 from sklearn.metrics import mean_squared_error
 from forecast_utils import forecast_with_xgboost
 import re
@@ -23,7 +22,7 @@ import openai
 import pandas as pd
 import os
 
-import pandas as pd
+
 from uuid import uuid4
 
 # Session state for logs
@@ -422,7 +421,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     
     # ====== STOCK SUMMARY ======
-    tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "Rotor Chatbot", "Rotor Assistant lite", "Planning Dashboard"])
+    tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite"])
     
     # === TAB 1: Stock Summary ===
     with tabs[0]:
@@ -733,245 +732,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.dataframe(summary, use_container_width=True, hide_index=True)            
         
       
-    with tabs[3]:
-        import openai
-        import streamlit as st
-        
-        # Configure OpenRouter
-        openai.api_key = st.secrets["openai"]["api_key"]
-        openai.base_url = "https://openrouter.ai/api/v1"
-        
-        st.title("🧠 Rotor Assistant (Streaming Chatbot)")
-        
-        # Input box for user query
-        query = st.chat_input("Ask anything about stock, buyers, sizes...")
-        
-        # Initialize chat history
-        if "messages" not in st.session_state:
-            st.session_state.messages = [
-                {"role": "system", "content": "You are a helpful rotor assistant."}
-            ]
-        
-        # Show previous messages
-        for msg in st.session_state.messages[1:]:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-        
-        # Handle user message
-        if query:
-            st.session_state.messages.append({"role": "user", "content": query})
-            with st.chat_message("user"):
-                st.markdown(query)
-        
-            # Display streaming reply
-            with st.chat_message("assistant"):
-                stream_response = openai.chat.completions.create(
-                    model="mistralai/mistral-7b-instruct:free",  # ✅ You can change this to mistral-7b-instruct or others
-                    messages=st.session_state.messages,
-                    stream=True,
-                )
-        
-                full_reply = ""
-                for chunk in stream_response:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        full_reply += chunk.choices[0].delta.content
-                        st.write(chunk.choices[0].delta.content, end="")
-                st.session_state.messages.append({"role": "assistant", "content": full_reply})
     
-                   
-          
-    with tabs[4]: 
-        
-    
-        st.subheader("💬 Ask RotorBot Lite")
-        
-        query = st.text_input("Ask about stock, pendings, buyers, or sizes", key="chat_query")
-        
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
-        
-        if st.button("🧹 Clear Size History"):
-            st.session_state.chat_history = []
-            st.success("Size history cleared.")
-        
-        df = st.session_state.data.copy()
-        df["Date"] = pd.to_datetime(df["Date"])
-        df["Clean_Remarks"] = df["Remarks"].fillna("").str.lower()
-        
-        # Extract size from query
-        size_match = re.findall(r"(\d{2,4})", query)
-        matched_size = int(size_match[0]) if size_match else None
-        entry_count_match = re.search(r"last\s+(\d+)", query.lower())
-        entry_count = int(entry_count_match.group(1)) if entry_count_match else 5
-        
-        # Flags
-        is_pending = "pending" in query.lower()
-        is_entries = "entry" in query.lower() or "entries" in query.lower()
-        is_stock = "stock" in query.lower()
-        
-        # === Buyer Detection from Remarks ===
-        buyer_name = None
-        for remark in df["Clean_Remarks"].dropna().unique():
-            if remark and remark in query.lower():
-                buyer_name = remark
-                break
-        
-        # === 1. Show Buyer Pendings ===
-        if buyer_name and is_pending:
-            buyer_pending = df[
-                (df["Clean_Remarks"].str.contains(buyer_name)) &
-                (df["Pending"]) &
-                (df["Status"] == "Current")
-            ]
-            if not buyer_pending.empty:
-                st.success(f"📦 Pending orders for buyer: **{buyer_name.title()}**")
-                st.dataframe(buyer_pending[["Date", "Size (mm)", "Quantity", "Remarks"]])
-            else:
-                st.info("No pendings found for this buyer.")
-        
-        # === 2. Show Buyer Last Entries ===
-        elif buyer_name and is_entries:
-            buyer_entries = df[
-                df["Clean_Remarks"].str.contains(buyer_name, na=False)
-            ].sort_values("Date", ascending=False)
-            st.success(f"🕓 Last {entry_count} entries for buyer: **{buyer_name.title()}**")
-            st.dataframe(buyer_entries[["Date", "Size (mm)", "Type", "Quantity", "Remarks"]].head(entry_count))
-        
-        # === 3. Show Size Pendings ===
-        elif matched_size and is_pending:
-            size_pending = df[
-                (df["Size (mm)"] == matched_size) &
-                (df["Pending"]) &
-                (df["Status"] == "Current")
-            ]
-            if not size_pending.empty:
-                st.success(f"📦 Pending orders for rotor size **{matched_size} mm**")
-                st.dataframe(size_pending[["Date", "Quantity", "Remarks"]])
-            else:
-                st.info("No pending orders for this size.")
-        
-        # === 4. Show Last N Entries for Size ===
-        elif matched_size and is_entries:
-            entries = df[df["Size (mm)"] == matched_size].sort_values("Date", ascending=False)
-            st.success(f"📄 Last {entry_count} entries for **{matched_size} mm**")
-            st.dataframe(entries[["Date", "Type", "Quantity", "Remarks"]].head(entry_count))
-        
-        # === 5. Show Actual Current Stock for Size ===
-        elif matched_size and is_stock:
-            temp = df[
-                (df["Status"] == "Current") &
-                (df["Size (mm)"] == matched_size)
-            ].copy()
-        
-            inward = temp[temp["Type"] == "Inward"]["Quantity"].sum()
-            outward = temp[temp["Type"] == "Outgoing"]["Quantity"].sum()
-            stock = inward - outward
-        
-            st.success(f"📦 Current stock for rotor size **{matched_size} mm**: `{int(stock)}` units")
-            st.session_state.chat_history.append(matched_size)
-        
-        # === 6. General Stock Suggestion Summary ===
-        if st.session_state.chat_history:
-            st.markdown("---")
-            st.markdown("🔎 **Recently Queried Rotor Sizes Stock Summary**")
-        
-            report = []
-            for size in st.session_state.chat_history:
-                temp = df[df["Size (mm)"] == size]
-                current = temp[temp["Status"] == "Current"]
-                inward = current[current["Type"] == "Inward"]["Quantity"].sum()
-                outward = current[current["Type"] == "Outgoing"]["Quantity"].sum()
-                pending = current[current["Pending"]]["Quantity"].sum()
-                future = df[
-                    (df["Status"] == "Future") &
-                    (df["Size (mm)"] == size) &
-                    (df["Type"] == "Inward")
-                ]["Quantity"].sum()
-        
-                stock = inward - outward
-                status = "🟢 OK"
-                if stock < 5:
-                    status = "🔴 Restock Suggested"
-        
-                report.append({
-                    "Size (mm)": size,
-                    "Current Stock": int(stock),
-                    "Pending Qty": int(pending),
-                    "Coming Qty": int(future),
-                    "Restock Status": status
-                })
-        
-            st.dataframe(report, use_container_width=True)
-        
-        # === 7. If nothing matches
-        if query and not (buyer_name or matched_size):
-            st.info("❓ Couldn’t match your query. Try asking: `250mm stock`, `Buyer XYZ pendings`, `100mm last 5 entries`")
-        
-        
-    with tabs[5]:
-        st.title("📅 Interactive Rotor Planning Dashboard")
-    
-        df = st.session_state.data.copy()
-        df["Date"] = pd.to_datetime(df["Date"])
-        
-        # === Usage (last 60 days)
-        cutoff = pd.Timestamp.today() - pd.Timedelta(days=60)
-        usage_df = df[
-            (df["Type"] == "Outgoing") &
-            (df["Status"] == "Current") &
-            (~df["Pending"]) &
-            (df["Date"] >= cutoff)
-        ]
-        avg_use = usage_df.groupby("Size (mm)")["Quantity"].mean().reset_index()
-        avg_use.columns = ["Size (mm)", "Avg Daily Usage"]
-        
-        # === Current stock (non-pending)
-        current = df[(df["Status"] == "Current") & (~df["Pending"])].copy()
-        current["Net"] = current.apply(lambda x: x["Quantity"] if x["Type"] == "Inward" else -x["Quantity"], axis=1)
-        stock_now = current.groupby("Size (mm)")["Net"].sum().reset_index().rename(columns={"Net": "Current Stock"})
-        
-        # === Pending
-        pending = df[df["Pending"]].groupby("Size (mm)")["Quantity"].sum().reset_index()
-        pending.columns = ["Size (mm)", "Pending Out"]
-        
-        # === Future inward
-        future = df[(df["Status"] == "Future") & (df["Type"] == "Inward")].groupby("Size (mm)")["Quantity"].sum().reset_index()
-        future.columns = ["Size (mm)", "Future In"]
-        
-        # === Merge
-        plan = avg_use.merge(stock_now, on="Size (mm)", how="outer") \
-                      .merge(pending, on="Size (mm)", how="outer") \
-                      .merge(future, on="Size (mm)", how="outer") \
-                      .fillna(0)
-        
-        plan["Forecast (30d)"] = plan["Avg Daily Usage"] * 30
-        plan["Projected Stock"] = plan["Current Stock"] - plan["Pending Out"] + plan["Future In"]
-        plan["Suggested Reorder"] = (plan["Forecast (30d)"] - plan["Projected Stock"]).clip(lower=0).round(0).astype(int)
-        plan["Days Left"] = (plan["Projected Stock"] / plan["Avg Daily Usage"]).replace([float('inf'), -float('inf')], 0).fillna(0).round(0).astype(int)
-        
-        # Cast types for display
-        for col in ["Avg Daily Usage", "Current Stock", "Pending Out", "Future In", "Forecast (30d)", "Projected Stock", "Suggested Reorder", "Days Left"]:
-            plan[col] = plan[col].round(0).astype(int)
-        
-        # === UI
-        st.subheader("📦 Rotor Reorder Overview")
-        st.dataframe(plan[[
-            "Size (mm)", "Avg Daily Usage", "Current Stock", "Pending Out", "Future In",
-            "Projected Stock", "Forecast (30d)", "Suggested Reorder", "Days Left"
-        ]].sort_values("Suggested Reorder", ascending=False), use_container_width=True)
-        
-        # === Reorder Alert
-        st.subheader("🚨 Urgent Restock Alert")
-        urgent = plan[plan["Days Left"] < 10]
-        if urgent.empty:
-            st.success("✅ No rotor sizes projected to run out soon.")
-        else:
-            st.warning("⚠️ The following rotors may run out in under 10 days:")
-            st.dataframe(urgent[["Size (mm)", "Days Left", "Suggested Reorder"]], use_container_width=True)
-        
-        # === Export
-        csv = plan.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇ Download Full Planning Table", data=csv, file_name="rotor_planning.csv", mime="text/csv")
 
 
 import streamlit as st
