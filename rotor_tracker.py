@@ -662,28 +662,113 @@ if tab_choice == "🔁 Rotor Tracker":
       
         # === TAB 3: Rotor Chatbot ===
     # === TAB 3: Rotor Chatbot ===
+    # === TAB 3: Rotor Chatbot ===
     with tabs[2]:
         st.subheader("💬 Rotor Chatbot Lite")
         
-        # Fixed prices for specific sizes (in Rupees)
-        FIXED_PRICES = {
-            1803: 430,    # ₹430 per rotor
-            2003: 478,    # ₹478 per rotor
-            35: 200,      # ₹200 per rotor
-            40: 220,      # ₹220 per rotor
-            50: 278,      # ₹278 per rotor
-            70: 378       # ₹378 per rotor
-        }
+        # =========================
+        # FIXED RATES MANAGEMENT
+        # =========================
+        # Initialize fixed prices in session state if not exists
+        if 'fixed_prices' not in st.session_state:
+            st.session_state.fixed_prices = {
+                1803: 430,    # ₹430 per rotor
+                2003: 478,    # ₹478 per rotor
+                35: 200,      # ₹200 per rotor
+                40: 220,      # ₹220 per rotor
+                50: 278,      # ₹278 per rotor
+                70: 378       # ₹378 per rotor
+            }
         
         # Base rate per mm for other sizes
         BASE_RATE_PER_MM = 3.8
         
-        # Display fixed prices
-        with st.expander("💰 Fixed Prices"):
-            st.write("Size (mm) → Price per rotor:")
-            for size, price in sorted(FIXED_PRICES.items()):
-                st.write(f"- {size}mm: ₹{price}")
-            st.write(f"- Other sizes: ₹{BASE_RATE_PER_MM} per mm")
+        # Fixed Rates Editor
+        with st.expander("⚙️ Edit Fixed Rates", expanded=False):
+            st.write("Edit fixed prices for specific rotor sizes:")
+            
+            # Display current rates in an editable table
+            rates_data = []
+            for size, price in sorted(st.session_state.fixed_prices.items()):
+                rates_data.append({
+                    'Size (mm)': size,
+                    'Price (₹)': price
+                })
+            
+            rates_df = pd.DataFrame(rates_data)
+            
+            # Create an editable dataframe
+            edited_df = st.data_editor(
+                rates_df,
+                num_rows="dynamic",  # Allow adding new rows
+                column_config={
+                    "Size (mm)": st.column_config.NumberColumn(
+                        "Size (mm)",
+                        help="Rotor size in mm",
+                        min_value=1,
+                        step=1
+                    ),
+                    "Price (₹)": st.column_config.NumberColumn(
+                        "Price (₹)",
+                        help="Price per rotor in Rupees",
+                        min_value=0,
+                        step=10
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # Update rates button
+            if st.button("💾 Update Fixed Rates"):
+                # Convert edited dataframe back to dictionary
+                new_prices = {}
+                for _, row in edited_df.iterrows():
+                    if not pd.isna(row['Size (mm)']) and not pd.isna(row['Price (₹)']):
+                        size = int(row['Size (mm)'])
+                        price = int(row['Price (₹)'])
+                        new_prices[size] = price
+                
+                st.session_state.fixed_prices = new_prices
+                st.success(f"✅ Updated {len(new_prices)} fixed rates!")
+                st.rerun()
+            
+            # Reset to default button
+            if st.button("🔄 Reset to Default Rates"):
+                st.session_state.fixed_prices = {
+                    1803: 430,
+                    2003: 478,
+                    35: 200,
+                    40: 220,
+                    50: 278,
+                    70: 378
+                }
+                st.success("✅ Reset to default rates!")
+                st.rerun()
+            
+            # Display base rate
+            st.divider()
+            base_rate_col1, base_rate_col2 = st.columns([1, 2])
+            with base_rate_col1:
+                new_base_rate = st.number_input(
+                    "Base Rate per mm (₹):",
+                    value=BASE_RATE_PER_MM,
+                    min_value=0.0,
+                    step=0.1,
+                    format="%.1f"
+                )
+            
+            if new_base_rate != BASE_RATE_PER_MM:
+                BASE_RATE_PER_MM = new_base_rate
+                st.info(f"Base rate updated to ₹{BASE_RATE_PER_MM} per mm")
+        
+        # Display current rates
+        with st.expander("💰 Current Pricing", expanded=True):
+            st.write("**Fixed Prices:**")
+            for size, price in sorted(st.session_state.fixed_prices.items()):
+                st.write(f"- {size}mm: ₹{price} per rotor")
+            
+            st.write(f"**Other sizes:** ₹{BASE_RATE_PER_MM} per mm × size")
         
         # Display example queries
         with st.expander("📋 Example Queries"):
@@ -738,7 +823,7 @@ if tab_choice == "🔁 Rotor Tracker":
         for size_str in size_matches:
             size_num = int(size_str)
             # Check if this looks like a rotor size (common sizes or > 20mm)
-            if size_num in FIXED_PRICES or size_num > 20:
+            if size_num in st.session_state.fixed_prices or size_num > 20:
                 target_size = size_num
                 break
         
@@ -749,7 +834,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.subheader("💰 Fixed Price List")
             
             price_data = []
-            for size, price in sorted(FIXED_PRICES.items()):
+            for size, price in sorted(st.session_state.fixed_prices.items()):
                 price_data.append({
                     'Size (mm)': size,
                     'Price per Rotor': f"₹{price}",
@@ -842,8 +927,8 @@ if tab_choice == "🔁 Rotor Tracker":
             size_int = int(size_mm)
             
             # Check if size has fixed price
-            if size_int in FIXED_PRICES:
-                return FIXED_PRICES[size_int] * quantity
+            if size_int in st.session_state.fixed_prices:
+                return st.session_state.fixed_prices[size_int] * quantity
             else:
                 # Use base rate for other sizes
                 return BASE_RATE_PER_MM * size_int * quantity
@@ -854,8 +939,8 @@ if tab_choice == "🔁 Rotor Tracker":
                 return 0
             
             size_int = int(size_mm)
-            if size_int in FIXED_PRICES:
-                return FIXED_PRICES[size_int]
+            if size_int in st.session_state.fixed_prices:
+                return st.session_state.fixed_prices[size_int]
             else:
                 return BASE_RATE_PER_MM * size_int
         
@@ -1408,13 +1493,13 @@ if tab_choice == "🔁 Rotor Tracker":
         # Show pricing information if size is specified
         if target_size:
             price = get_price_per_rotor(target_size)
-            method = "Fixed Price" if target_size in FIXED_PRICES else f"₹{BASE_RATE_PER_MM}/mm × {target_size}mm"
+            method = "Fixed Price" if target_size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {target_size}mm"
             st.info(f"**Pricing:** {target_size}mm = ₹{price} ({method})")
         elif len(filtered['Size (mm)'].unique()) <= 5:
             st.info("**Pricing Used:**")
             for size in sorted(filtered['Size (mm)'].unique()):
                 price = get_price_per_rotor(size)
-                method = "Fixed Price" if size in FIXED_PRICES else f"₹{BASE_RATE_PER_MM}/mm × {size}mm"
+                method = "Fixed Price" if size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {size}mm"
                 st.write(f"- {size}mm: ₹{price} ({method})")
         
         # Grouped display
