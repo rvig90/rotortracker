@@ -663,6 +663,7 @@ if tab_choice == "🔁 Rotor Tracker":
         # === TAB 3: Rotor Chatbot ===
     # === TAB 3: Rotor Chatbot ===
     # === TAB 3: Rotor Chatbot ===
+    # === TAB 3: Rotor Chatbot ===
     with tabs[2]:
         st.subheader("💬 Rotor Chatbot Lite")
         
@@ -1439,6 +1440,171 @@ if tab_choice == "🔁 Rotor Tracker":
                     st.info(f"Did you mean: {', '.join(similar_buyers[:3])}")
             
             st.stop()
+        
+        # =========================
+        # CALCULATIONS & DISPLAY WITH NEW PRICING
+        # =========================
+        # Apply the new pricing logic
+        filtered['Estimated Value'] = filtered.apply(
+            lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+        )
+        
+        # Add price per rotor for display
+        filtered['Price per Rotor'] = filtered['Size (mm)'].apply(get_price_per_rotor)
+        
+        total_rotors = filtered['Quantity'].sum()
+        total_value = filtered['Estimated Value'].sum()
+        
+        # Build informative title
+        title_parts = ["📊"]
+        
+        if buyer:
+            title_parts.append(f"**{buyer}**")
+        
+        if movement:
+            title_parts.append(f"**{movement.upper()}**")
+        
+        if target_size:
+            title_parts.append(f"**Size {target_size}mm**")
+        
+        if month_num:
+            title_parts.append(f"**{month_name} {year_num}**")
+        elif 'summary' in query:
+            title_parts.append(f"**Year {year_num} Summary**")
+        
+        if not buyer and not movement and not month_num and not target_size:
+            title_parts.append("**All Transactions**")
+        
+        title = " | ".join(title_parts)
+        st.markdown(f"## {title}")
+        
+        # Summary metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Rotors", f"{int(total_rotors):,}")
+        with col2:
+            st.metric("Total Value", f"₹{total_value:,.2f}")
+        with col3:
+            if not filtered.empty:
+                avg_size = filtered['Size (mm)'].mean()
+                st.metric("Avg Size", f"{avg_size:.0f} mm")
+            else:
+                st.metric("Avg Size", "0 mm")
+        
+        # Show pricing information if size is specified
+        if target_size:
+            price = get_price_per_rotor(target_size)
+            method = "Fixed Price" if target_size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {target_size}mm"
+            st.info(f"**Pricing:** {target_size}mm = ₹{price} ({method})")
+        elif len(filtered['Size (mm)'].unique()) <= 5:
+            st.info("**Pricing Used:**")
+            for size in sorted(filtered['Size (mm)'].unique()):
+                price = get_price_per_rotor(size)
+                method = "Fixed Price" if size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {size}mm"
+                st.write(f"- {size}mm: ₹{price} ({method})")
+        
+        # Grouped display
+        if buyer:
+            # For single buyer, show detailed breakdown
+            display_df = filtered.copy()
+            display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+            display_df['Total Value'] = display_df['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+            display_df['Unit Price'] = display_df['Price per Rotor'].apply(lambda x: f"₹{x:,.0f}")
+            
+            st.subheader("📋 Detailed Transactions")
+            st.dataframe(
+                display_df[['Date', 'Type', 'Size (mm)', 'Quantity', 'Unit Price', 'Status', 'Pending', 'Total Value']]
+                .rename(columns={
+                    'Type': 'Movement',
+                    'Size (mm)': 'Size',
+                    'Quantity': 'Qty',
+                    'Pending': 'Is Pending',
+                    'Unit Price': 'Price/Rotor'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Size-wise summary for the buyer
+            if not target_size:  # Only if size wasn't already filtered
+                size_summary = filtered.groupby('Size (mm)').agg({
+                    'Quantity': 'sum',
+                    'Estimated Value': 'sum'
+                }).reset_index()
+                
+                st.subheader("📊 Size-wise Summary")
+                display_size = size_summary.copy()
+                display_size['Estimated Value'] = display_size['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+                st.dataframe(
+                    display_size.rename(columns={
+                        'Size (mm)': 'Size',
+                        'Quantity': 'Total Qty',
+                        'Estimated Value': 'Total Value'
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            
+        else:
+            # For multiple buyers or general queries
+            grouped = filtered.groupby(['Remarks', 'Size (mm)']).agg({
+                'Quantity': 'sum',
+                'Estimated Value': 'sum'
+            }).reset_index()
+            
+            # Calculate price per rotor for each size
+            grouped['Price per Rotor'] = grouped['Size (mm)'].apply(get_price_per_rotor)
+            grouped['Total Value'] = grouped['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+            
+            st.dataframe(
+                grouped[['Remarks', 'Size (mm)', 'Quantity', 'Price per Rotor', 'Total Value']]
+                .rename(columns={
+                    'Remarks': 'Buyer',
+                    'Size (mm)': 'Size (mm)',
+                    'Quantity': 'Total Qty',
+                    'Price per Rotor': 'Price/Rotor'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+        
+        # Additional insights
+        with st.expander("📈 Insights"):
+            if buyer and movement == 'pending':
+                total_pending = filtered[filtered['Pending']]['Quantity'].sum()
+                pending_value = filtered[filtered['Pending']]['Estimated Value'].sum()
+                st.info(f"**{buyer}** has **{int(total_pending)}** rotors pending worth **₹{pending_value:,.2f}**")
+            
+            if month_num:
+                month_volume = filtered['Quantity'].sum()
+                month_value = filtered['Estimated Value'].sum()
+                st.info(f"**{month_name} {year_num}**: **{int(month_volume)}** rotors worth **₹{month_value:,.2f}**")
+            
+            if target_size:
+                # Show stock status for this size
+                current_stock_df = df[
+                    (df['Size (mm)'] == target_size) &
+                    (df['Status'] == 'Current')
+                ].copy()
+                
+                current_stock_df['Net'] = current_stock_df.apply(
+                    lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+                )
+                
+                current_stock = current_stock_df[~current_stock_df['Pending']]['Net'].sum()
+                pending_qty = current_stock_df[current_stock_df['Pending']]['Quantity'].sum()
+                
+                st.info(f"**Stock status for {target_size}mm:**")
+                st.write(f"- Current stock: {int(current_stock)} rotors")
+                st.write(f"- Pending orders: {int(pending_qty)} rotors")
+                st.write(f"- Available after pending: {int(current_stock - pending_qty)} rotors")
+            
+            # Most valuable size
+            if not filtered.empty and not target_size:
+                value_by_size = filtered.groupby('Size (mm)')['Estimated Value'].sum()
+                most_valuable_size = value_by_size.idxmax()
+                most_valuable_value = value_by_size.max()
+                st.info(f"Most valuable size: **{most_valuable_size}mm** (₹{most_valuable_value:,.2f})")
         
         # =========================
         # CALCULATIONS & DISPLAY WITH NEW PRICING
