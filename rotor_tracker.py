@@ -57,6 +57,7 @@ if 'data' not in st.session_state:
     st.session_state.filter_reset = False
 
 
+
 # ====== APP LOGO ======
 import streamlit as st
 import requests
@@ -181,6 +182,143 @@ if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
 import streamlit as st
+# rotor_tracker.py
+
+
+
+# REMOVE THIS SECTION (lines 50-52):
+# if 'data' not in st.session_state:
+#     st.session_state.data = pd.DataFrame()
+#     
+#     df = st.session_state.data.copy()
+
+# ====== APPLE WATCH COMPATIBLE MODE ======
+# Add this at the end of your existing app, right before the last line
+
+# Detect if accessing from mobile/watch
+user_agent = st.query_params.get("user_agent", "").lower()
+is_mobile = any(x in user_agent for x in ['mobile', 'iphone', 'ipod', 'android', 'blackberry', 'windows phone'])
+is_watch = 'watch' in user_agent or 'wearable' in user_agent
+
+# Add a query parameter to force watch mode
+watch_mode = st.query_params.get("watch", "false").lower() == "true"
+
+# If on watch or mobile, show simplified view
+if is_watch or watch_mode or is_mobile:
+    # Override the entire app with watch view
+    st.set_page_config(
+        page_title="Rotor Stock ⌚",
+        page_icon="⌚",
+        layout="centered",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Simple CSS for watch
+    st.markdown("""
+    <style>
+    .stock-card {
+        background: white;
+        border: 2px solid #007AFF;
+        border-radius: 15px;
+        padding: 15px;
+        margin: 10px 0;
+        text-align: center;
+    }
+    .stock-number {
+        font-size: 48px;
+        font-weight: bold;
+        color: #007AFF;
+        margin: 10px 0;
+    }
+    .stock-label {
+        font-size: 18px;
+        color: #666;
+    }
+    .watch-button {
+        font-size: 20px;
+        height: 60px;
+        margin: 5px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("⌚ Rotor Stock")
+    
+    # Quick size selection
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("1803", key="w_1803", use_container_width=True):
+            size = 1803
+    with col2:
+        if st.button("2003", key="w_2003", use_container_width=True):
+            size = 2003
+    with col3:
+        if st.button("70", key="w_70", use_container_width=True):
+            size = 70
+    
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        if st.button("50", key="w_50", use_container_width=True):
+            size = 50
+    with col5:
+        if st.button("40", key="w_40", use_container_width=True):
+            size = 40
+    with col6:
+        if st.button("35", key="w_35", use_container_width=True):
+            size = 35
+    
+    # Or enter custom size
+    custom_size = st.number_input("Or enter size:", min_value=1, step=1, key="watch_size")
+    
+    if custom_size:
+        size = custom_size
+    
+    # Check if size is selected
+    if 'size' in locals():
+        # Calculate stock (using your existing data)
+        # FIRST, ensure data is initialized
+        if 'data' not in st.session_state:
+            st.session_state.data = pd.DataFrame(columns=[
+                'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
+            ])
+            
+        df = st.session_state.data.copy()
+        
+        size_df = df[df['Size (mm)'] == size]
+        
+        # Simple calculation
+        current_df = size_df[
+            (size_df['Status'] == 'Current') & 
+            (~size_df['Pending'])
+        ].copy()
+        current_df['Net'] = current_df.apply(
+            lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+        )
+        stock = current_df['Net'].sum()
+        
+        # Display
+        st.markdown(f"""
+        <div class="stock-card">
+            <div class="stock-label">{size}mm Stock</div>
+            <div class="stock-number">{int(stock)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Status
+        if stock > 100:
+            st.success("✅ Good stock")
+        elif stock > 50:
+            st.warning("⚠️ Medium stock")
+        elif stock > 10:
+            st.error("🟠 Low stock")
+        else:
+            st.error("🔴 Very low stock")
+        
+        # Simple refresh
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
+    
+    st.stop()
 
 # App title
 st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
