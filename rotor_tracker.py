@@ -182,124 +182,217 @@ if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
     load_from_gsheet()
 
 import streamlit as st
-# rotor_tracker.py
-
-
-
-# REMOVE THIS SECTION (lines 50-52):
-# if 'data' not in st.session_state:
-#     st.session_state.data = pd.DataFrame()
-#     
-#     df = st.session_state.data.copy()
-
 # ====== APPLE WATCH COMPATIBLE MODE ======
-# Add this at the end of your existing app, right before the last line
-
 # Detect if accessing from mobile/watch
-user_agent = st.query_params.get("user_agent", "").lower()
+st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">', unsafe_allow_html=True)
+
+# Get user agent from headers if available
+try:
+    user_agent = st.experimental_get_query_params().get("user_agent", [""])[0].lower()
+except:
+    # Try to get from request headers (for Streamlit Cloud)
+    try:
+        import streamlit.runtime.scriptrunner as scriptrunner
+        ctx = scriptrunner.get_script_run_ctx()
+        if ctx:
+            user_agent = ctx.request.headers.get("User-Agent", "").lower()
+        else:
+            user_agent = ""
+    except:
+        user_agent = ""
+
 is_mobile = any(x in user_agent for x in ['mobile', 'iphone', 'ipod', 'android', 'blackberry', 'windows phone'])
-is_watch = 'watch' in user_agent or 'wearable' in user_agent
+is_watch = 'watch' in user_agent or 'wearable' in user_agent or 'apple watch' in user_agent
 
 # Add a query parameter to force watch mode
-watch_mode = st.query_params.get("watch", "false").lower() == "true"
+watch_mode = st.experimental_get_query_params().get("watch", ["false"])[0].lower() == "true"
+
+# Simple direct test - if screen is small, show watch mode
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    if st.button("⌚ Switch to Watch Mode"):
+        watch_mode = True
 
 # If on watch or mobile, show simplified view
 if is_watch or watch_mode or is_mobile:
-    # Override the entire app with watch view
-    st.set_page_config(
-        page_title="Rotor Stock ⌚",
-        page_icon="⌚",
-        layout="centered",
-        initial_sidebar_state="collapsed"
-    )
-    
-    # Simple CSS for watch
+    # Simplified CSS for Apple Watch - much simpler
     st.markdown("""
     <style>
-    .stock-card {
-        background: white;
-        border: 2px solid #007AFF;
-        border-radius: 15px;
+    /* Reset all padding/margins for watch */
+    .main .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    /* Make buttons bigger for watch */
+    .stButton > button {
+        width: 100% !important;
+        height: 44px !important;
+        font-size: 18px !important;
+        border-radius: 22px !important;
+        margin: 4px 0 !important;
+    }
+    /* Make number input bigger */
+    .stNumberInput input {
+        font-size: 24px !important;
+        height: 44px !important;
+    }
+    /* Center everything */
+    h1, h2, h3 {
+        text-align: center !important;
+        margin: 8px 0 !important;
+    }
+    /* Simple stock display */
+    .stock-display {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
         padding: 15px;
         margin: 10px 0;
+        color: white;
         text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
     .stock-number {
-        font-size: 48px;
-        font-weight: bold;
-        color: #007AFF;
+        font-size: 64px;
+        font-weight: 800;
         margin: 10px 0;
     }
     .stock-label {
-        font-size: 18px;
-        color: #666;
-    }
-    .watch-button {
-        font-size: 20px;
-        height: 60px;
-        margin: 5px;
+        font-size: 24px;
+        opacity: 0.9;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    st.title("⌚ Rotor Stock")
+    # EXTREMELY SIMPLE TITLE
+    st.markdown("<h1 style='text-align:center;'>⌚ Rotor Stock</h1>", unsafe_allow_html=True)
     
-    # Quick size selection
-    col1, col2, col3 = st.columns(3)
+    # Load data first
+    if 'data' not in st.session_state:
+        st.session_state.data = pd.DataFrame(columns=[
+            'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
+        ])
+        # Try to load from Google Sheets
+        try:
+            load_from_gsheet()
+        except:
+            pass
     
+    # SIMPLE SIZE SELECTOR - Only show most common sizes
+    st.markdown("### 📏 Select Size")
     
-    # Or enter custom size
-    custom_size = st.number_input("Enter Size:", min_value=1, step=1, key="watch_size")
+    # Most common rotor sizes
+    common_sizes = [35, 40, 50, 70, 1803, 2003]
+    
+    # Create buttons in 2 columns
+    cols = st.columns(2)
+    size = None
+    
+    for i, sz in enumerate(common_sizes):
+        with cols[i % 2]:
+            if st.button(f"{sz}mm", key=f"sz_{sz}", use_container_width=True):
+                size = sz
+                st.session_state.selected_size = sz
+    
+    # Custom size input
+    st.markdown("### 🔢 Custom Size")
+    custom_size = st.number_input("Enter any size:", 
+                                  min_value=1, 
+                                  step=1, 
+                                  key="watch_custom_size",
+                                  label_visibility="collapsed")
     
     if custom_size:
-        size = custom_size
+        size = int(custom_size)
+        st.session_state.selected_size = size
     
     # Check if size is selected
-    if 'size' in locals():
-        # Calculate stock (using your existing data)
-        # FIRST, ensure data is initialized
-        if 'data' not in st.session_state:
-            st.session_state.data = pd.DataFrame(columns=[
-                'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
-            ])
+    if 'selected_size' in st.session_state:
+        size = st.session_state.selected_size
+        
+        # Show loading indicator
+        with st.spinner(f"Checking {size}mm stock..."):
+            df = st.session_state.data.copy()
             
-        df = st.session_state.data.copy()
-        
-        size_df = df[df['Size (mm)'] == size]
-        
-        # Simple calculation
-        current_df = size_df[
-            (size_df['Status'] == 'Current') & 
-            (~size_df['Pending'])
-        ].copy()
-        current_df['Net'] = current_df.apply(
-            lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
-        )
-        stock = current_df['Net'].sum()
-        
-        # Display
-        st.markdown(f"""
-        <div class="stock-card">
-            <div class="stock-label">{size}mm Stock</div>
-            <div class="stock-number">{int(stock)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Status
-        if stock > 100:
-            st.success("✅ Good stock")
-        elif stock > 50:
-            st.warning("⚠️ Medium stock")
-        elif stock > 10:
-            st.error("🟠 Low stock")
-        else:
-            st.error("🔴 Very low stock")
-        
-        # Simple refresh
-        if st.button("🔄 Refresh", use_container_width=True):
-            st.rerun()
+            if not df.empty and 'Size (mm)' in df.columns:
+                # Filter for selected size
+                size_df = df[df['Size (mm)'] == size]
+                
+                if not size_df.empty:
+                    # Simple calculation
+                    current_df = size_df[
+                        (size_df['Status'] == 'Current') & 
+                        (~size_df['Pending'])
+                    ].copy()
+                    
+                    if not current_df.empty:
+                        current_df['Net'] = current_df.apply(
+                            lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+                        )
+                        stock = int(current_df['Net'].sum())
+                    else:
+                        stock = 0
+                else:
+                    stock = 0
+                
+                # Display stock in big numbers
+                st.markdown(f"""
+                <div class="stock-display">
+                    <div class="stock-label">{size}mm Stock</div>
+                    <div class="stock-number">{stock}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Simple status indicator
+                if stock > 100:
+                    st.success("✅ Good stock level")
+                elif stock > 50:
+                    st.warning("⚠️ Medium stock")
+                elif stock > 10:
+                    st.error("🟠 Low stock")
+                elif stock > 0:
+                    st.error("🔴 Very low stock")
+                else:
+                    st.error("❌ Out of stock")
+                
+                # Show quick summary
+                with st.expander("📊 Quick Details", expanded=False):
+                    # Future incoming
+                    future_in = df[
+                        (df['Size (mm)'] == size) & 
+                        (df['Status'] == 'Future') & 
+                        (df['Type'] == 'Inward')
+                    ]['Quantity'].sum()
+                    
+                    # Pending outgoing
+                    pending_out = df[
+                        (df['Size (mm)'] == size) & 
+                        (df['Pending'] == True) & 
+                        (df['Status'] == 'Current')
+                    ]['Quantity'].sum()
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("📥 Coming Soon", int(future_in))
+                    with col2:
+                        st.metric("📤 Pending Orders", int(pending_out))
+            
+            else:
+                st.info("No data loaded yet. Please sync with Google Sheets.")
     
-    st.stop()
+    # Simple sync button
+    if st.button("🔄 Sync Data", use_container_width=True):
+        with st.spinner("Syncing..."):
+            load_from_gsheet()
+        st.success("Synced!")
+        st.rerun()
+    
+    # Clear selection button
+    if st.button("🗑️ Clear Selection", use_container_width=True):
+        if 'selected_size' in st.session_state:
+            del st.session_state.selected_size
+        st.rerun()
+    
+    st.stop()  # Stop here, don't show the rest of the app
 
 # App title
 st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
