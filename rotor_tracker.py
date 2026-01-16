@@ -278,10 +278,7 @@ if is_watch or watch_mode or is_mobile:
             pass
     
     # SIMPLE SIZE SELECTOR - Only show most common sizes
-    st.markdown("### 📏 Select Size")
     
-    # Most common rotor sizes
-    common_sizes = [35, 40, 50, 70, 1803, 2003]
     
     # Create buttons in 2 columns
     cols = st.columns(2)
