@@ -15,6 +15,10 @@ import re
 
 
 import os
+if 'data' not in st.session_state:
+            st.session_state.data = pd.DataFrame()
+            
+            df = st.session_state.data.copy()
 # ====== APPLE WATCH COMPATIBLE MODE ======
 # Add this at the end of your existing app, right before the last line
 
@@ -99,10 +103,7 @@ if is_watch or watch_mode or is_mobile:
     # Check if size is selected
     if 'size' in locals():
         # Calculate stock (using your existing data)
-        if 'data' not in st.session_state:
-            st.session_state.data = pd.DataFrame()
-            
-            df = st.session_state.data.copy()
+        
             size_df = df[df['Size (mm)'] == size]
         
         if not size_df.empty:
