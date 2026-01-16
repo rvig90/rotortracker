@@ -106,7 +106,7 @@ if is_watch or watch_mode or is_mobile:
         
             size_df = df[df['Size (mm)'] == size]
         
-        if not size_df.empty:
+            
             # Simple calculation
             current_df = size_df[
                 (size_df['Status'] == 'Current') & 
