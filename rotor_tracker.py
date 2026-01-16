@@ -16,6 +16,16 @@ import re
 
 import os
 
+# rotor_tracker.py
+
+
+
+# REMOVE THIS SECTION (lines 50-52):
+# if 'data' not in st.session_state:
+#     st.session_state.data = pd.DataFrame()
+#     
+#     df = st.session_state.data.copy()
+
 # ====== APPLE WATCH COMPATIBLE MODE ======
 # Add this at the end of your existing app, right before the last line
 
@@ -100,45 +110,49 @@ if is_watch or watch_mode or is_mobile:
     # Check if size is selected
     if 'size' in locals():
         # Calculate stock (using your existing data)
+        # FIRST, ensure data is initialized
+        if 'data' not in st.session_state:
+            st.session_state.data = pd.DataFrame(columns=[
+                'Date', 'Size (mm)', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'ID'
+            ])
+            
+        df = st.session_state.data.copy()
         
-            size_df = df[df['Size (mm)'] == size]
+        size_df = df[df['Size (mm)'] == size]
         
-            
-            # Simple calculation
-            current_df = size_df[
-                (size_df['Status'] == 'Current') & 
-                (~size_df['Pending'])
-            ].copy()
-            current_df['Net'] = current_df.apply(
-                lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
-            )
-            stock = current_df['Net'].sum()
-            
-            # Display
-            st.markdown(f"""
-            <div class="stock-card">
-                <div class="stock-label">{size}mm Stock</div>
-                <div class="stock-number">{int(stock)}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Status
-            if stock > 100:
-                st.success("✅ Good stock")
-            elif stock > 50:
-                st.warning("⚠️ Medium stock")
-            elif stock > 10:
-                st.error("🟠 Low stock")
-            else:
-                st.error("🔴 Very low stock")
-            
-            # Simple refresh
-            if st.button("🔄 Refresh", use_container_width=True):
-                st.rerun()
+        # Simple calculation
+        current_df = size_df[
+            (size_df['Status'] == 'Current') & 
+            (~size_df['Pending'])
+        ].copy()
+        current_df['Net'] = current_df.apply(
+            lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+        )
+        stock = current_df['Net'].sum()
+        
+        # Display
+        st.markdown(f"""
+        <div class="stock-card">
+            <div class="stock-label">{size}mm Stock</div>
+            <div class="stock-number">{int(stock)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Status
+        if stock > 100:
+            st.success("✅ Good stock")
+        elif stock > 50:
+            st.warning("⚠️ Medium stock")
+        elif stock > 10:
+            st.error("🟠 Low stock")
         else:
-            st.warning(f"No data for {size}mm")
+            st.error("🔴 Very low stock")
+        
+        # Simple refresh
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
     
-    st.stop()  # Stop here, don't show the rest of the app
+    st.stop()  # Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
 ROTOR_WEIGHTS = { 80: 0.5, 100: 1, 110: 1.01, 120: 1.02, 125: 1.058, 130: 1.1, 140: 1.15, 150: 1.3, 160: 1.4, 170: 1.422, 180: 1.5, 200: 1.7, 225: 1.9, 260: 2.15, 2403: 1.46, 1803: 1, 2003: 1.1 }
 from uuid import uuid4
 
