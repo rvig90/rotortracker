@@ -246,29 +246,10 @@ if is_watch or watch_mode or is_mobile:
     
     # Quick size selection
     col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("1803", key="w_1803", use_container_width=True):
-            size = 1803
-    with col2:
-        if st.button("2003", key="w_2003", use_container_width=True):
-            size = 2003
-    with col3:
-        if st.button("70", key="w_70", use_container_width=True):
-            size = 70
     
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        if st.button("50", key="w_50", use_container_width=True):
-            size = 50
-    with col5:
-        if st.button("40", key="w_40", use_container_width=True):
-            size = 40
-    with col6:
-        if st.button("35", key="w_35", use_container_width=True):
-            size = 35
     
     # Or enter custom size
-    custom_size = st.number_input("Or enter size:", min_value=1, step=1, key="watch_size")
+    custom_size = st.number_input("Enter Size:", min_value=1, step=1, key="watch_size")
     
     if custom_size:
         size = custom_size
