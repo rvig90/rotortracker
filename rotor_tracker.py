@@ -284,11 +284,7 @@ if is_watch or watch_mode or is_mobile:
     cols = st.columns(2)
     size = None
     
-    for i, sz in enumerate(common_sizes):
-        with cols[i % 2]:
-            if st.button(f"{sz}mm", key=f"sz_{sz}", use_container_width=True):
-                size = sz
-                st.session_state.selected_size = sz
+    
     
     # Custom size input
     st.markdown("### 🔢 Custom Size")
