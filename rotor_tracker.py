@@ -15,10 +15,7 @@ import re
 
 
 import os
-if 'data' not in st.session_state:
-            st.session_state.data = pd.DataFrame()
-            
-            df = st.session_state.data.copy()
+
 # ====== APPLE WATCH COMPATIBLE MODE ======
 # Add this at the end of your existing app, right before the last line
 
