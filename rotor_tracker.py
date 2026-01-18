@@ -802,7 +802,7 @@ if tab_choice == "🔁 Rotor Tracker":
           st.write("**Fixed Prices:**")
           for size, price in sorted(st.session_state.fixed_prices.items()):
               st.write(f"- {size}mm: ₹{price} per rotor")
-          st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.1f} per mm × size")
+          st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.2f} per mm × size")
       
       
       
