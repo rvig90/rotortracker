@@ -831,7 +831,7 @@ if tab_choice == "🔁 Rotor Tracker":
         df = df.dropna(subset=['Date'])
       
         
-      query = chat_query.lower().strip()
+          query = chat_query.lower().strip()
       
         
         # =========================
