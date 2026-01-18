@@ -667,7 +667,6 @@ if tab_choice == "🔁 Rotor Tracker":
     # === TAB 3: Rotor Chatbot ===
    # === TAB 3: Rotor Chatbot ===
     with tabs[2]:
-      
       st.subheader("💬 Rotor Chatbot Lite")
       
       # =========================
@@ -798,676 +797,1025 @@ if tab_choice == "🔁 Rotor Tracker":
                   st.session_state.base_rate_per_mm = 3.8
                   st.success("✅ Reset to default rates!")
                   st.rerun()
-
-      
-                
       
       with st.expander("💰 Current Pricing", expanded=True):
           st.write("**Fixed Prices:**")
           for size, price in sorted(st.session_state.fixed_prices.items()):
               st.write(f"- {size}mm: ₹{price} per rotor")
           st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.1f} per mm × size")
-        
-        
-        
-          
-        chat_query = st.text_input(
-          
+      
+      
+      
+      # =========================
+      # CHAT INPUT
+      # =========================
+      chat_query = st.text_input(
           "💬 Ask about rotors:",
-          
           placeholder="e.g., history 1803 | size summary 2003 | coming rotors"
+      )
+      
+      if not chat_query:
+          st.info("👆 Enter a query above to get started")
+          st.stop()
+      
+      # =========================
+      # IMPROVED DATA PREPARATION
+      # =========================
+      df = st.session_state.data.copy()
+      
+      # Ensure required columns exist
+      required_columns = ['Date', 'Remarks', 'Type', 'Status', 'Size (mm)', 'Quantity']
+      for col in required_columns:
+          if col not in df.columns:
+              df[col] = None
+      
+      df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+      df['Remarks'] = df['Remarks'].astype(str).str.strip()
+      df['Type'] = df['Type'].astype(str).str.strip()
+      df['Status'] = df['Status'].astype(str).str.strip()
+      df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
+      df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+      
+      # Add Pending column if not exists
+      if 'Pending' not in df.columns:
+          df['Pending'] = False
+      
+      df = df.dropna(subset=['Date'])
+      
+      
+      query = chat_query.lower().strip()
+      
+      
+      # =========================
+      # DETECT SIZE IN QUERY
+      # =========================
+      target_size = None
+      size_matches = re.findall(r'\b(\d+)\b', query)
+      for size_str in size_matches:
+          size_num = int(size_str)
+          if size_num in st.session_state.fixed_prices or size_num > 20:
+              target_size = size_num
+              break
+      
+      # =========================
+      # DETECT TIME PERIOD IN QUERY
+      # =========================
+      days_filter = None
+      time_patterns = [
+          (r'last\s+(\d+)\s+days', 1),  # "last 30 days"
+          (r'past\s+(\d+)\s+days', 1),   # "past 30 days"
+          (r'(\d+)\s+days', 1),          # "30 days"
+          (r'last\s+month', 30),         # "last month"
+          (r'this\s+month', 0),          # "this month" (month to date)
+          (r'last\s+week', 7),           # "last week"
+          (r'this\s+week', 0),           # "this week" (week to date)
+          (r'year\s+to\s+date', 0),      # "year to date"
+          (r'ytd', 0),                   # "ytd"
+      ]
+      
+      for pattern, default_days in time_patterns:
+          match = re.search(pattern, query)
+          if match:
+              if default_days == 0:  # Special cases
+                  if 'month' in pattern:
+                      days_filter = 'month_to_date'
+                  elif 'week' in pattern:
+                      days_filter = 'week_to_date'
+                  elif 'year' in pattern or 'ytd' in pattern:
+                      days_filter = 'year_to_date'
+              else:
+                  days_filter = int(match.group(1)) if match.groups() else default_days
+              break
+      
+      # =========================
+      # DETECT HISTORY COMMAND
+      # =========================
+      is_history_query = 'history' in query or 'transactions' in query or 'log' in query
+      
+      # =========================
+      # SPECIAL COMMAND: PRICE LIST
+      # =========================
+      if 'price list' in query or 'prices' in query:
+          st.subheader("💰 Fixed Price List")
+          price_data = []
+          for size, price in sorted(st.session_state.fixed_prices.items()):
+              price_data.append({
+                  'Size (mm)': size,
+                  'Price per Rotor': f"₹{price}",
+                  'Calculation': 'Fixed Price'
+              })
+          price_df = pd.DataFrame(price_data)
+          st.dataframe(price_df, use_container_width=True, hide_index=True)
+          st.info(f"For other sizes: ₹{BASE_RATE_PER_MM} per mm × size")
+          st.stop()
+      
+      # =========================
+      # IMPROVED MONTH/YEAR DETECTION
+      # =========================
+      month_name = None
+      month_num = None
+      year_num = datetime.now().year
+      
+      month_mapping = {
+          'january': 1, 'jan': 1,
+          'february': 2, 'feb': 2,
+          'march': 3, 'mar': 3,
+          'april': 4, 'apr': 4,
+          'may': 5,
+          'june': 6, 'jun': 6,
+          'july': 7, 'jul': 7,
+          'august': 8, 'aug': 8,
+          'september': 9, 'sep': 9,
+          'october': 10, 'oct': 10,
+          'november': 11, 'nov': 11,
+          'december': 12, 'dec': 12
+      }
+      
+      for month_str, month_val in month_mapping.items():
+          if month_str in query:
+              month_name = month_str.capitalize()
+              month_num = month_val
+              break
+      
+      year_match = re.search(r'\b(20\d{2})\b', query)
+      if year_match:
+          year_num = int(year_match.group(1))
+      
+      # =========================
+      # IMPROVED BUYER DETECTION
+      # =========================
+      buyers = sorted([b for b in df['Remarks'].unique() if b and str(b).strip() and str(b).lower() not in ['', 'nan', 'none']])
+      
+      buyer = None
+      for b in buyers:
+          b_lower = str(b).lower()
+          if b_lower in query and len(b_lower) > 2:
+              buyer = b
+              break
+      
+      show_all_buyers = 'all buyers' in query or 'buyers list' in query
+      
+      # =========================
+      # MOVEMENT TYPE DETECTION
+      # =========================
+      movement = None
+      
+      if 'pending' in query:
+          movement = 'pending'
+      elif 'incoming' in query or 'inward' in query:
+          movement = 'incoming'
+      elif 'outgoing' in query or 'outward' in query:
+          movement = 'outgoing'
+      elif ('coming' in query and 'rotors' in query) or ('future' in query and 'inward' in query):
+          movement = 'coming_datewise'
+      elif 'coming' in query or 'future' in query:
+          movement = 'coming'
+      elif 'stock' in query and 'alert' in query:
+          movement = 'stock_alert'
+      elif 'summary' in query:
+          movement = 'summary'
+      
+      # =========================
+      # NEW ESTIMATION FUNCTIONS
+      # =========================
+      def calculate_value(size_mm, quantity):
+          if pd.isna(size_mm) or pd.isna(quantity):
+              return 0
+          size_int = int(size_mm)
+          if size_int in st.session_state.fixed_prices:
+              return st.session_state.fixed_prices[size_int] * quantity
+          else:
+              return BASE_RATE_PER_MM * size_int * quantity
+      
+      def get_price_per_rotor(size_mm):
+          if pd.isna(size_mm):
+              return 0
+          size_int = int(size_mm)
+          if size_int in st.session_state.fixed_prices:
+              return st.session_state.fixed_prices[size_int]
+          else:
+              return BASE_RATE_PER_MM * size_int
+      
+      # =========================
+      # SPECIAL CASE: TRANSACTION HISTORY BY SIZE
+      # =========================
+      if target_size and is_history_query:
+          st.subheader(f"📜 Transaction History for Size {target_size}mm")
           
+          # Filter for the specific size
+          history_df = df[df['Size (mm)'] == target_size].copy()
+          
+          if history_df.empty:
+              st.info(f"No transaction history found for size {target_size}mm")
+              st.stop()
+          
+          # Apply time filter if specified
+          original_count = len(history_df)
+          
+          if days_filter:
+              if isinstance(days_filter, int):
+                  cutoff_date = datetime.now() - timedelta(days=days_filter)
+                  history_df = history_df[history_df['Date'] >= cutoff_date]
+                  time_desc = f"Last {days_filter} days"
+              elif days_filter == 'month_to_date':
+                  today = datetime.now()
+                  first_day = today.replace(day=1)
+                  history_df = history_df[history_df['Date'] >= first_day]
+                  time_desc = "This month (to date)"
+              elif days_filter == 'week_to_date':
+                  today = datetime.now()
+                  start_of_week = today - timedelta(days=today.weekday())
+                  history_df = history_df[history_df['Date'] >= start_of_week]
+                  time_desc = "This week (to date)"
+              elif days_filter == 'year_to_date':
+                  today = datetime.now()
+                  first_day_year = today.replace(month=1, day=1)
+                  history_df = history_df[history_df['Date'] >= first_day_year]
+                  time_desc = "Year to date"
+          else:
+              time_desc = "All time"
+          
+          # Sort by date (newest first)
+          history_df = history_df.sort_values('Date', ascending=False)
+          
+          price_per = get_price_per_rotor(target_size)
+          
+          # Calculate summary metrics
+          total_inward = history_df[history_df['Type'] == 'Inward']['Quantity'].sum()
+          total_outgoing = history_df[history_df['Type'] == 'Outgoing']['Quantity'].sum()
+          total_transactions = len(history_df)
+          
+          col1, col2, col3, col4 = st.columns(4)
+          with col1:
+              st.metric("Total Inward", f"{int(total_inward)}")
+          with col2:
+              st.metric("Total Outgoing", f"{int(total_outgoing)}")
+          with col3:
+              st.metric("Net Change", f"{int(total_inward - total_outgoing)}")
+          with col4:
+              st.metric("Transactions", total_transactions)
+          
+          st.info(f"**{time_desc}** · Price: ₹{price_per} per rotor")
+          
+          # Display filters
+          col1, col2, col3 = st.columns(3)
+          with col1:
+              show_type = st.selectbox(
+                  "Filter by type:",
+                  ["All", "Inward", "Outgoing"],
+                  key="history_type"
+              )
+          with col2:
+              show_status = st.selectbox(
+                  "Filter by status:",
+                  ["All", "Current", "Future"],
+                  key="history_status"
+              )
+          with col3:
+              show_pending = st.selectbox(
+                  "Filter pending:",
+                  ["All", "Pending Only", "Non-Pending Only"],
+                  key="history_pending"
+              )
+          
+          # Apply filters
+          filtered_history = history_df.copy()
+          
+          if show_type != "All":
+              filtered_history = filtered_history[filtered_history['Type'] == show_type]
+          
+          if show_status != "All":
+              filtered_history = filtered_history[filtered_history['Status'] == show_status]
+          
+          if show_pending == "Pending Only":
+              filtered_history = filtered_history[filtered_history['Pending'] == True]
+          elif show_pending == "Non-Pending Only":
+              filtered_history = filtered_history[filtered_history['Pending'] == False]
+          
+          # Calculate value for each transaction
+          filtered_history['Value'] = filtered_history.apply(
+              lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
           )
-        
-        if not chat_query:
-            st.info("👆 Enter a query above to get started")
-            st.stop()
-        
-        # =========================
-        # IMPROVED DATA PREPARATION
-        # =========================
-        df = st.session_state.data.copy()
-        
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df['Remarks'] = df['Remarks'].astype(str).str.strip()
-        df['Type'] = df['Type'].astype(str).str.strip()
-        df['Status'] = df['Status'].astype(str).str.strip()
-        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
-        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
-        
-        df = df.dropna(subset=['Date'])
+          
+          # Format for display
+          display_history = filtered_history.copy()
+          display_history['Date'] = display_history['Date'].dt.strftime('%Y-%m-%d')
+          display_history['Value'] = display_history['Value'].apply(lambda x: f"₹{x:,.2f}")
+          display_history['Pending'] = display_history['Pending'].apply(lambda x: 'Yes' if x else 'No')
+          
+          # Display transaction history
+          st.subheader(f"📋 Transaction Details ({len(filtered_history)} records)")
+          
+          st.dataframe(
+              display_history[['Date', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'Value']]
+              .rename(columns={
+                  'Type': 'Movement',
+                  'Quantity': 'Qty',
+                  'Pending': 'Is Pending',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Monthly summary
+          st.subheader("📅 Monthly Summary")
+          
+          # Create monthly pivot
+          history_df['MonthYear'] = history_df['Date'].dt.strftime('%b %Y')
+          monthly_pivot = history_df.pivot_table(
+              index='MonthYear',
+              columns='Type',
+              values='Quantity',
+              aggfunc='sum',
+              fill_value=0
+          ).reset_index()
+          
+          if 'Inward' in monthly_pivot.columns and 'Outgoing' in monthly_pivot.columns:
+              monthly_pivot['Net'] = monthly_pivot['Inward'] - monthly_pivot['Outgoing']
+              monthly_pivot['Net'] = monthly_pivot['Net'].astype(int)
+          elif 'Inward' in monthly_pivot.columns:
+              monthly_pivot['Net'] = monthly_pivot['Inward']
+          elif 'Outgoing' in monthly_pivot.columns:
+              monthly_pivot['Net'] = -monthly_pivot['Outgoing']
+          
+          monthly_pivot = monthly_pivot.sort_values('MonthYear', ascending=False)
+          
+          # Add value columns
+          if 'Inward' in monthly_pivot.columns:
+              monthly_pivot['Inward Value'] = monthly_pivot['Inward'] * price_per
+          if 'Outgoing' in monthly_pivot.columns:
+              monthly_pivot['Outgoing Value'] = monthly_pivot['Outgoing'] * price_per
+          
+          # Format for display
+          display_monthly = monthly_pivot.copy()
+          if 'Inward Value' in display_monthly.columns:
+              display_monthly['Inward Value'] = display_monthly['Inward Value'].apply(lambda x: f"₹{x:,.0f}")
+          if 'Outgoing Value' in display_monthly.columns:
+              display_monthly['Outgoing Value'] = display_monthly['Outgoing Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(display_monthly, use_container_width=True, hide_index=True)
+          
+          # Top buyers
+          st.subheader("👥 Top Buyers")
+          
+          if 'Outgoing' in history_df.columns:
+              buyer_summary = history_df[history_df['Type'] == 'Outgoing'].groupby('Remarks').agg({
+                  'Quantity': 'sum',
+                  'Date': ['min', 'max']
+              }).reset_index()
+              
+              buyer_summary.columns = ['Buyer', 'Total Qty', 'First Purchase', 'Last Purchase']
+              buyer_summary = buyer_summary.sort_values('Total Qty', ascending=False)
+              
+              # Calculate total value
+              buyer_summary['Total Value'] = buyer_summary['Total Qty'] * price_per
+              buyer_summary['Total Value'] = buyer_summary['Total Value'].apply(lambda x: f"₹{x:,.0f}")
+              buyer_summary['First Purchase'] = pd.to_datetime(buyer_summary['First Purchase']).dt.strftime('%Y-%m-%d')
+              buyer_summary['Last Purchase'] = pd.to_datetime(buyer_summary['Last Purchase']).dt.strftime('%Y-%m-%d')
+              
+              st.dataframe(buyer_summary, use_container_width=True, hide_index=True)
+          
+          # Stock timeline visualization
+          st.subheader("📈 Stock Timeline")
+          
+          # Calculate cumulative stock
+          timeline_df = history_df.sort_values('Date').copy()
+          timeline_df['Net Qty'] = timeline_df.apply(
+              lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+          )
+          timeline_df['Cumulative Stock'] = timeline_df['Net Qty'].cumsum()
+          
+          # Resample to monthly for cleaner chart
+          timeline_df.set_index('Date', inplace=True)
+          monthly_stock = timeline_df.resample('M')['Cumulative Stock'].last().reset_index()
+          
+          if not monthly_stock.empty:
+              chart = alt.Chart(monthly_stock).mark_line(point=True).encode(
+                  x=alt.X('Date:T', title='Date'),
+                  y=alt.Y('Cumulative Stock:Q', title='Stock Level'),
+                  tooltip=['Date', 'Cumulative Stock']
+              ).properties(
+                  height=300,
+                  title=f'Stock Level Over Time for {target_size}mm'
+              )
+              st.altair_chart(chart, use_container_width=True)
+          
+          st.stop()
       
-        
-        query = chat_query.lower().strip()
+      # =========================
+      # SPECIAL CASE: SIZE PENDING
+      # =========================
+      if target_size and ('pending' in query or 'size pending' in query):
+          st.subheader(f"⏳ Pending Orders for Size {target_size}mm")
+          
+          pending_df = df[
+              (df['Size (mm)'] == target_size) &
+              (df['Type'] == 'Outgoing') &
+              (df['Pending'] == True)
+          ].copy()
+          
+          if pending_df.empty:
+              st.info(f"No pending orders found for size {target_size}mm")
+              st.stop()
+          
+          # Calculate value
+          pending_df['Value'] = pending_df.apply(
+              lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+          )
+          
+          price_per = get_price_per_rotor(target_size)
+          total_qty = pending_df['Quantity'].sum()
+          total_value = pending_df['Value'].sum()
+          
+          col1, col2, col3 = st.columns(3)
+          with col1:
+              st.metric("Total Pending Qty", f"{int(total_qty)}")
+          with col2:
+              st.metric("Total Value", f"₹{total_value:,.0f}")
+          with col3:
+              st.metric("Price per Rotor", f"₹{price_per}")
+          
+          # Format for display
+          display_df = pending_df.copy()
+          display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+          display_df['Value'] = display_df['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              display_df[['Date', 'Remarks', 'Quantity', 'Status', 'Value']]
+              .rename(columns={
+                  'Remarks': 'Buyer',
+                  'Quantity': 'Qty',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Group by buyer
+          buyer_summary = pending_df.groupby('Remarks').agg({
+              'Quantity': 'sum',
+              'Value': 'sum'
+          }).reset_index()
+          
+          buyer_summary['Value'] = buyer_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.subheader("📊 Buyer-wise Summary")
+          st.dataframe(
+              buyer_summary.rename(columns={
+                  'Remarks': 'Buyer',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          st.stop()
       
-        
-        # =========================
-        # DETECT SIZE IN QUERY
-        # =========================
-        target_size = None
-        size_matches = re.findall(r'\b(\d+)\b', query)
-        for size_str in size_matches:
-            size_num = int(size_str)
-            if size_num in st.session_state.fixed_prices or size_num > 20:
-                target_size = size_num
-                break
-        
-        # =========================
-        # DETECT TIME PERIOD IN QUERY
-        # =========================
-        days_filter = None
-        time_patterns = [
-            (r'last\s+(\d+)\s+days', 1),  # "last 30 days"
-            (r'past\s+(\d+)\s+days', 1),   # "past 30 days"
-            (r'(\d+)\s+days', 1),          # "30 days"
-            (r'last\s+month', 30),         # "last month"
-            (r'this\s+month', 0),          # "this month" (month to date)
-            (r'last\s+week', 7),           # "last week"
-            (r'this\s+week', 0),           # "this week" (week to date)
-            (r'year\s+to\s+date', 0),      # "year to date"
-            (r'ytd', 0),                   # "ytd"
-        ]
-        
-        for pattern, default_days in time_patterns:
-            match = re.search(pattern, query)
-            if match:
-                if default_days == 0:  # Special cases
-                    if 'month' in pattern:
-                        days_filter = 'month_to_date'
-                    elif 'week' in pattern:
-                        days_filter = 'week_to_date'
-                    elif 'year' in pattern or 'ytd' in pattern:
-                        days_filter = 'year_to_date'
-                else:
-                    days_filter = int(match.group(1)) if match.groups() else default_days
-                break
-        
-        # =========================
-        # DETECT HISTORY COMMAND
-        # =========================
-        is_history_query = 'history' in query or 'transactions' in query or 'log' in query
-        
-        # =========================
-        # SPECIAL COMMAND: PRICE LIST
-        # =========================
-        if 'price list' in query or 'prices' in query:
-            st.subheader("💰 Fixed Price List")
-            price_data = []
-            for size, price in sorted(st.session_state.fixed_prices.items()):
-                price_data.append({
-                    'Size (mm)': size,
-                    'Price per Rotor': f"₹{price}",
-                    'Calculation': 'Fixed Price'
-                })
-            price_df = pd.DataFrame(price_data)
-            st.dataframe(price_df, use_container_width=True, hide_index=True)
-            st.info(f"For other sizes: ₹{BASE_RATE_PER_MM} per mm × size")
-            st.stop()
-        
-        # =========================
-        # IMPROVED MONTH/YEAR DETECTION
-        # =========================
-        month_name = None
-        month_num = None
-        year_num = datetime.now().year
-        
-        month_mapping = {
-            'january': 1, 'jan': 1,
-            'february': 2, 'feb': 2,
-            'march': 3, 'mar': 3,
-            'april': 4, 'apr': 4,
-            'may': 5,
-            'june': 6, 'jun': 6,
-            'july': 7, 'jul': 7,
-            'august': 8, 'aug': 8,
-            'september': 9, 'sep': 9,
-            'october': 10, 'oct': 10,
-            'november': 11, 'nov': 11,
-            'december': 12, 'dec': 12
-        }
-        
-        for month_str, month_val in month_mapping.items():
-            if month_str in query:
-                month_name = month_str.capitalize()
-                month_num = month_val
-                break
-        
-        year_match = re.search(r'\b(20\d{2})\b', query)
-        if year_match:
-            year_num = int(year_match.group(1))
-        
-        # =========================
-        # IMPROVED BUYER DETECTION
-        # =========================
-        buyers = sorted([b for b in df['Remarks'].unique() if b and b.strip() and b.lower() not in ['', 'nan', 'none']])
-        
-        buyer = None
-        for b in buyers:
-            b_lower = b.lower()
-            if b_lower in query and len(b_lower) > 2:
-                buyer = b
-                break
-        
-        show_all_buyers = 'all buyers' in query or 'buyers list' in query
-        
-        # =========================
-        # MOVEMENT TYPE DETECTION
-        # =========================
-        movement = None
-        
-        if 'pending' in query:
-            movement = 'pending'
-        elif 'incoming' in query or 'inward' in query:
-            movement = 'incoming'
-        elif 'outgoing' in query or 'outward' in query:
-            movement = 'outgoing'
-        elif ('coming' in query and 'rotors' in query) or ('future' in query and 'inward' in query):
-            movement = 'coming_datewise'
-        elif 'coming' in query or 'future' in query:
-            movement = 'coming'
-        elif 'stock' in query and 'alert' in query:
-            movement = 'stock_alert'
-        elif 'summary' in query:
-            movement = 'summary'
-        
-        # =========================
-        # NEW ESTIMATION FUNCTIONS
-        # =========================
-        def calculate_value(size_mm, quantity):
-            if pd.isna(size_mm) or pd.isna(quantity):
-                return 0
-            size_int = int(size_mm)
-            if size_int in st.session_state.fixed_prices:
-                return st.session_state.fixed_prices[size_int] * quantity
-            else:
-                return BASE_RATE_PER_MM * size_int * quantity
-        
-        def get_price_per_rotor(size_mm):
-            if pd.isna(size_mm):
-                return 0
-            size_int = int(size_mm)
-            if size_int in st.session_state.fixed_prices:
-                return st.session_state.fixed_prices[size_int]
-            else:
-                return BASE_RATE_PER_MM * size_int
-        
-        # =========================
-        # SPECIAL CASE: TRANSACTION HISTORY BY SIZE
-        # =========================
-        if target_size and is_history_query:
-            st.subheader(f"📜 Transaction History for Size {target_size}mm")
-            
-            # Filter for the specific size
-            history_df = df[df['Size (mm)'] == target_size].copy()
-            
-            if history_df.empty:
-                st.info(f"No transaction history found for size {target_size}mm")
-                st.stop()
-            
-            # Apply time filter if specified
-            original_count = len(history_df)
-            
-            if days_filter:
-                if isinstance(days_filter, int):
-                    cutoff_date = datetime.now() - timedelta(days=days_filter)
-                    history_df = history_df[history_df['Date'] >= cutoff_date]
-                    time_desc = f"Last {days_filter} days"
-                elif days_filter == 'month_to_date':
-                    today = datetime.now()
-                    first_day = today.replace(day=1)
-                    history_df = history_df[history_df['Date'] >= first_day]
-                    time_desc = "This month (to date)"
-                elif days_filter == 'week_to_date':
-                    today = datetime.now()
-                    start_of_week = today - timedelta(days=today.weekday())
-                    history_df = history_df[history_df['Date'] >= start_of_week]
-                    time_desc = "This week (to date)"
-                elif days_filter == 'year_to_date':
-                    today = datetime.now()
-                    first_day_year = today.replace(month=1, day=1)
-                    history_df = history_df[history_df['Date'] >= first_day_year]
-                    time_desc = "Year to date"
-            else:
-                time_desc = "All time"
-            
-            # Sort by date (newest first)
-            history_df = history_df.sort_values('Date', ascending=False)
-            
-            price_per = get_price_per_rotor(target_size)
-            
-            # Calculate summary metrics
-            total_inward = history_df[history_df['Type'] == 'Inward']['Quantity'].sum()
-            total_outgoing = history_df[history_df['Type'] == 'Outgoing']['Quantity'].sum()
-            total_transactions = len(history_df)
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Inward", f"{int(total_inward)}")
-            with col2:
-                st.metric("Total Outgoing", f"{int(total_outgoing)}")
-            with col3:
-                st.metric("Net Change", f"{int(total_inward - total_outgoing)}")
-            with col4:
-                st.metric("Transactions", total_transactions)
-            
-            st.info(f"**{time_desc}** · Price: ₹{price_per} per rotor")
-            
-            # Display filters
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                show_type = st.selectbox(
-                    "Filter by type:",
-                    ["All", "Inward", "Outgoing"],
-                    key="history_type"
-                )
-            with col2:
-                show_status = st.selectbox(
-                    "Filter by status:",
-                    ["All", "Current", "Future"],
-                    key="history_status"
-                )
-            with col3:
-                show_pending = st.selectbox(
-                    "Filter pending:",
-                    ["All", "Pending Only", "Non-Pending Only"],
-                    key="history_pending"
-                )
-            
-            # Apply filters
-            filtered_history = history_df.copy()
-            
-            if show_type != "All":
-                filtered_history = filtered_history[filtered_history['Type'] == show_type]
-            
-            if show_status != "All":
-                filtered_history = filtered_history[filtered_history['Status'] == show_status]
-            
-            if show_pending == "Pending Only":
-                filtered_history = filtered_history[filtered_history['Pending'] == True]
-            elif show_pending == "Non-Pending Only":
-                filtered_history = filtered_history[filtered_history['Pending'] == False]
-            
-            # Calculate value for each transaction
-            filtered_history['Value'] = filtered_history.apply(
-                lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
-            )
-            
-            # Format for display
-            display_history = filtered_history.copy()
-            display_history['Date'] = display_history['Date'].dt.strftime('%Y-%m-%d')
-            display_history['Value'] = display_history['Value'].apply(lambda x: f"₹{x:,.2f}")
-            display_history['Pending'] = display_history['Pending'].apply(lambda x: 'Yes' if x else 'No')
-            
-            # Display transaction history
-            st.subheader(f"📋 Transaction Details ({len(filtered_history)} records)")
-            
-            st.dataframe(
-                display_history[['Date', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'Value']]
-                .rename(columns={
-                    'Type': 'Movement',
-                    'Quantity': 'Qty',
-                    'Pending': 'Is Pending',
-                    'Value': 'Total Value'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Monthly summary
-            st.subheader("📅 Monthly Summary")
-            
-            # Create monthly pivot
-            history_df['MonthYear'] = history_df['Date'].dt.strftime('%b %Y')
-            monthly_pivot = history_df.pivot_table(
-                index='MonthYear',
-                columns='Type',
-                values='Quantity',
-                aggfunc='sum',
-                fill_value=0
-            ).reset_index()
-            
-            if 'Inward' in monthly_pivot.columns and 'Outgoing' in monthly_pivot.columns:
-                monthly_pivot['Net'] = monthly_pivot['Inward'] - monthly_pivot['Outgoing']
-                monthly_pivot['Net'] = monthly_pivot['Net'].astype(int)
-            elif 'Inward' in monthly_pivot.columns:
-                monthly_pivot['Net'] = monthly_pivot['Inward']
-            elif 'Outgoing' in monthly_pivot.columns:
-                monthly_pivot['Net'] = -monthly_pivot['Outgoing']
-            
-            monthly_pivot = monthly_pivot.sort_values('MonthYear', ascending=False)
-            
-            # Add value columns
-            monthly_pivot['Inward Value'] = monthly_pivot.apply(
-                lambda x: calculate_value(target_size, x['Inward']) if 'Inward' in monthly_pivot.columns else 0,
-                axis=1
-            )
-            monthly_pivot['Outgoing Value'] = monthly_pivot.apply(
-                lambda x: calculate_value(target_size, x['Outgoing']) if 'Outgoing' in monthly_pivot.columns else 0,
-                axis=1
-            )
-            
-            # Format for display
-            display_monthly = monthly_pivot.copy()
-            if 'Inward Value' in display_monthly.columns:
-                display_monthly['Inward Value'] = display_monthly['Inward Value'].apply(lambda x: f"₹{x:,.0f}")
-            if 'Outgoing Value' in display_monthly.columns:
-                display_monthly['Outgoing Value'] = display_monthly['Outgoing Value'].apply(lambda x: f"₹{x:,.0f}")
-            
-            st.dataframe(display_monthly, use_container_width=True, hide_index=True)
-            
-            # Top buyers
-            st.subheader("👥 Top Buyers")
-            
-            if 'Outgoing' in history_df.columns:
-                buyer_summary = history_df[history_df['Type'] == 'Outgoing'].groupby('Remarks').agg({
-                    'Quantity': 'sum',
-                    'Date': ['min', 'max']
-                }).reset_index()
-                
-                buyer_summary.columns = ['Buyer', 'Total Qty', 'First Purchase', 'Last Purchase']
-                buyer_summary = buyer_summary.sort_values('Total Qty', ascending=False)
-                
-                # Calculate total value
-                buyer_summary['Total Value'] = buyer_summary['Total Qty'] * price_per
-                buyer_summary['Total Value'] = buyer_summary['Total Value'].apply(lambda x: f"₹{x:,.0f}")
-                buyer_summary['First Purchase'] = buyer_summary['First Purchase'].dt.strftime('%Y-%m-%d')
-                buyer_summary['Last Purchase'] = buyer_summary['Last Purchase'].dt.strftime('%Y-%m-%d')
-                
-                st.dataframe(buyer_summary, use_container_width=True, hide_index=True)
-            
-            # Stock timeline visualization
-            st.subheader("📈 Stock Timeline")
-            
-            # Calculate cumulative stock
-            timeline_df = history_df.sort_values('Date').copy()
-            timeline_df['Net Qty'] = timeline_df.apply(
-                lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
-            )
-            timeline_df['Cumulative Stock'] = timeline_df['Net Qty'].cumsum()
-            
-            # Resample to monthly for cleaner chart
-            timeline_df.set_index('Date', inplace=True)
-            monthly_stock = timeline_df.resample('M')['Cumulative Stock'].last().reset_index()
-            
-            if not monthly_stock.empty:
-                chart = alt.Chart(monthly_stock).mark_line(point=True).encode(
-                    x=alt.X('Date:T', title='Date'),
-                    y=alt.Y('Cumulative Stock:Q', title='Stock Level'),
-                    tooltip=['Date', 'Cumulative Stock']
-                ).properties(
-                    height=300,
-                    title=f'Stock Level Over Time for {target_size}mm'
-                )
-                st.altair_chart(chart, use_container_width=True)
-            
-            st.stop()
-        
-        # =========================
-        # SPECIAL CASE: SIZE PENDING
-        # =========================
-        if target_size and ('pending' in query or 'size pending' in query):
-            # ... [keep your existing size pending code here] ...
-            pass
-        
-        # =========================
-        # SPECIAL CASE: SIZE SUMMARY
-        # =========================
-        if target_size and ('summary' in query or 'size summary' in query) and not is_history_query:
-            # ... [keep your existing size summary code here] ...
-            pass
-        
-        # =========================
-        # SPECIAL CASE: COMING ROTORS DATE-WISE
-        # =========================
-        if movement == 'coming_datewise':
-            # ... [keep your existing coming rotors code here] ...
-            pass
-        
-        # =========================
-        # QUERY PROCESSING LOGIC FOR OTHER CASES
-        # =========================
-        
-        # CASE 1: ALL BUYERS LIST
-        if show_all_buyers:
-            # ... [keep your existing all buyers code here] ...
-            pass
-        
-        # CASE 2: STOCK ALERTS
-        elif movement == 'stock_alert':
-            # ... [keep your existing stock alerts code here] ...
-            pass
-        
-        # CASE 3: REGULAR QUERIES
-        filtered = df.copy()
-        
-        # Apply buyer filter
-        if buyer:
-            filtered = filtered[filtered['Remarks'].str.lower() == buyer.lower()]
-        
-        # Apply movement filter
-        if movement == 'pending':
-            filtered = filtered[
-                (filtered['Type'] == 'Outgoing') & 
-                (filtered['Pending'] == True)
-            ]
-        elif movement == 'incoming':
-            filtered = filtered[filtered['Type'] == 'Inward']
-        elif movement == 'outgoing':
-            filtered = filtered[filtered['Type'] == 'Outgoing']
-        elif movement == 'coming':
-            filtered = filtered[filtered['Status'] == 'Future']
-        
-        # Apply size filter if specified
-        if target_size:
-            filtered = filtered[filtered['Size (mm)'] == target_size]
-        
-        # Apply date filters
-        if month_num:
-            start_date = datetime(year_num, month_num, 1)
-            if month_num == 12:
-                end_date = datetime(year_num, month_num, 31)
-            else:
-                end_date = datetime(year_num, month_num + 1, 1) - timedelta(days=1)
-            
-            filtered = filtered[
-                (filtered['Date'] >= start_date) &
-                (filtered['Date'] <= end_date)
-            ]
-        
-        # If user asks for yearly summary
-        elif 'summary' in query and year_num:
-            start_date = datetime(year_num, 1, 1)
-            end_date = datetime(year_num, 12, 31)
-            filtered = filtered[
-                (filtered['Date'] >= start_date) &
-                (filtered['Date'] <= end_date)
-            ]
-        
-        # Filter out invalid data
-        filtered = filtered.dropna(subset=['Size (mm)', 'Quantity'])
-        
-        if filtered.empty:
-            st.warning(f"❌ No matching records found for: '{chat_query}'")
-            
-            # Suggest similar buyers
-            if buyer:
-                similar_buyers = [b for b in buyers if buyer.lower() in b.lower()]
-                if similar_buyers:
-                    st.info(f"Did you mean: {', '.join(similar_buyers[:3])}")
-            
-            st.stop()
-        
-        # =========================
-        # CALCULATIONS & DISPLAY WITH NEW PRICING
-        # =========================
-        # ... [keep your existing display code here] ...
-        
-        
-        
-        # =========================
-        # CALCULATIONS & DISPLAY WITH NEW PRICING
-        # =========================
-        # Apply the new pricing logic
-        filtered['Estimated Value'] = filtered.apply(
-            lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
-        )
-        
-        # Add price per rotor for display
-        filtered['Price per Rotor'] = filtered['Size (mm)'].apply(get_price_per_rotor)
-        
-        total_rotors = filtered['Quantity'].sum()
-        total_value = filtered['Estimated Value'].sum()
-        
-        # Build informative title
-        title_parts = ["📊"]
-        
-        if buyer:
-            title_parts.append(f"**{buyer}**")
-        
-        if movement:
-            title_parts.append(f"**{movement.upper()}**")
-        
-        if target_size:
-            title_parts.append(f"**Size {target_size}mm**")
-        
-        if month_num:
-            title_parts.append(f"**{month_name} {year_num}**")
-        elif 'summary' in query:
-            title_parts.append(f"**Year {year_num} Summary**")
-        
-        if not buyer and not movement and not month_num and not target_size:
-            title_parts.append("**All Transactions**")
-        
-        title = " | ".join(title_parts)
-        st.markdown(f"## {title}")
-        
-        # Summary metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Rotors", f"{int(total_rotors):,}")
-        with col2:
-            st.metric("Total Value", f"₹{total_value:,.2f}")
-        with col3:
-            if not filtered.empty:
-                avg_size = filtered['Size (mm)'].mean()
-                st.metric("Avg Size", f"{avg_size:.0f} mm")
-            else:
-                st.metric("Avg Size", "0 mm")
-        
-        # Show pricing information if size is specified
-        if target_size:
-            price = get_price_per_rotor(target_size)
-            method = "Fixed Price" if target_size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {target_size}mm"
-            st.info(f"**Pricing:** {target_size}mm = ₹{price} ({method})")
-        elif len(filtered['Size (mm)'].unique()) <= 5:
-            st.info("**Pricing Used:**")
-            for size in sorted(filtered['Size (mm)'].unique()):
-                price = get_price_per_rotor(size)
-                method = "Fixed Price" if size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {size}mm"
-                st.write(f"- {size}mm: ₹{price} ({method})")
-        
-        # Grouped display
-        if buyer:
-            # For single buyer, show detailed breakdown
-            display_df = filtered.copy()
-            display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
-            display_df['Total Value'] = display_df['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
-            display_df['Unit Price'] = display_df['Price per Rotor'].apply(lambda x: f"₹{x:,.0f}")
-            
-            st.subheader("📋 Detailed Transactions")
-            st.dataframe(
-                display_df[['Date', 'Type', 'Size (mm)', 'Quantity', 'Unit Price', 'Status', 'Pending', 'Total Value']]
-                .rename(columns={
-                    'Type': 'Movement',
-                    'Size (mm)': 'Size',
-                    'Quantity': 'Qty',
-                    'Pending': 'Is Pending',
-                    'Unit Price': 'Price/Rotor'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Size-wise summary for the buyer
-            if not target_size:  # Only if size wasn't already filtered
-                size_summary = filtered.groupby('Size (mm)').agg({
-                    'Quantity': 'sum',
-                    'Estimated Value': 'sum'
-                }).reset_index()
-                
-                st.subheader("📊 Size-wise Summary")
-                display_size = size_summary.copy()
-                display_size['Estimated Value'] = display_size['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
-                st.dataframe(
-                    display_size.rename(columns={
-                        'Size (mm)': 'Size',
-                        'Quantity': 'Total Qty',
-                        'Estimated Value': 'Total Value'
-                    }),
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
-        else:
-            # For multiple buyers or general queries
-            grouped = filtered.groupby(['Remarks', 'Size (mm)']).agg({
-                'Quantity': 'sum',
-                'Estimated Value': 'sum'
-            }).reset_index()
-            
-            # Calculate price per rotor for each size
-            grouped['Price per Rotor'] = grouped['Size (mm)'].apply(get_price_per_rotor)
-            grouped['Total Value'] = grouped['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
-            
-            st.dataframe(
-                grouped[['Remarks', 'Size (mm)', 'Quantity', 'Price per Rotor', 'Total Value']]
-                .rename(columns={
-                    'Remarks': 'Buyer',
-                    'Size (mm)': 'Size (mm)',
-                    'Quantity': 'Total Qty',
-                    'Price per Rotor': 'Price/Rotor'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-        
-        # Additional insights
-        with st.expander("📈 Insights"):
-            if buyer and movement == 'pending':
-                total_pending = filtered[filtered['Pending']]['Quantity'].sum()
-                pending_value = filtered[filtered['Pending']]['Estimated Value'].sum()
-                st.info(f"**{buyer}** has **{int(total_pending)}** rotors pending worth **₹{pending_value:,.2f}**")
-            
-            if month_num:
-                month_volume = filtered['Quantity'].sum()
-                month_value = filtered['Estimated Value'].sum()
-                st.info(f"**{month_name} {year_num}**: **{int(month_volume)}** rotors worth **₹{month_value:,.2f}**")
-            
-            if target_size:
-                # Show stock status for this size
-                current_stock_df = df[
-                    (df['Size (mm)'] == target_size) &
-                    (df['Status'] == 'Current')
-                ].copy()
-                
-                current_stock_df['Net'] = current_stock_df.apply(
-                    lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
-                )
-                
-                current_stock = current_stock_df[~current_stock_df['Pending']]['Net'].sum()
-                pending_qty = current_stock_df[current_stock_df['Pending']]['Quantity'].sum()
-                
-                st.info(f"**Stock status for {target_size}mm:**")
-                st.write(f"- Current stock: {int(current_stock)} rotors")
-                st.write(f"- Pending orders: {int(pending_qty)} rotors")
-                st.write(f"- Available after pending: {int(current_stock - pending_qty)} rotors")
-            
-            # Most valuable size
-            if not filtered.empty and not target_size:
-                value_by_size = filtered.groupby('Size (mm)')['Estimated Value'].sum()
-                most_valuable_size = value_by_size.idxmax()
-                most_valuable_value = value_by_size.max()
-                st.info(f"Most valuable size: **{most_valuable_size}mm** (₹{most_valuable_value:,.2f})")
+      # =========================
+      # SPECIAL CASE: SIZE SUMMARY
+      # =========================
+      if target_size and ('summary' in query or 'size summary' in query) and not is_history_query:
+          st.subheader(f"📊 Summary for Size {target_size}mm")
+          
+          # Filter for the specific size
+          summary_df = df[df['Size (mm)'] == target_size].copy()
+          
+          if summary_df.empty:
+              st.info(f"No data found for size {target_size}mm")
+              st.stop()
+          
+          # Apply time filter if specified
+          if days_filter:
+              if isinstance(days_filter, int):
+                  cutoff_date = datetime.now() - timedelta(days=days_filter)
+                  summary_df = summary_df[summary_df['Date'] >= cutoff_date]
+                  time_desc = f"Last {days_filter} days"
+              elif days_filter == 'month_to_date':
+                  today = datetime.now()
+                  first_day = today.replace(day=1)
+                  summary_df = summary_df[summary_df['Date'] >= first_day]
+                  time_desc = "This month (to date)"
+              elif days_filter == 'week_to_date':
+                  today = datetime.now()
+                  start_of_week = today - timedelta(days=today.weekday())
+                  summary_df = summary_df[summary_df['Date'] >= start_of_week]
+                  time_desc = "This week (to date)"
+              elif days_filter == 'year_to_date':
+                  today = datetime.now()
+                  first_day_year = today.replace(month=1, day=1)
+                  summary_df = summary_df[summary_df['Date'] >= first_day_year]
+                  time_desc = "Year to date"
+          else:
+              time_desc = "All time"
+          
+          price_per = get_price_per_rotor(target_size)
+          
+          # Calculate metrics
+          total_inward = summary_df[summary_df['Type'] == 'Inward']['Quantity'].sum()
+          total_outgoing = summary_df[summary_df['Type'] == 'Outgoing']['Quantity'].sum()
+          total_pending = summary_df[
+              (summary_df['Type'] == 'Outgoing') & 
+              (summary_df['Pending'] == True)
+          ]['Quantity'].sum()
+          
+          net_stock = total_inward - total_outgoing + total_pending
+          
+          col1, col2, col3, col4 = st.columns(4)
+          with col1:
+              st.metric("Total Inward", f"{int(total_inward)}")
+          with col2:
+              st.metric("Total Outgoing", f"{int(total_outgoing)}")
+          with col3:
+              st.metric("Pending Orders", f"{int(total_pending)}")
+          with col4:
+              st.metric("Net Stock", f"{int(net_stock)}")
+          
+          st.info(f"**{time_desc}** · Price: ₹{price_per} per rotor")
+          
+          # Value calculations
+          inward_value = calculate_value(target_size, total_inward)
+          outgoing_value = calculate_value(target_size, total_outgoing)
+          pending_value = calculate_value(target_size, total_pending)
+          
+          col1, col2, col3 = st.columns(3)
+          with col1:
+              st.metric("Inward Value", f"₹{inward_value:,.0f}")
+          with col2:
+              st.metric("Outgoing Value", f"₹{outgoing_value:,.0f}")
+          with col3:
+              st.metric("Pending Value", f"₹{pending_value:,.0f}")
+          
+          # Top buyers
+          st.subheader("👥 Top Buyers")
+          
+          if len(summary_df[summary_df['Type'] == 'Outgoing']) > 0:
+              buyer_summary = summary_df[summary_df['Type'] == 'Outgoing'].groupby('Remarks').agg({
+                  'Quantity': 'sum'
+              }).reset_index()
+              
+              buyer_summary['Value'] = buyer_summary['Quantity'] * price_per
+              buyer_summary = buyer_summary.sort_values('Quantity', ascending=False)
+              buyer_summary['Value'] = buyer_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+              
+              st.dataframe(
+                  buyer_summary.rename(columns={
+                      'Remarks': 'Buyer',
+                      'Quantity': 'Total Qty',
+                      'Value': 'Total Value'
+                  }),
+                  use_container_width=True,
+                  hide_index=True
+              )
+          
+          st.stop()
+      
+      # =========================
+      # SPECIAL CASE: COMING ROTORS DATE-WISE
+      # =========================
+      if movement == 'coming_datewise':
+          st.subheader("📅 Coming Rotors (Date-wise)")
+          
+          coming_df = df[
+              (df['Status'] == 'Future') &
+              (df['Type'] == 'Inward')
+          ].copy()
+          
+          if coming_df.empty:
+              st.info("No future rotors coming")
+              st.stop()
+          
+          # Calculate value
+          coming_df['Value'] = coming_df.apply(
+              lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+          )
+          
+          # Group by date
+          coming_df['Date'] = pd.to_datetime(coming_df['Date'])
+          date_summary = coming_df.groupby('Date').agg({
+              'Size (mm)': lambda x: ', '.join(map(str, sorted(set(x)))),
+              'Quantity': 'sum',
+              'Value': 'sum',
+              'Remarks': lambda x: ', '.join(sorted(set([str(r) for r in x if str(r).strip()])))
+          }).reset_index()
+          
+          date_summary = date_summary.sort_values('Date')
+          
+          total_qty = date_summary['Quantity'].sum()
+          total_value = date_summary['Value'].sum()
+          
+          col1, col2 = st.columns(2)
+          with col1:
+              st.metric("Total Coming Rotors", f"{int(total_qty)}")
+          with col2:
+              st.metric("Total Value", f"₹{total_value:,.0f}")
+          
+          # Format for display
+          display_df = date_summary.copy()
+          display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+          display_df['Value'] = display_df['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              display_df.rename(columns={
+                  'Date': 'Arrival Date',
+                  'Size (mm)': 'Sizes',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value',
+                  'Remarks': 'Suppliers'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Size-wise breakdown
+          st.subheader("📊 Size-wise Breakdown")
+          
+          size_summary = coming_df.groupby('Size (mm)').agg({
+              'Quantity': 'sum',
+              'Value': 'sum'
+          }).reset_index()
+          
+          size_summary['Value'] = size_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              size_summary.rename(columns={
+                  'Size (mm)': 'Size',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          st.stop()
+      
+      # =========================
+      # QUERY PROCESSING LOGIC FOR OTHER CASES
+      # =========================
+      
+      # CASE 1: ALL BUYERS LIST
+      if show_all_buyers:
+          st.subheader("👥 All Buyers List")
+          
+          # Get unique buyers with their activity
+          buyer_activity = df[df['Type'] == 'Outgoing'].groupby('Remarks').agg({
+              'Date': ['min', 'max', 'count'],
+              'Quantity': 'sum'
+          }).reset_index()
+          
+          buyer_activity.columns = ['Buyer', 'First Purchase', 'Last Purchase', 'Transactions', 'Total Qty']
+          
+          # Calculate total value for each buyer
+          buyer_activity['Total Value'] = 0
+          for idx, row in buyer_activity.iterrows():
+              buyer_df = df[df['Remarks'] == row['Buyer']]
+              total_value = 0
+              for _, trans in buyer_df.iterrows():
+                  total_value += calculate_value(trans['Size (mm)'], trans['Quantity'])
+              buyer_activity.at[idx, 'Total Value'] = total_value
+          
+          # Sort by total value
+          buyer_activity = buyer_activity.sort_values('Total Value', ascending=False)
+          
+          # Format for display
+          display_buyers = buyer_activity.copy()
+          display_buyers['First Purchase'] = pd.to_datetime(display_buyers['First Purchase']).dt.strftime('%Y-%m-%d')
+          display_buyers['Last Purchase'] = pd.to_datetime(display_buyers['Last Purchase']).dt.strftime('%Y-%m-%d')
+          display_buyers['Total Value'] = display_buyers['Total Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(display_buyers, use_container_width=True, hide_index=True)
+          
+          # Summary stats
+          col1, col2, col3 = st.columns(3)
+          with col1:
+              st.metric("Total Buyers", len(buyer_activity))
+          with col2:
+              total_buyer_qty = buyer_activity['Total Qty'].sum()
+              st.metric("Total Rotors Sold", f"{int(total_buyer_qty)}")
+          with col3:
+              total_buyer_value = sum([float(v.replace('₹', '').replace(',', '')) for v in display_buyers['Total Value']])
+              st.metric("Total Sales Value", f"₹{total_buyer_value:,.0f}")
+          
+          st.stop()
+      
+      # CASE 2: STOCK ALERTS
+      elif movement == 'stock_alert':
+          st.subheader("⚠️ Stock Alerts")
+          
+          # Calculate current stock for each size
+          stock_data = []
+          
+          for size in df['Size (mm)'].unique():
+              if pd.isna(size):
+                  continue
+                  
+              size_df = df[df['Size (mm)'] == size]
+              
+              # Calculate net stock (inward - outgoing where not pending)
+              total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+              total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+              current_stock = total_inward - total_outgoing
+              
+              # Calculate pending outgoing
+              pending_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'])]['Quantity'].sum()
+              
+              # Calculate incoming
+              incoming = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+              
+              stock_data.append({
+                  'Size (mm)': size,
+                  'Current Stock': current_stock,
+                  'Pending Orders': pending_outgoing,
+                  'Incoming': incoming,
+                  'Available After Pending': current_stock - pending_outgoing
+              })
+          
+          stock_df = pd.DataFrame(stock_data)
+          
+          # Filter for low stock (less than 10)
+          low_stock = stock_df[stock_df['Current Stock'] < 10].copy()
+          
+          if low_stock.empty:
+              st.success("✅ All stock levels are healthy!")
+          else:
+              st.warning(f"⚠️ {len(low_stock)} sizes have low stock!")
+              
+              # Calculate value for low stock items
+              low_stock['Value'] = low_stock.apply(
+                  lambda row: calculate_value(row['Size (mm)'], row['Current Stock']), axis=1
+              )
+              
+              # Format for display
+              display_low = low_stock.copy()
+              display_low['Value'] = display_low['Value'].apply(lambda x: f"₹{x:,.0f}")
+              
+              st.dataframe(
+                  display_low[['Size (mm)', 'Current Stock', 'Pending Orders', 'Incoming', 'Available After Pending', 'Value']]
+                  .rename(columns={
+                      'Size (mm)': 'Size',
+                      'Current Stock': 'Current',
+                      'Pending Orders': 'Pending',
+                      'Available After Pending': 'Available'
+                  }),
+                  use_container_width=True,
+                  hide_index=True
+              )
+          
+          # Show all stock levels
+          with st.expander("📊 View All Stock Levels"):
+              stock_df['Value'] = stock_df.apply(
+                  lambda row: calculate_value(row['Size (mm)'], row['Current Stock']), axis=1
+              )
+              
+              display_all = stock_df.sort_values('Current Stock').copy()
+              display_all['Value'] = display_all['Value'].apply(lambda x: f"₹{x:,.0f}")
+              
+              st.dataframe(
+                  display_all[['Size (mm)', 'Current Stock', 'Pending Orders', 'Incoming', 'Available After Pending', 'Value']]
+                  .rename(columns={
+                      'Size (mm)': 'Size',
+                      'Current Stock': 'Current',
+                      'Pending Orders': 'Pending',
+                      'Available After Pending': 'Available'
+                  }),
+                  use_container_width=True,
+                  hide_index=True
+              )
+          
+          st.stop()
+      
+      # CASE 3: REGULAR QUERIES
+      filtered = df.copy()
+      
+      # Apply buyer filter
+      if buyer:
+          filtered = filtered[filtered['Remarks'].str.lower() == str(buyer).lower()]
+      
+      # Apply movement filter
+      if movement == 'pending':
+          filtered = filtered[
+              (filtered['Type'] == 'Outgoing') & 
+              (filtered['Pending'] == True)
+          ]
+      elif movement == 'incoming':
+          filtered = filtered[filtered['Type'] == 'Inward']
+      elif movement == 'outgoing':
+          filtered = filtered[filtered['Type'] == 'Outgoing']
+      elif movement == 'coming':
+          filtered = filtered[filtered['Status'] == 'Future']
+      
+      # Apply size filter if specified
+      if target_size:
+          filtered = filtered[filtered['Size (mm)'] == target_size]
+      
+      # Apply date filters
+      if month_num:
+          start_date = datetime(year_num, month_num, 1)
+          if month_num == 12:
+              end_date = datetime(year_num, month_num, 31)
+          else:
+              end_date = datetime(year_num, month_num + 1, 1) - timedelta(days=1)
+          
+          filtered = filtered[
+              (filtered['Date'] >= start_date) &
+              (filtered['Date'] <= end_date)
+          ]
+      
+      # If user asks for yearly summary
+      elif 'summary' in query and year_num:
+          start_date = datetime(year_num, 1, 1)
+          end_date = datetime(year_num, 12, 31)
+          filtered = filtered[
+              (filtered['Date'] >= start_date) &
+              (filtered['Date'] <= end_date)
+          ]
+      
+      # Filter out invalid data
+      filtered = filtered.dropna(subset=['Size (mm)', 'Quantity'])
+      
+      if filtered.empty:
+          st.warning(f"❌ No matching records found for: '{chat_query}'")
+          
+          # Suggest similar buyers
+          if buyer:
+              similar_buyers = [b for b in buyers if str(buyer).lower() in str(b).lower()]
+              if similar_buyers:
+                  st.info(f"Did you mean: {', '.join(similar_buyers[:3])}")
+          
+          st.stop()
+      
+      # =========================
+      # CALCULATIONS & DISPLAY WITH NEW PRICING
+      # =========================
+      # Apply the new pricing logic
+      filtered['Estimated Value'] = filtered.apply(
+          lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+      )
+      
+      # Add price per rotor for display
+      filtered['Price per Rotor'] = filtered['Size (mm)'].apply(get_price_per_rotor)
+      
+      total_rotors = filtered['Quantity'].sum()
+      total_value = filtered['Estimated Value'].sum()
+      
+      # Build informative title
+      title_parts = ["📊"]
+      
+      if buyer:
+          title_parts.append(f"**{buyer}**")
+      
+      if movement:
+          movement_display = {
+              'pending': 'PENDING ORDERS',
+              'incoming': 'INCOMING',
+              'outgoing': 'OUTGOING',
+              'coming': 'FUTURE ROTORS',
+              'summary': 'SUMMARY'
+          }
+          title_parts.append(f"**{movement_display.get(movement, movement.upper())}**")
+      
+      if target_size:
+          title_parts.append(f"**Size {target_size}mm**")
+      
+      if month_num:
+          title_parts.append(f"**{month_name} {year_num}**")
+      elif 'summary' in query:
+          title_parts.append(f"**Year {year_num} Summary**")
+      
+      if not buyer and not movement and not month_num and not target_size:
+          title_parts.append("**All Transactions**")
+      
+      title = " | ".join(title_parts)
+      st.markdown(f"## {title}")
+      
+      # Summary metrics
+      col1, col2, col3 = st.columns(3)
+      with col1:
+          st.metric("Total Rotors", f"{int(total_rotors):,}")
+      with col2:
+          st.metric("Total Value", f"₹{total_value:,.2f}")
+      with col3:
+          if not filtered.empty:
+              avg_size = filtered['Size (mm)'].mean()
+              st.metric("Avg Size", f"{avg_size:.0f} mm")
+          else:
+              st.metric("Avg Size", "0 mm")
+      
+      # Show pricing information if size is specified
+      if target_size:
+          price = get_price_per_rotor(target_size)
+          method = "Fixed Price" if target_size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {target_size}mm"
+          st.info(f"**Pricing:** {target_size}mm = ₹{price} ({method})")
+      elif len(filtered['Size (mm)'].unique()) <= 5:
+          st.info("**Pricing Used:**")
+          for size in sorted(filtered['Size (mm)'].unique()):
+              price = get_price_per_rotor(size)
+              method = "Fixed Price" if size in st.session_state.fixed_prices else f"₹{BASE_RATE_PER_MM}/mm × {size}mm"
+              st.write(f"- {size}mm: ₹{price} ({method})")
+      
+      # Grouped display
+      if buyer:
+          # For single buyer, show detailed breakdown
+          display_df = filtered.copy()
+          display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+          display_df['Total Value'] = display_df['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+          display_df['Unit Price'] = display_df['Price per Rotor'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.subheader("📋 Detailed Transactions")
+          st.dataframe(
+              display_df[['Date', 'Type', 'Size (mm)', 'Quantity', 'Unit Price', 'Status', 'Pending', 'Total Value']]
+              .rename(columns={
+                  'Type': 'Movement',
+                  'Size (mm)': 'Size',
+                  'Quantity': 'Qty',
+                  'Pending': 'Is Pending',
+                  'Unit Price': 'Price/Rotor'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Size-wise summary for the buyer
+          if not target_size:  # Only if size wasn't already filtered
+              size_summary = filtered.groupby('Size (mm)').agg({
+                  'Quantity': 'sum',
+                  'Estimated Value': 'sum'
+              }).reset_index()
+              
+              st.subheader("📊 Size-wise Summary")
+              display_size = size_summary.copy()
+              display_size['Estimated Value'] = display_size['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+              st.dataframe(
+                  display_size.rename(columns={
+                      'Size (mm)': 'Size',
+                      'Quantity': 'Total Qty',
+                      'Estimated Value': 'Total Value'
+                  }),
+                  use_container_width=True,
+                  hide_index=True
+              )
+          
+      else:
+          # For multiple buyers or general queries
+          grouped = filtered.groupby(['Remarks', 'Size (mm)']).agg({
+              'Quantity': 'sum',
+              'Estimated Value': 'sum'
+          }).reset_index()
+          
+          # Calculate price per rotor for each size
+          grouped['Price per Rotor'] = grouped['Size (mm)'].apply(get_price_per_rotor)
+          grouped['Total Value'] = grouped['Estimated Value'].apply(lambda x: f"₹{x:,.2f}")
+          
+          st.dataframe(
+              grouped[['Remarks', 'Size (mm)', 'Quantity', 'Price per Rotor', 'Total Value']]
+              .rename(columns={
+                  'Remarks': 'Buyer',
+                  'Size (mm)': 'Size (mm)',
+                  'Quantity': 'Total Qty',
+                  'Price per Rotor': 'Price/Rotor'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+      
+      # Additional insights
+      with st.expander("📈 Insights"):
+          if buyer and movement == 'pending':
+              total_pending = filtered[filtered['Pending']]['Quantity'].sum()
+              pending_value = filtered[filtered['Pending']]['Estimated Value'].sum()
+              st.info(f"**{buyer}** has **{int(total_pending)}** rotors pending worth **₹{pending_value:,.2f}**")
+          
+          if month_num:
+              month_volume = filtered['Quantity'].sum()
+              month_value = filtered['Estimated Value'].sum()
+              st.info(f"**{month_name} {year_num}**: **{int(month_volume)}** rotors worth **₹{month_value:,.2f}**")
+          
+          if target_size:
+              # Show stock status for this size
+              current_stock_df = df[
+                  (df['Size (mm)'] == target_size) &
+                  (df['Status'] == 'Current')
+              ].copy()
+              
+              current_stock_df['Net'] = current_stock_df.apply(
+                  lambda x: x['Quantity'] if x['Type'] == 'Inward' else -x['Quantity'], axis=1
+              )
+              
+              current_stock = current_stock_df[~current_stock_df['Pending']]['Net'].sum()
+              pending_qty = current_stock_df[current_stock_df['Pending']]['Quantity'].sum()
+              
+              st.info(f"**Stock status for {target_size}mm:**")
+              st.write(f"- Current stock: {int(current_stock)} rotors")
+              st.write(f"- Pending orders: {int(pending_qty)} rotors")
+              st.write(f"- Available after pending: {int(current_stock - pending_qty)} rotors")
+          
+          # Most valuable size
+          if not filtered.empty and not target_size:
+              value_by_size = filtered.groupby('Size (mm)')['Estimated Value'].sum()
+              most_valuable_size = value_by_size.idxmax()
+              most_valuable_value = value_by_size.max()
+              st.info(f"Most valuable size: **{most_valuable_size}mm** (₹{most_valuable_value:,.2f})")
     
         # === CASE: Buyer weight estimation ===
         
