@@ -726,9 +726,9 @@ if tab_choice == "🔁 Rotor Tracker":
           new_base_rate = st.number_input(
               "Base Rate (₹ per mm)",
               value=float(st.session_state.base_rate_per_mm),
-              min_value=0.0,
-              step=0.1,
-              format="%.1f",
+              min_value=0.00,
+              step=0.2,
+              format="%.2f",
               key="base_rate_editor"
           )
           
