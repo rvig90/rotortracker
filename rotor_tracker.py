@@ -829,8 +829,10 @@ if tab_choice == "🔁 Rotor Tracker":
         df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
         
         df = df.dropna(subset=['Date'])
+      
         
-        query = chat_query.lower().strip()
+      query = chat_query.lower().strip()
+      
         
         # =========================
         # DETECT SIZE IN QUERY
