@@ -798,6 +798,9 @@ if tab_choice == "🔁 Rotor Tracker":
                   st.session_state.base_rate_per_mm = 3.8
                   st.success("✅ Reset to default rates!")
                   st.rerun()
+
+      
+                
       
       with st.expander("💰 Current Pricing", expanded=True):
           st.write("**Fixed Prices:**")
@@ -806,10 +809,14 @@ if tab_choice == "🔁 Rotor Tracker":
           st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.1f} per mm × size")
         
         
+        
           
-          chat_query = st.text_input(
-              "💬 Ask about rotors:",
-              placeholder="e.g., history 1803 | size summary 2003 | coming rotors"
+        chat_query = st.text_input(
+          
+          "💬 Ask about rotors:",
+          
+          placeholder="e.g., history 1803 | size summary 2003 | coming rotors"
+          
           )
         
         if not chat_query:
@@ -831,7 +838,7 @@ if tab_choice == "🔁 Rotor Tracker":
         df = df.dropna(subset=['Date'])
       
         
-          query = chat_query.lower().strip()
+        query = chat_query.lower().strip()
       
         
         # =========================
