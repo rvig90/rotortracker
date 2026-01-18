@@ -682,10 +682,10 @@ if tab_choice == "🔁 Rotor Tracker":
                 70: 378       # ₹378 per rotor
             }
         
-        if 'BASE_RATE_PER_MM' not in st.session_state:
-          st.session_state.BASE_RATE_PER_MM = {
-            'base rate':3.8
-          }
+        if 'base_rate_per_mm' not in st.session_state:
+          st.session_state.base_rate_per_mm = 3.8
+            
+        
         
         with st.expander("⚙️ Edit Fixed Rates", expanded=False):
             st.write("Edit fixed prices for specific rotor sizes:")
