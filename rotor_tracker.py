@@ -667,108 +667,142 @@ if tab_choice == "🔁 Rotor Tracker":
     # === TAB 3: Rotor Chatbot ===
    # === TAB 3: Rotor Chatbot ===
     with tabs[2]:
-        st.subheader("💬 Rotor Chatbot Lite")
-        
-        # =========================
-        # FIXED RATES MANAGEMENT
-        # =========================
-        if 'fixed_prices' not in st.session_state:
-            st.session_state.fixed_prices = {
-                1803: 430,    # ₹430 per rotor
-                2003: 478,    # ₹478 per rotor
-                35: 200,      # ₹200 per rotor
-                40: 220,      # ₹220 per rotor
-                50: 278,      # ₹278 per rotor
-                70: 378       # ₹378 per rotor
-            }
-        
-        if 'BASE_RATE_PER_MM' not in st.session_state:
-            st.session_state.BASE_RATE_PER_MM = 3.8
-        
-        with st.expander("⚙️ Edit Fixed Rates", expanded=False):
-            st.write("Edit fixed prices for specific rotor sizes:")
-            
-            rates_data = []
-            for size, price in sorted(st.session_state.fixed_prices.items()):
-                rates_data.append({
-                    'Size (mm)': size,
-                    'Price (₹)': price
-                })
-            
-            rates_df = pd.DataFrame(rates_data)
-            
-            edited_df = st.data_editor(
-                rates_df,
-                num_rows="dynamic",
-                column_config={
-                    "Size (mm)": st.column_config.NumberColumn(
-                        "Size (mm)",
-                        help="Rotor size in mm",
-                        min_value=1,
-                        step=1
-                    ),
-                    "Price (₹)": st.column_config.NumberColumn(
-                        "Price (₹)",
-                        help="Price per rotor in Rupees",
-                        min_value=0,
-                        step=10
-                    )
-                },
-                hide_index=True,
-                use_container_width=True
-            )
-            
-            # Base Rate Per MM editing
-            st.divider()
-            st.write("**Edit Base Rate Per MM:**")
-            new_base_rate = st.number_input(
-                "Base Rate (₹ per mm)",
-                value=float(st.session_state.base_rate_per_mm),
-                min_value=0.00,
-                step=0.10,
-                format="%.2f",
-                key="base_rate_editor"
-            )
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("💾 Update All Rates", type="primary"):
-                    # Update fixed rates
-                    new_prices = {}
-                    for _, row in edited_df.iterrows():
-                        if not pd.isna(row['Size (mm)']) and not pd.isna(row['Price (₹)']):
-                            size = int(row['Size (mm)'])
-                            price = int(row['Price (₹)'])
-                            new_prices[size] = price
-                    
-                    st.session_state.fixed_prices = new_prices
-                    
-                    # Update base rate
-                    st.session_state.BASE_RATE_PER_MM = new_base_rate
-                    
-                    st.success(f"✅ Updated {len(new_prices)} fixed rates and base rate!")
-                    st.rerun()
-            
-            with col2:
-                if st.button("🔄 Reset to Default Rates"):
-                    st.session_state.fixed_prices = {
-                        1803: 430,
-                        2003: 478,
-                        35: 200,
-                        40: 220,
-                        50: 278,
-                        70: 378
-                    }
-                    st.session_state.BASE_RATE_PER_MM = 3.8
-                    st.success("✅ Reset to default rates!")
-                    st.rerun()
-        
-        with st.expander("💰 Current Pricing", expanded=True):
-            st.write("**Fixed Prices:**")
-            for size, price in sorted(st.session_state.fixed_prices.items()):
-                st.write(f"- {size}mm: ₹{price} per rotor")
-            st.write(f"**Other sizes:** ₹{st.session_state.BASE_RATE_PER_MM:.2f} per mm × size")
+      st.subheader("💬 Rotor Chatbot Lite")
+      
+      # =========================
+      # FIXED RATES MANAGEMENT
+      # =========================
+      if 'fixed_prices' not in st.session_state:
+          st.session_state.fixed_prices = {
+              1803: 430,    # ₹430 per rotor
+              2003: 478,    # ₹478 per rotor
+              35: 200,      # ₹200 per rotor
+              40: 220,      # ₹220 per rotor
+              50: 278,      # ₹278 per rotor
+              70: 378       # ₹378 per rotor
+          }
+      
+      if 'base_rate_per_mm' not in st.session_state:
+          st.session_state.base_rate_per_mm = 3.8
+      
+      BASE_RATE_PER_MM = st.session_state.base_rate_per_mm
+      
+      with st.expander("⚙️ Edit Fixed Rates", expanded=False):
+          st.write("Edit fixed prices for specific rotor sizes:")
+          
+          rates_data = []
+          for size, price in sorted(st.session_state.fixed_prices.items()):
+              rates_data.append({
+                  'Size (mm)': size,
+                  'Price (₹)': price
+              })
+          
+          rates_df = pd.DataFrame(rates_data)
+          
+          edited_df = st.data_editor(
+              rates_df,
+              num_rows="dynamic",
+              column_config={
+                  "Size (mm)": st.column_config.NumberColumn(
+                      "Size (mm)",
+                      help="Rotor size in mm",
+                      min_value=1,
+                      step=1
+                  ),
+                  "Price (₹)": st.column_config.NumberColumn(
+                      "Price (₹)",
+                      help="Price per rotor in Rupees",
+                      min_value=0,
+                      step=10
+                  )
+              },
+              hide_index=True,
+              use_container_width=True
+          )
+          
+          # Base Rate Per MM editing
+          st.divider()
+          st.write("**Edit Base Rate Per MM:**")
+          new_base_rate = st.number_input(
+              "Base Rate (₹ per mm)",
+              value=float(st.session_state.base_rate_per_mm),
+              min_value=0.0,
+              step=0.1,
+              format="%.1f",
+              key="base_rate_editor"
+          )
+          
+          col1, col2 = st.columns(2)
+          
+          with col1:
+              if st.button("💾 Update All Rates", type="primary"):
+                  try:
+                      # Update fixed rates with validation
+                      new_prices = {}
+                      valid_rows = 0
+                      
+                      for _, row in edited_df.iterrows():
+                          # Check if both values are numeric
+                          try:
+                              size_val = row['Size (mm)']
+                              price_val = row['Price (₹)']
+                              
+                              # Skip rows with NaN or None values
+                              if pd.isna(size_val) or pd.isna(price_val):
+                                  continue
+                                  
+                              # Convert to appropriate types
+                              size = int(float(size_val))
+                              price = int(float(price_val))
+                              
+                              # Validate positive values
+                              if size > 0 and price >= 0:
+                                  new_prices[size] = price
+                                  valid_rows += 1
+                              else:
+                                  st.warning(f"Skipping row with invalid values: Size={size_val}, Price={price_val}")
+                                  
+                          except (ValueError, TypeError) as e:
+                              st.warning(f"Skipping row with invalid data: {row.to_dict()}")
+                              continue
+                      
+                      # Only update if we have valid data
+                      if valid_rows > 0 or len(new_prices) > 0:
+                          st.session_state.fixed_prices = new_prices
+                      
+                      # Update base rate
+                      st.session_state.base_rate_per_mm = new_base_rate
+                      
+                      if valid_rows > 0:
+                          st.success(f"✅ Updated {len(new_prices)} fixed rates and base rate to ₹{new_base_rate:.1f} per mm!")
+                      else:
+                          st.success(f"✅ Updated base rate to ₹{new_base_rate:.1f} per mm (no valid fixed rates to update)")
+                      
+                      st.rerun()
+                      
+                  except Exception as e:
+                      st.error(f"Error updating rates: {str(e)}")
+                      st.info("Please check that all inputs are valid numbers")
+          
+          with col2:
+              if st.button("🔄 Reset to Default Rates"):
+                  st.session_state.fixed_prices = {
+                      1803: 430,
+                      2003: 478,
+                      35: 200,
+                      40: 220,
+                      50: 278,
+                      70: 378
+                  }
+                  st.session_state.base_rate_per_mm = 3.8
+                  st.success("✅ Reset to default rates!")
+                  st.rerun()
+      
+      with st.expander("💰 Current Pricing", expanded=True):
+          st.write("**Fixed Prices:**")
+          for size, price in sorted(st.session_state.fixed_prices.items()):
+              st.write(f"- {size}mm: ₹{price} per rotor")
+          st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.1f} per mm × size")
         
         with st.expander("📋 Example Queries"):
             st.markdown("""
