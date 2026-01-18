@@ -805,24 +805,7 @@ if tab_choice == "🔁 Rotor Tracker":
               st.write(f"- {size}mm: ₹{price} per rotor")
           st.write(f"**Other sizes:** ₹{st.session_state.base_rate_per_mm:.1f} per mm × size")
         
-        with st.expander("📋 Example Queries"):
-          
-          st.markdown("""
-          **Query Examples:**
-          - `ravi pending` - Show all pending rotors for Ravi
-          - `ravi january` - Show Ravi's transactions in January
-          - `outgoing february` - Show all outgoing rotors in February
-          - `incoming may` - Show all incoming rotors in May
-          - `coming rotors` - Show all future incoming rotors (date-wise)
-          - `size pending 1803` - Show pending rotors for size 1803mm
-          - `size summary 2003` - Show all transactions for size 2003mm
-          - `history 1803` - Show transaction history for size 1803mm
-          - `1803 history last 30 days` - Show recent history for 1803mm
-          - `ravi summary 2024` - Show Ravi's yearly summary
-          - `all buyers` - List all buyers with their total transactions
-          - `stock alert` - Show stock alerts
-          - `price list` - Show fixed prices
-          """)
+        
           
           chat_query = st.text_input(
               "💬 Ask about rotors:",
