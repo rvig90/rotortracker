@@ -966,7 +966,7 @@ if tab_choice == "🔁 Rotor Tracker":
           
           # Check if any buyer word is in the query
           for buyer_word in buyer_words:
-              if len(buyer_word) > 2 and buyer_word in clean_query:
+              if len(buyer_word) > 1 and buyer_word in clean_query:
                   buyer = buyers[i]
                   buyer_name = b_lower
                   break
