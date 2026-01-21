@@ -949,7 +949,7 @@ if tab_choice == "🔁 Rotor Tracker":
       buyer = None
       for b in buyers:
           b_lower = str(b).lower()
-          if b_lower in query and len(b_lower) > 1:
+          if b_lower in query and len(b_lower):
               buyer = b
               break
       
