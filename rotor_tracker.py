@@ -947,74 +947,68 @@ if tab_choice == "🔁 Rotor Tracker":
       # =========================
       # IMPROVED BUYER DETECTION
       # =========================
+      # =========================
+      # SIMPLE BUT EFFECTIVE BUYER DETECTION
+      # =========================
       buyers = sorted([b for b in df['Remarks'].unique() if b and str(b).strip() and str(b).lower() not in ['', 'nan', 'none']])
       
+      # Convert buyers to lowercase for matching
+      buyers_lower = [str(b).lower().strip() for b in buyers]
+      
       buyer = None
-      # First, try exact matches or partial matches
-      for b in buyers:
-          b_lower = str(b).lower()
+      buyer_name = None
+      clean_query = query.lower().strip()
+      
+      # Check each buyer name against the query
+      for i, b_lower in enumerate(buyers_lower):
+          # Split buyer name into words
+          buyer_words = b_lower.split()
           
-          # Check if buyer name is in the query (e.g., "enova" in "enova pending")
-          if b_lower in query and len(b_lower) > 1:
-              buyer = b
-              break
-          
-          # Check if any word from query matches buyer name
-          query_words = query.split()
-          for word in query_words:
-              if len(word) > 2 and word in b_lower:
-                  buyer = b
+          # Check if any buyer word is in the query
+          for buyer_word in buyer_words:
+              if len(buyer_word) > 2 and buyer_word in clean_query:
+                  buyer = buyers[i]
+                  buyer_name = b_lower
                   break
           if buyer:
               break
       
-      # If no buyer found with above logic, check for common patterns
+      # If still not found, check the opposite - if any query word is in buyer name
       if not buyer:
-          # Look for buyer names that might be mentioned
-          buyer_keywords = []
-          for b in buyers:
-              b_words = str(b).lower().split()
-              buyer_keywords.extend(b_words)
-          
-          buyer_keywords = list(set([k for k in buyer_keywords if len(k) > 2]))
-          
-          # Check if any buyer keyword is in the query
-          for keyword in buyer_keywords:
-              if keyword in query:
-                  # Find the first buyer containing this keyword
-                  for b in buyers:
-                      if keyword in str(b).lower():
-                          buyer = b
+          query_words = clean_query.split()
+          for word in query_words:
+              if len(word) > 2:
+                  for i, b_lower in enumerate(buyers_lower):
+                      if word in b_lower:
+                          buyer = buyers[i]
+                          buyer_name = b_lower
                           break
                   if buyer:
                       break
       
-      # Also, explicitly check for common buyer patterns
-      if not buyer:
-          common_patterns = {
-              'enova': ['enova'],
-              'ajji': ['ajji', 'aji'],
-              'alpha': ['alpha'],
-              'beta': ['beta'],
-              'gamma': ['gamma'],
-              'delta': ['delta'],
-              'omega': ['omega']
-          }
+      # Debug display
+      if buyer:
+          st.info(f"🔍 Detected buyer: **{buyer}**")
           
-          for buyer_name, patterns in common_patterns.items():
-              for pattern in patterns:
-                  if pattern in query:
-                      # Find buyers containing this pattern
-                      for b in buyers:
-                          if pattern in str(b).lower():
-                              buyer = b
-                              break
-                      if buyer:
-                          break
-              if buyer:
-                  break
+      show_all_buyers = 'all buyers' in clean_query or 'buyers list' in clean_query
       
-      show_all_buyers = 'all buyers' in query or 'buyers list' in query or 'list buyers' in query
+      # =========================
+      # SIMPLE FILTERING
+      # =========================
+      filtered = df.copy()
+      
+      if buyer:
+          # First filter by buyer
+          mask = filtered['Remarks'].notna() & filtered['Remarks'].astype(str).str.lower().str.strip().str.contains(buyer_name, na=False)
+          filtered = filtered[mask]
+          
+          # Show what we found
+          if len(filtered) == 0:
+              st.warning(f"No transactions found for buyer containing '{buyer_name}'")
+              # Try alternative search
+              possible_matches = [b for b in buyers if buyer_name in str(b).lower()]
+              if possible_matches:
+                  st.info(f"Possible matches: {', '.join(possible_matches[:5])}")
       
       # =========================
       # MOVEMENT TYPE DETECTION
