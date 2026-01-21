@@ -944,16 +944,77 @@ if tab_choice == "🔁 Rotor Tracker":
       # =========================
       # IMPROVED BUYER DETECTION
       # =========================
+      # =========================
+      # IMPROVED BUYER DETECTION
+      # =========================
       buyers = sorted([b for b in df['Remarks'].unique() if b and str(b).strip() and str(b).lower() not in ['', 'nan', 'none']])
       
       buyer = None
+      # First, try exact matches or partial matches
       for b in buyers:
           b_lower = str(b).lower()
-          if b_lower in query and len(b_lower):
+          
+          # Check if buyer name is in the query (e.g., "enova" in "enova pending")
+          if b_lower in query and len(b_lower) > 1:
               buyer = b
               break
+          
+          # Check if any word from query matches buyer name
+          query_words = query.split()
+          for word in query_words:
+              if len(word) > 2 and word in b_lower:
+                  buyer = b
+                  break
+          if buyer:
+              break
       
-      show_all_buyers = 'all buyers' in query or 'buyers list' in query
+      # If no buyer found with above logic, check for common patterns
+      if not buyer:
+          # Look for buyer names that might be mentioned
+          buyer_keywords = []
+          for b in buyers:
+              b_words = str(b).lower().split()
+              buyer_keywords.extend(b_words)
+          
+          buyer_keywords = list(set([k for k in buyer_keywords if len(k) > 2]))
+          
+          # Check if any buyer keyword is in the query
+          for keyword in buyer_keywords:
+              if keyword in query:
+                  # Find the first buyer containing this keyword
+                  for b in buyers:
+                      if keyword in str(b).lower():
+                          buyer = b
+                          break
+                  if buyer:
+                      break
+      
+      # Also, explicitly check for common buyer patterns
+      if not buyer:
+          common_patterns = {
+              'enova': ['enova'],
+              'ajji': ['ajji', 'aji'],
+              'alpha': ['alpha'],
+              'beta': ['beta'],
+              'gamma': ['gamma'],
+              'delta': ['delta'],
+              'omega': ['omega']
+          }
+          
+          for buyer_name, patterns in common_patterns.items():
+              for pattern in patterns:
+                  if pattern in query:
+                      # Find buyers containing this pattern
+                      for b in buyers:
+                          if pattern in str(b).lower():
+                              buyer = b
+                              break
+                      if buyer:
+                          break
+              if buyer:
+                  break
+      
+      show_all_buyers = 'all buyers' in query or 'buyers list' in query or 'list buyers' in query
       
       # =========================
       # MOVEMENT TYPE DETECTION
