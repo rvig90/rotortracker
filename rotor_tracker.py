@@ -674,16 +674,16 @@ if tab_choice == "🔁 Rotor Tracker":
       # =========================
       if 'fixed_prices' not in st.session_state:
           st.session_state.fixed_prices = {
-              1803: 430,    # ₹430 per rotor
-              2003: 478,    # ₹478 per rotor
-              35: 200,      # ₹200 per rotor
-              40: 220,      # ₹220 per rotor
-              50: 278,      # ₹278 per rotor
-              70: 378       # ₹378 per rotor
+              1803: 460,    # ₹460 per rotor
+              2003: 511,    # ₹511 per rotor
+              35: 210,      # ₹210 per rotor
+              40: 265,      # ₹265 per rotor
+              50: 293,      # ₹293 per rotor
+              70: 398       # ₹398 per rotor
           }
       
       if 'base_rate_per_mm' not in st.session_state:
-          st.session_state.base_rate_per_mm = 3.8
+          st.session_state.base_rate_per_mm = 4.10
       
       BASE_RATE_PER_MM = st.session_state.base_rate_per_mm
       
