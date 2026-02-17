@@ -1054,7 +1054,10 @@ if tab_choice == "🔁 Rotor Tracker":
       # =========================
       # SPECIAL CASE: TRANSACTION HISTORY BY SIZE
       # =========================
-      if target_size and is_history_query:
+      # =========================
+      # TRANSACTION HISTORY BY SIZE (COMPREHENSIVE)
+      # =========================
+      if target_size:  # Just check for target_size, no need for is_history_query
           st.subheader(f"📜 Transaction History for Size {target_size}mm")
           
           # Filter for the specific size
@@ -1065,8 +1068,6 @@ if tab_choice == "🔁 Rotor Tracker":
               st.stop()
           
           # Apply time filter if specified
-          original_count = len(history_df)
-          
           if days_filter:
               if isinstance(days_filter, int):
                   cutoff_date = datetime.now() - timedelta(days=days_filter)
@@ -1166,6 +1167,7 @@ if tab_choice == "🔁 Rotor Tracker":
               .rename(columns={
                   'Type': 'Movement',
                   'Quantity': 'Qty',
+                  'Remarks': 'Buyer',
                   'Pending': 'Is Pending',
                   'Value': 'Total Value'
               }),
