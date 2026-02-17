@@ -1431,8 +1431,169 @@ if tab_choice == "🔁 Rotor Tracker":
       # =========================
       # SPECIAL CASE: COMING ROTORS DATE-WISE
       # =========================
-      if movement == 'coming_datewise':
-          st.subheader("📅 Coming Rotors (Date-wise)")
+     # =========================
+      # COMING ROTORS TRANSACTION HISTORY
+      # =========================
+      if movement == 'coming_datewise' or (movement == 'coming' and 'history' in query):
+          st.subheader("📜 Coming Rotors Transaction History")
+          
+          coming_df = df[
+              (df['Status'] == 'Future') &
+              (df['Type'] == 'Inward')
+          ].copy()
+          
+          if coming_df.empty:
+              st.info("No future rotors coming")
+              st.stop()
+          
+          # Sort by date
+          coming_df = coming_df.sort_values('Date')
+          
+          # Calculate value for each transaction
+          coming_df['Value'] = coming_df.apply(
+              lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+          )
+          
+          # Summary metrics
+          total_qty = coming_df['Quantity'].sum()
+          total_value = coming_df['Value'].sum()
+          unique_sizes = coming_df['Size (mm)'].nunique()
+          unique_suppliers = coming_df['Remarks'].nunique()
+          
+          col1, col2, col3, col4 = st.columns(4)
+          with col1:
+              st.metric("Total Coming", f"{int(total_qty)}")
+          with col2:
+              st.metric("Total Value", f"₹{total_value:,.0f}")
+          with col3:
+              st.metric("Different Sizes", unique_sizes)
+          with col4:
+              st.metric("Suppliers", unique_suppliers)
+          
+          # Filters
+          col1, col2 = st.columns(2)
+          with col1:
+              # Size filter
+              all_sizes = sorted(coming_df['Size (mm)'].unique())
+              size_filter = st.multiselect(
+                  "Filter by Size:",
+                  options=all_sizes,
+                  default=all_sizes,
+                  key="coming_size_filter"
+              )
+          with col2:
+              # Supplier filter
+              all_suppliers = sorted([s for s in coming_df['Remarks'].unique() if s and str(s).strip()])
+              supplier_filter = st.multiselect(
+                  "Filter by Supplier:",
+                  options=all_suppliers,
+                  default=all_suppliers,
+                  key="coming_supplier_filter"
+              )
+          
+          # Apply filters
+          filtered_coming = coming_df[
+              (coming_df['Size (mm)'].isin(size_filter)) &
+              (coming_df['Remarks'].isin(supplier_filter))
+          ].copy()
+          
+          if filtered_coming.empty:
+              st.warning("No transactions match your filters")
+              st.stop()
+          
+          # Display transaction history
+          st.subheader(f"📋 Transaction Details ({len(filtered_coming)} records)")
+          
+          display_coming = filtered_coming.copy()
+          display_coming['Date'] = display_coming['Date'].dt.strftime('%Y-%m-%d')
+          display_coming['Value'] = display_coming['Value'].apply(lambda x: f"₹{x:,.0f}")
+          display_coming['Price per Rotor'] = display_coming['Size (mm)'].apply(get_price_per_rotor)
+          display_coming['Price per Rotor'] = display_coming['Price per Rotor'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              display_coming[['Date', 'Size (mm)', 'Quantity', 'Price per Rotor', 'Remarks', 'Value']]
+              .rename(columns={
+                  'Size (mm)': 'Size',
+                  'Quantity': 'Qty',
+                  'Remarks': 'Supplier',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Group by date
+          st.subheader("📅 Date-wise Summary")
+          
+          date_summary = filtered_coming.groupby('Date').agg({
+              'Size (mm)': lambda x: ', '.join(map(str, sorted(set(x)))),
+              'Quantity': 'sum',
+              'Value': 'sum',
+              'Remarks': lambda x: ', '.join(sorted(set([str(r) for r in x if str(r).strip()])))
+          }).reset_index()
+          
+          date_summary = date_summary.sort_values('Date')
+          date_summary['Date'] = date_summary['Date'].dt.strftime('%Y-%m-%d')
+          date_summary['Value'] = date_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              date_summary.rename(columns={
+                  'Date': 'Arrival Date',
+                  'Size (mm)': 'Sizes',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value',
+                  'Remarks': 'Suppliers'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Size-wise breakdown
+          st.subheader("📊 Size-wise Summary")
+          
+          size_summary = filtered_coming.groupby('Size (mm)').agg({
+              'Quantity': 'sum',
+              'Value': 'sum'
+          }).reset_index()
+          
+          size_summary = size_summary.sort_values('Size (mm)')
+          size_summary['Value'] = size_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          size_summary['Price per Rotor'] = size_summary['Size (mm)'].apply(get_price_per_rotor)
+          size_summary['Price per Rotor'] = size_summary['Price per Rotor'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              size_summary.rename(columns={
+                  'Size (mm)': 'Size',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Supplier-wise breakdown
+          st.subheader("🏢 Supplier-wise Summary")
+          
+          supplier_summary = filtered_coming.groupby('Remarks').agg({
+              'Quantity': 'sum',
+              'Value': 'sum',
+              'Size (mm)': lambda x: ', '.join(map(str, sorted(set(x)))),
+              'Date': ['min', 'max']
+          }).reset_index()
+          
+          supplier_summary.columns = ['Supplier', 'Total Qty', 'Total Value', 'Sizes', 'Earliest', 'Latest']
+          supplier_summary = supplier_summary.sort_values('Total Qty', ascending=False)
+          supplier_summary['Total Value'] = supplier_summary['Total Value'].apply(lambda x: f"₹{x:,.0f}")
+          supplier_summary['Earliest'] = pd.to_datetime(supplier_summary['Earliest']).dt.strftime('%Y-%m-%d')
+          supplier_summary['Latest'] = pd.to_datetime(supplier_summary['Latest']).dt.strftime('%Y-%m-%d')
+          
+          st.dataframe(supplier_summary, use_container_width=True, hide_index=True)
+          
+          st.stop()
+      
+      # Keep the original coming rotors view for "coming rotors" without history
+      elif movement == 'coming':
+          st.subheader("📅 Coming Rotors Summary")
           
           coming_df = df[
               (df['Status'] == 'Future') &
