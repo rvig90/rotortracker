@@ -2359,207 +2359,448 @@ def prepare_ai_context():
 # Add this as a new tab in your existing tabs
 # For example, if you have tabs[0], tabs[1], tabs[2], make this tabs[3]
         
-    with tabs[3]:  # Adjust this number based on your existing tabs
-        st.subheader("AI Assistant")
-        
-        # Check if Sarvam is available
-        if not SARVAM_AVAILABLE:
-            st.warning("""
-            ⚠️ LangChain Sarvam package not installed.
-            
-            To enable AI features, install:
-            ```bash
-            pip install langchain-sarvam
-            ```
-            """)
-            st.stop()
-        
-        # Get API key securely
-        api_key = setup_sarvam_ai()
-        
-        if not api_key:
-            st.info("""
-            ### 🔒 Setup Sarvam AI API Key
-            
-            To use the AI assistant, you need to add your Sarvam API key to your environment.
-            
-            **Option 1: Environment Variable (Recommended)**
-            ```bash
-            export SARVAM_API_KEY=your_api_key_here
-            ```
-            
-            **Option 2: Streamlit Secrets**
-            Add to `.streamlit/secrets.toml`:
-            ```toml
-            SARVAM_API_KEY = "your_api_key_here"
-            ```
-            
-            **Option 3: .env file**
-            Create a `.env` file:
-            ```
-            SARVAM_API_KEY=your_api_key_here
-            ```
-            
-            Get your free API key from [dashboard.sarvam.ai](https://dashboard.sarvam.ai)
-            
-            🔐 **Your API key stays on your computer and is never shared!**
-            """)
-            st.stop()
-        
-        # Initialize Sarvam LLM
+# =========================
+# SARVAM AI ASSISTANT TAB
+# =========================
+
+# Add this at the top of your file with other imports
+import os
+import json
+from datetime import datetime, timedelta
+import pandas as pd
+import streamlit as st
+
+try:
+    from langchain_sarvam import ChatSarvam
+    from langchain_core.messages import HumanMessage, SystemMessage
+    SARVAM_AVAILABLE = True
+except ImportError:
+    SARVAM_AVAILABLE = False
+
+# =========================
+# SARVAM AI SETUP (SECURE)
+# =========================
+def setup_sarvam_ai():
+    """Initialize Sarvam AI with secure API key handling"""
+    
+    # Try to get API key from environment variable
+    api_key = os.getenv("SARVAM_API_KEY")
+    
+    # If not in environment, try Streamlit secrets
+    if not api_key:
         try:
-            llm = ChatSarvam(
-                model="sarvam-m",
-                temperature=0.2,
-                sarvam_api_key=api_key,
-                max_tokens=1024
-            )
-            st.success("✅ Sarvam AI connected successfully!")
-        except Exception as e:
-            st.error(f"❌ Failed to initialize Sarvam AI: {str(e)}")
-            st.stop()
+            api_key = st.secrets.get("SARVAM_API_KEY", "")
+        except:
+            pass
+    
+    return api_key
+
+# =========================
+# INVENTORY CONTEXT FUNCTIONS
+# =========================
+def get_current_stock_data(df):
+    """Get current stock levels from dataframe"""
+    stock_data = []
+    for size in df['Size (mm)'].unique():
+        if pd.isna(size):
+            continue
         
-        # System prompt for the AI
-        system_prompt = """You are an AI inventory assistant for a rotor manufacturing company. 
-        You have access to real-time inventory data and can help with:
+        size_df = df[df['Size (mm)'] == size]
         
-        1. Stock checks for specific sizes
-        2. Pending orders information by buyer
-        3. Future incoming rotors by date
-        4. Transaction history
-        5. Price calculations using fixed rates or base rate
-        6. Low stock alerts
-        7. Buyer/supplier information
+        # Calculate net stock
+        total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+        total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+        current_stock = total_inward - total_outgoing
         
-        Current inventory context is provided below. Use this data to answer questions accurately.
+        # Pending orders
+        pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'])]['Quantity'].sum()
         
-        Guidelines:
-        - Be concise and helpful
-        - Format numbers clearly (e.g., "1,234 rotors")
-        - Show calculations when relevant
-        - If asked about something not in the data, politely say you don't have that information
-        - For stock levels, mention both quantity and value when appropriate
-        - For pending orders, mention the buyer and expected dates
+        # Future incoming
+        future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
         
-        Current Date: {current_date}
-        """
+        # Calculate value
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * current_stock
+        else:
+            value = st.session_state.base_rate_per_mm * size * current_stock
         
-        # Prepare context
-        context = prepare_ai_context()
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Initialize chat history
-        if 'ai_chat_history' not in st.session_state:
-            st.session_state.ai_chat_history = []
-        
-        # Quick action buttons
-        st.markdown("### 🚀 Quick Actions")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("📦 Check Stock", use_container_width=True):
-                prompt = "Show me current stock levels for all sizes"
-        with col2:
-            if st.button("⏳ Pending Orders", use_container_width=True):
-                prompt = "Show all pending orders with buyer names"
-        with col3:
-            if st.button("📅 Coming Rotors", use_container_width=True):
-                prompt = "Show future incoming rotors with expected dates"
-        with col4:
-            if st.button("💰 Price List", use_container_width=True):
-                prompt = "What are the current prices for all rotor sizes?"
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("⚠️ Low Stock", use_container_width=True):
-                prompt = "Which sizes have low stock (less than 10 units)?"
-        with col2:
-            if st.button("📊 Summary", use_container_width=True):
-                prompt = "Give me a quick summary of current inventory"
-        with col3:
-            if st.button("🏭 Top Buyers", use_container_width=True):
-                prompt = "Who are the top buyers by quantity?"
-        with col4:
-            if st.button("📈 Recent Activity", use_container_width=True):
-                prompt = "Show recent transactions from last 30 days"
-        
-        st.divider()
-        
-        # Display chat history
-        chat_container = st.container()
-        with chat_container:
-            for message in st.session_state.ai_chat_history:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
-        
-        # Chat input
-        if prompt := st.chat_input("Ask me anything about your inventory..."):
-            # Add user message to history
-            st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+        if current_stock > 0 or pending > 0 or future > 0:
+            stock_data.append({
+                'size': int(size),
+                'current_stock': int(current_stock),
+                'pending_orders': int(pending),
+                'future_incoming': int(future),
+                'value': float(value)
+            })
+    
+    return sorted(stock_data, key=lambda x: x['size'])
+
+def get_pending_orders_data(df):
+    """Get pending orders summary"""
+    pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
+    
+    if pending_df.empty:
+        return []
+    
+    pending_data = []
+    for _, row in pending_df.iterrows():
+        if pd.isna(row['Size (mm)']) or pd.isna(row['Quantity']):
+            continue
             
-            # Display user message
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            
-            # Get AI response
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    try:
-                        # Prepare the full context for this query
-                        full_context = prepare_ai_context()
-                        
-                        # Create messages
-                        messages = [
-                            SystemMessage(content=system_prompt.format(current_date=current_date)),
-                            HumanMessage(content=f"Current Inventory Context:\n{json.dumps(full_context, indent=2, default=str)}\n\nUser Query: {prompt}")
-                        ]
-                        
-                        # Get response from Sarvam AI
-                        response = llm.invoke(messages)
-                        
-                        # Display response
-                        st.markdown(response.content)
-                        
-                        # Add to chat history
-                        st.session_state.ai_chat_history.append({"role": "assistant", "content": response.content})
-                        
-                    except Exception as e:
-                        error_msg = f"❌ Error getting response: {str(e)}"
-                        st.error(error_msg)
-                        st.session_state.ai_chat_history.append({"role": "assistant", "content": error_msg})
+        size = int(row['Size (mm)'])
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * row['Quantity']
+        else:
+            value = st.session_state.base_rate_per_mm * size * row['Quantity']
         
-        # Sidebar controls for the AI tab
-        with st.sidebar:
-            st.markdown("### 🎛️ AI Assistant Controls")
+        pending_data.append({
+            'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+            'size': size,
+            'quantity': int(row['Quantity']),
+            'buyer': str(row['Remarks']),
+            'value': float(value)
+        })
+    
+    return pending_data
+
+def get_future_incoming_data(df):
+    """Get future incoming rotors data"""
+    future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+    
+    if future_df.empty:
+        return []
+    
+    future_data = []
+    for _, row in future_df.iterrows():
+        if pd.isna(row['Size (mm)']) or pd.isna(row['Quantity']):
+            continue
             
-            if st.button("🗑️ Clear Chat History", use_container_width=True):
-                st.session_state.ai_chat_history = []
-                st.rerun()
-            
-            if st.button("🔄 Refresh Context", use_container_width=True):
-                st.rerun()
-            
-            st.divider()
-            
-            # Show context stats
-            st.markdown("### 📊 Current Stats")
-            context = prepare_ai_context()
-            
-            total_stock = sum(item['current_stock'] for item in context['stock_summary'])
-            total_value = sum(item['value'] for item in context['stock_summary'])
-            total_pending = len(context['pending_orders'])
-            total_future = len(context['future_incoming'])
-            
-            st.metric("Total Rotors in Stock", f"{total_stock:,}")
-            st.metric("Total Stock Value", f"₹{total_value:,.0f}")
-            st.metric("Pending Orders", total_pending)
-            st.metric("Future Incoming", total_future)
-            
-            st.divider()
-            
-            # Debug expander
-            with st.expander("🔍 View Raw Context"):
-                st.json(context, default=str)
+        size = int(row['Size (mm)'])
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * row['Quantity']
+        else:
+            value = st.session_state.base_rate_per_mm * size * row['Quantity']
+        
+        future_data.append({
+            'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+            'size': size,
+            'quantity': int(row['Quantity']),
+            'supplier': str(row['Remarks']),
+            'value': float(value)
+        })
+    
+    return future_data
+
+def prepare_ai_context():
+    """Prepare inventory context for AI"""
+    df = st.session_state.data.copy()
+    
+    # Handle date column
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Get all data summaries
+    context = {
+        'as_of_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'stock_summary': get_current_stock_data(df),
+        'pending_orders': get_pending_orders_data(df),
+        'future_incoming': get_future_incoming_data(df),
+        'fixed_prices': st.session_state.fixed_prices,
+        'base_rate_per_mm': st.session_state.base_rate_per_mm,
+        'total_sizes_tracked': len(df['Size (mm)'].unique()),
+        'total_buyers': len(df[df['Type'] == 'Outgoing']['Remarks'].unique()),
+        'total_suppliers': len(df[df['Type'] == 'Inward']['Remarks'].unique())
+    }
+    
+    return context
+
+# =========================
+# THE AI ASSISTANT TAB
+# =========================
+# Assuming you have tabs defined somewhere, this should be one of them
+# For example: tab1, tab2, tab3, tab4 = st.tabs(["Dashboard", "Chat", "Rates", "AI Assistant"])
+
+# Use the correct tab variable name from your existing code
+# If your tabs are named differently, replace 'tab4' with your actual tab variable
+
+# For this example, I'll use a generic approach - you'll need to replace this with your actual tab
+# Let's assume your tabs are: tab1, tab2, tab3, tab4
+
+# First, check if we're in the right context
+st.markdown("### 🤖 AI Inventory Assistant (Powered by Sarvam AI)")
+
+# Check if Sarvam is available
+if not SARVAM_AVAILABLE:
+    st.warning("""
+    ⚠️ LangChain Sarvam package not installed.
+    
+    To enable AI features, install:
+    ```bash
+    pip install langchain-sarvam
+    ```
+    """)
+    st.stop()
+
+# Get API key securely
+api_key = setup_sarvam_ai()
+
+if not api_key:
+    st.info("""
+    ### 🔒 Setup Sarvam AI API Key
+    
+    To use the AI assistant, you need to add your Sarvam API key to your environment.
+    
+    **Option 1: Environment Variable (Recommended)**
+    ```bash
+    export SARVAM_API_KEY=your_api_key_here
+    ```
+    
+    **Option 2: Streamlit Secrets**
+    Add to `.streamlit/secrets.toml`:
+    ```toml
+    SARVAM_API_KEY = "your_api_key_here"
+    ```
+    
+    **Option 3: .env file**
+    Create a `.env` file:
+    ```
+    SARVAM_API_KEY=your_api_key_here
+    ```
+    
+    Get your free API key from [dashboard.sarvam.ai](https://dashboard.sarvam.ai)
+    
+    🔐 **Your API key stays on your computer and is never shared!**
+    """)
+    
+    # Show a preview of what the assistant can do
+    with st.expander("👀 Preview what the AI Assistant can do"):
+        st.markdown("""
+        Once you set up your API key, you can ask questions like:
+        
+        - "What's the current stock of 1803mm rotors?"
+        - "Show me all pending orders for Enova"
+        - "When are the 130mm rotors coming?"
+        - "How many rotors do we have in total?"
+        - "What's the value of all 50mm rotors in stock?"
+        - "Which buyers have pending orders?"
+        - "Give me a low stock alert"
+        - "What's the price of 2003mm rotors?"
+        """)
+    st.stop()
+
+# Initialize Sarvam LLM
+try:
+    llm = ChatSarvam(
+        model="sarvam-m",
+        temperature=0.2,
+        sarvam_api_key=api_key,
+        max_tokens=1024
+    )
+    st.success("✅ Sarvam AI connected successfully!")
+except Exception as e:
+    st.error(f"❌ Failed to initialize Sarvam AI: {str(e)}")
+    st.stop()
+
+# System prompt for the AI
+system_prompt = """You are an AI inventory assistant for a rotor manufacturing company. 
+You have access to real-time inventory data and can help with:
+
+1. Stock checks for specific sizes
+2. Pending orders information by buyer
+3. Future incoming rotors by date
+4. Transaction history
+5. Price calculations using fixed rates or base rate
+6. Low stock alerts
+7. Buyer/supplier information
+
+Current inventory context is provided below. Use this data to answer questions accurately.
+
+Guidelines:
+- Be concise and helpful
+- Format numbers clearly (e.g., "1,234 rotors")
+- Show calculations when relevant
+- If asked about something not in the data, politely say you don't have that information
+- For stock levels, mention both quantity and value when appropriate
+- For pending orders, mention the buyer and expected dates
+
+Current Date: {current_date}
+"""
+
+# Prepare context
+context = prepare_ai_context()
+current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+# Initialize chat history
+if 'ai_chat_history' not in st.session_state:
+    st.session_state.ai_chat_history = []
+
+# Welcome message if chat is empty
+if len(st.session_state.ai_chat_history) == 0:
+    welcome_msg = f"""👋 Hello! I'm your AI Inventory Assistant. I can see you have **{len(context['stock_summary'])}** rotor sizes in stock with a total of **{sum(item['current_stock'] for item in context['stock_summary'])}** rotors.
+
+Try asking me:
+- "Show me current stock levels"
+- "What pending orders do we have?"
+- "When are new rotors coming?"
+- "Check stock of size 1803mm"
+"""
+    st.session_state.ai_chat_history.append({"role": "assistant", "content": welcome_msg})
+
+# Quick action buttons
+st.markdown("### 🚀 Quick Actions")
+col1, col2, col3, col4 = st.columns(4)
+
+# Use session state to store button clicks
+if 'button_pressed' not in st.session_state:
+    st.session_state.button_pressed = None
+
+with col1:
+    if st.button("📦 Check Stock", use_container_width=True):
+        st.session_state.button_pressed = "Show me current stock levels for all sizes"
+with col2:
+    if st.button("⏳ Pending Orders", use_container_width=True):
+        st.session_state.button_pressed = "Show all pending orders with buyer names"
+with col3:
+    if st.button("📅 Coming Rotors", use_container_width=True):
+        st.session_state.button_pressed = "Show future incoming rotors with expected dates"
+with col4:
+    if st.button("💰 Price List", use_container_width=True):
+        st.session_state.button_pressed = "What are the current prices for all rotor sizes?"
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    if st.button("⚠️ Low Stock", use_container_width=True):
+        st.session_state.button_pressed = "Which sizes have low stock (less than 10 units)?"
+with col2:
+    if st.button("📊 Summary", use_container_width=True):
+        st.session_state.button_pressed = "Give me a quick summary of current inventory"
+with col3:
+    if st.button("🏭 Top Buyers", use_container_width=True):
+        st.session_state.button_pressed = "Who are the top buyers by quantity?"
+with col4:
+    if st.button("📈 Recent Activity", use_container_width=True):
+        st.session_state.button_pressed = "Show recent transactions from last 30 days"
+
+st.divider()
+
+# Display chat history
+chat_container = st.container()
+with chat_container:
+    for message in st.session_state.ai_chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# Handle button press
+if st.session_state.button_pressed:
+    prompt = st.session_state.button_pressed
+    st.session_state.button_pressed = None  # Reset
+    
+    # Add user message to history
+    st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Get AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                # Prepare the full context for this query
+                full_context = prepare_ai_context()
+                
+                # Create messages
+                messages = [
+                    SystemMessage(content=system_prompt.format(current_date=current_date)),
+                    HumanMessage(content=f"Current Inventory Context:\n{json.dumps(full_context, indent=2, default=str)}\n\nUser Query: {prompt}")
+                ]
+                
+                # Get response from Sarvam AI
+                response = llm.invoke(messages)
+                
+                # Display response
+                st.markdown(response.content)
+                
+                # Add to chat history
+                st.session_state.ai_chat_history.append({"role": "assistant", "content": response.content})
+                
+            except Exception as e:
+                error_msg = f"❌ Error getting response: {str(e)}"
+                st.error(error_msg)
+                st.session_state.ai_chat_history.append({"role": "assistant", "content": error_msg})
+    
+    st.rerun()
+
+# Chat input
+if prompt := st.chat_input("Ask me anything about your inventory..."):
+    # Add user message to history
+    st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Get AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                # Prepare the full context for this query
+                full_context = prepare_ai_context()
+                
+                # Create messages
+                messages = [
+                    SystemMessage(content=system_prompt.format(current_date=current_date)),
+                    HumanMessage(content=f"Current Inventory Context:\n{json.dumps(full_context, indent=2, default=str)}\n\nUser Query: {prompt}")
+                ]
+                
+                # Get response from Sarvam AI
+                response = llm.invoke(messages)
+                
+                # Display response
+                st.markdown(response.content)
+                
+                # Add to chat history
+                st.session_state.ai_chat_history.append({"role": "assistant", "content": response.content})
+                
+            except Exception as e:
+                error_msg = f"❌ Error getting response: {str(e)}"
+                st.error(error_msg)
+                st.session_state.ai_chat_history.append({"role": "assistant", "content": error_msg})
+    
+    st.rerun()
+
+# Sidebar controls for the AI tab
+with st.sidebar:
+    st.markdown("### 🎛️ AI Assistant Controls")
+    
+    if st.button("🗑️ Clear Chat History", use_container_width=True):
+        st.session_state.ai_chat_history = []
+        st.rerun()
+    
+    if st.button("🔄 Refresh Context", use_container_width=True):
+        st.rerun()
+    
+    st.divider()
+    
+    # Show context stats
+    st.markdown("### 📊 Current Stats")
+    context = prepare_ai_context()
+    
+    total_stock = sum(item['current_stock'] for item in context['stock_summary'])
+    total_value = sum(item['value'] for item in context['stock_summary'])
+    total_pending = len(context['pending_orders'])
+    total_future = len(context['future_incoming'])
+    
+    st.metric("Total Rotors in Stock", f"{total_stock:,}")
+    st.metric("Total Stock Value", f"₹{total_value:,.0f}")
+    st.metric("Pending Orders", total_pending)
+    st.metric("Future Incoming", total_future)
+    
+    st.divider()
+    
+    # Debug expander
+    with st.expander("🔍 View Raw Context"):
+        st.json(context, default=str)
 
         # === CASE: Buyer weight estimation ===
         
