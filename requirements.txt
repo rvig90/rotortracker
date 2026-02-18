@@ -13,3 +13,5 @@ langchain
 langchain-experimental
 tabulate
 spacy
+langchain-sarvam
+sarvamai
