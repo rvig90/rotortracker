@@ -1590,6 +1590,140 @@ if tab_choice == "🔁 Rotor Tracker":
           st.dataframe(supplier_summary, use_container_width=True, hide_index=True)
           
           st.stop()
+
+      # =========================
+      # SIZE-SPECIFIC COMING ROTORS
+      # =========================
+      if target_size and 'coming' in query and 'size' in query:
+          st.subheader(f"📅 Coming Rotors for Size {target_size}mm")
+          
+          coming_df = df[
+              (df['Size (mm)'] == target_size) &
+              (df['Status'] == 'Future') &
+              (df['Type'] == 'Inward')
+          ].copy()
+          
+          if coming_df.empty:
+              st.info(f"No future rotors coming for size {target_size}mm")
+              st.stop()
+          
+          # Sort by date
+          coming_df = coming_df.sort_values('Date')
+          
+          # Calculate value
+          coming_df['Value'] = coming_df.apply(
+              lambda row: calculate_value(row['Size (mm)'], row['Quantity']), axis=1
+          )
+          
+          price_per = get_price_per_rotor(target_size)
+          
+          # Summary metrics
+          total_qty = coming_df['Quantity'].sum()
+          total_value = coming_df['Value'].sum()
+          unique_dates = coming_df['Date'].nunique()
+          unique_suppliers = coming_df['Remarks'].nunique()
+          
+          col1, col2, col3, col4 = st.columns(4)
+          with col1:
+              st.metric("Total Coming", f"{int(total_qty)}")
+          with col2:
+              st.metric("Total Value", f"₹{total_value:,.0f}")
+          with col3:
+              st.metric("Delivery Dates", unique_dates)
+          with col4:
+              st.metric("Suppliers", unique_suppliers)
+          
+          st.info(f"**Price:** ₹{price_per} per rotor")
+          
+          # Date-wise summary
+          st.subheader("📆 Date-wise Schedule")
+          
+          date_summary = coming_df.groupby('Date').agg({
+              'Quantity': 'sum',
+              'Value': 'sum',
+              'Remarks': lambda x: ', '.join(sorted(set([str(r) for r in x if str(r).strip()])))
+          }).reset_index()
+          
+          date_summary = date_summary.sort_values('Date')
+          date_summary['Date'] = date_summary['Date'].dt.strftime('%Y-%m-%d')
+          date_summary['Value'] = date_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              date_summary.rename(columns={
+                  'Date': 'Expected Date',
+                  'Quantity': 'Qty',
+                  'Value': 'Total Value',
+                  'Remarks': 'Suppliers'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Supplier-wise breakdown
+          st.subheader("🏢 Supplier-wise Breakdown")
+          
+          supplier_summary = coming_df.groupby('Remarks').agg({
+              'Quantity': 'sum',
+              'Value': 'sum',
+              'Date': lambda x: ', '.join(sorted(set([d.strftime('%Y-%m-%d') for d in x])))
+          }).reset_index()
+          
+          supplier_summary = supplier_summary.sort_values('Quantity', ascending=False)
+          supplier_summary['Value'] = supplier_summary['Value'].apply(lambda x: f"₹{x:,.0f}")
+          
+          st.dataframe(
+              supplier_summary.rename(columns={
+                  'Remarks': 'Supplier',
+                  'Quantity': 'Total Qty',
+                  'Value': 'Total Value',
+                  'Date': 'Delivery Dates'
+              }),
+              use_container_width=True,
+              hide_index=True
+          )
+          
+          # Detailed transactions
+          with st.expander("📋 View All Transactions"):
+              display_df = coming_df.copy()
+              display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+              display_df['Value'] = display_df['Value'].apply(lambda x: f"₹{x:,.0f}")
+              
+              st.dataframe(
+                  display_df[['Date', 'Quantity', 'Remarks', 'Status', 'Value']]
+                  .rename(columns={
+                      'Date': 'Expected Date',
+                      'Quantity': 'Qty',
+                      'Remarks': 'Supplier',
+                      'Value': 'Total Value'
+                  }),
+                  use_container_width=True,
+                  hide_index=True
+              )
+          
+          # Timeline visualization
+          if len(coming_df) > 1:
+              st.subheader("📈 Delivery Timeline")
+              
+              timeline_data = coming_df.groupby('Date')['Quantity'].sum().reset_index()
+              timeline_data = timeline_data.sort_values('Date')
+              
+              chart = alt.Chart(timeline_data).mark_bar().encode(
+                  x=alt.X('Date:T', title='Expected Date'),
+                  y=alt.Y('Quantity:Q', title='Quantity'),
+                  tooltip=['Date', 'Quantity']
+              ).properties(
+                  height=300,
+                  title=f'Delivery Schedule for Size {target_size}mm'
+              )
+              st.altair_chart(chart, use_container_width=True)
+          
+          st.stop()
+      
+      # =========================
+      # COMING ROTORS TRANSACTION HISTORY
+      # =========================
+      elif movement == 'coming_datewise' or (movement == 'coming' and 'history' in query):
+          # ... existing coming rotors transaction history code ...
       
       # Keep the original coming rotors view for "coming rotors" without history
       elif movement == 'coming':
