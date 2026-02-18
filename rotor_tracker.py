@@ -559,16 +559,36 @@ if tab_choice == "🔁 Rotor Tracker":
     if 'sarvam_initialized' not in st.session_state:
         st.session_state.sarvam_initialized = False
     
-    # Custom CSS for floating widget
+    if 'inventory_data' not in st.session_state:
+        # Initialize with sample data
+        st.session_state.inventory_data = pd.DataFrame({
+            'Date': [datetime.now() - timedelta(days=x) for x in range(20)],
+            'Type': ['Inward', 'Outgoing'] * 10,
+            'Size (mm)': [1803, 2003, 35, 40, 50, 70, 130, 1803, 2003, 35] * 2,
+            'Quantity': [10, 5, 20, 15, 8, 12, 25, 7, 18, 30] * 2,
+            'Remarks': ['Enova', 'Ajji', 'Alpha', 'Beta', 'Gamma', 'Delta', 'Enova', 'Ajji', 'Alpha', 'Beta'] * 2,
+            'Status': ['Current', 'Future', 'Current', 'Current', 'Future', 'Current', 'Current', 'Future', 'Current', 'Current'] * 2,
+            'Pending': [False, True, False, False, True, False, False, True, False, False] * 2
+        })
+    
+    if 'fixed_prices' not in st.session_state:
+        st.session_state.fixed_prices = {
+            1803: 430, 2003: 478, 35: 200, 40: 220, 50: 278, 70: 378, 130: 0
+        }
+    
+    if 'base_rate_per_mm' not in st.session_state:
+        st.session_state.base_rate_per_mm = 3.8
+    
+    # Custom CSS (keep your existing CSS)
     st.markdown("""
     <style>
+    /* Your existing CSS here */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
         right: 20px;
         z-index: 9999;
     }
-    
     .floating-btn {
         background-color: #4CAF50;
         color: white;
@@ -579,15 +599,7 @@ if tab_choice == "🔁 Rotor Tracker":
         font-weight: bold;
         cursor: pointer;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        transition: all 0.3s;
-        border: none;
     }
-    
-    .floating-btn:hover {
-        background-color: #45a049;
-        transform: scale(1.05);
-    }
-    
     .assistant-widget {
         position: fixed;
         bottom: 90px;
@@ -604,15 +616,6 @@ if tab_choice == "🔁 Rotor Tracker":
         border: 1px solid #e0e0e0;
         padding: 10px;
     }
-    
-    .api-key-input {
-        margin-bottom: 10px;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        width: 100%;
-    }
-    
     .chat-messages {
         flex-grow: 1;
         overflow-y: auto;
@@ -621,7 +624,6 @@ if tab_choice == "🔁 Rotor Tracker":
         border-radius: 5px;
         margin-bottom: 10px;
     }
-    
     .user-msg {
         background-color: #4CAF50;
         color: white;
@@ -631,9 +633,7 @@ if tab_choice == "🔁 Rotor Tracker":
         max-width: 80%;
         float: right;
         clear: both;
-        word-wrap: break-word;
     }
-    
     .assistant-msg {
         background-color: #e0e0e0;
         color: black;
@@ -643,9 +643,7 @@ if tab_choice == "🔁 Rotor Tracker":
         max-width: 80%;
         float: left;
         clear: both;
-        word-wrap: break-word;
     }
-    
     .clearfix::after {
         content: "";
         clear: both;
@@ -655,7 +653,95 @@ if tab_choice == "🔁 Rotor Tracker":
     """, unsafe_allow_html=True)
     
     # =========================
-    # SARVAM AI SETUP WITH USER INPUT
+    # DATA PREPARATION FUNCTIONS FOR AI
+    # =========================
+    def prepare_inventory_context():
+        """Prepare comprehensive inventory context for AI"""
+        df = st.session_state.inventory_data.copy()
+        
+        # Calculate current stock for each size
+        stock_data = []
+        for size in df['Size (mm)'].unique():
+            if pd.isna(size):
+                continue
+            
+            size_df = df[df['Size (mm)'] == size]
+            
+            # Calculate net stock
+            total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current_stock = total_inward - total_outgoing
+            
+            # Pending orders
+            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'])]['Quantity'].sum()
+            
+            # Future incoming
+            future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+            
+            # Calculate value
+            if size in st.session_state.fixed_prices:
+                price = st.session_state.fixed_prices[size]
+                value = price * current_stock
+            else:
+                price = st.session_state.base_rate_per_mm * size
+                value = price * current_stock
+            
+            stock_data.append({
+                'size': int(size),
+                'current_stock': int(current_stock),
+                'pending_orders': int(pending),
+                'future_incoming': int(future),
+                'price_per_rotor': float(price),
+                'total_value': float(value)
+            })
+        
+        # Get pending orders by buyer
+        pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
+        pending_by_buyer = pending_df.groupby('Remarks').agg({
+            'Quantity': 'sum',
+            'Size (mm)': lambda x: list(x)
+        }).to_dict()
+        
+        # Get future incoming by date
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+        future_by_date = future_df.groupby(future_df['Date'].dt.date).agg({
+            'Quantity': 'sum',
+            'Size (mm)': lambda x: list(x),
+            'Remarks': lambda x: list(x)
+        }).to_dict()
+        
+        # Get recent transactions
+        recent_df = df[df['Date'] >= datetime.now() - timedelta(days=30)]
+        
+        # Get unique buyers and suppliers
+        buyers = df[df['Type'] == 'Outgoing']['Remarks'].unique().tolist()
+        suppliers = df[df['Type'] == 'Inward']['Remarks'].unique().tolist()
+        
+        context = {
+            'as_of_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stock_summary': stock_data,
+            'pending_orders_summary': {
+                'total_pending': int(pending_df['Quantity'].sum()),
+                'by_buyer': pending_by_buyer
+            },
+            'future_incoming_summary': {
+                'total_incoming': int(future_df['Quantity'].sum()),
+                'by_date': str(future_by_date)  # Convert to string for JSON
+            },
+            'recent_activity': {
+                'last_30_days_transactions': len(recent_df),
+                'total_quantity': int(recent_df['Quantity'].sum())
+            },
+            'buyers': [b for b in buyers if b and str(b).strip()],
+            'suppliers': [s for s in suppliers if s and str(s).strip()],
+            'fixed_prices': st.session_state.fixed_prices,
+            'base_rate_per_mm': st.session_state.base_rate_per_mm
+        }
+        
+        return context
+    
+    # =========================
+    # SARVAM AI SETUP
     # =========================
     def initialize_sarvam(api_key):
         """Initialize Sarvam AI with user-provided API key"""
@@ -667,7 +753,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 model="sarvam-m",
                 temperature=0.2,
                 sarvam_api_key=api_key,
-                max_tokens=512
+                max_tokens=1024
             )
             return llm, None
         except Exception as e:
@@ -676,7 +762,37 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # MAIN APP CONTENT
     # =========================
+    st.title("🚀 Rotor Inventory Management System")
     
+    # Your existing tabs
+    tab1, tab2, tab3 = st.tabs(["Dashboard", "Transactions", "Settings"])
+    
+    with tab1:
+        st.write("### Dashboard")
+        st.dataframe(st.session_state.inventory_data.head(10))
+        
+        # Stock summary
+        st.write("### Stock Summary")
+        context = prepare_inventory_context()
+        stock_df = pd.DataFrame(context['stock_summary'])
+        st.dataframe(stock_df)
+    
+    with tab2:
+        st.write("### Transactions")
+        # You can add data editing here
+        edited_df = st.data_editor(
+            st.session_state.inventory_data,
+            num_rows="dynamic",
+            use_container_width=True
+        )
+        if st.button("Save Changes"):
+            st.session_state.inventory_data = edited_df
+            st.success("Data updated!")
+    
+    with tab3:
+        st.write("### Settings")
+        st.write("Fixed Prices:", st.session_state.fixed_prices)
+        st.write("Base Rate/mm:", st.session_state.base_rate_per_mm)
     
     # =========================
     # FLOATING BUTTON
@@ -715,41 +831,37 @@ if tab_choice == "🔁 Rotor Tracker":
                 "Sarvam AI API Key",
                 type="password",
                 placeholder="sk_...",
-                key="api_key_field",
-                help="Enter your Sarvam AI API key. It will be stored only for this session."
+                key="api_key_field"
             )
             
-            if st.button("Connect", key="connect_api"):
-                if api_key_input:
-                    with st.spinner("Connecting..."):
-                        llm, error = initialize_sarvam(api_key_input)
-                        if llm:
-                            st.session_state.user_api_key = api_key_input
-                            st.session_state.sarvam_initialized = True
-                            st.session_state.llm = llm
-                            st.success("✅ Connected successfully!")
-                            st.rerun()
-                        else:
-                            st.error(f"Connection failed: {error}")
-                else:
-                    st.warning("Please enter your API key")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Connect", key="connect_api"):
+                    if api_key_input:
+                        with st.spinner("Connecting..."):
+                            llm, error = initialize_sarvam(api_key_input)
+                            if llm:
+                                st.session_state.user_api_key = api_key_input
+                                st.session_state.sarvam_initialized = True
+                                st.session_state.llm = llm
+                                st.success("✅ Connected!")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {error}")
+                    else:
+                        st.warning("Enter API key")
             
-            # Demo mode option
-            if st.button("Try Demo Mode (No API Key)"):
-                st.session_state.sarvam_initialized = True
-                st.session_state.llm = None  # Demo mode
-                st.rerun()
+            with col2:
+                if st.button("Try Demo Mode"):
+                    st.session_state.sarvam_initialized = True
+                    st.session_state.llm = None
+                    st.rerun()
             
             st.markdown('</div>', unsafe_allow_html=True)
             st.stop()
         
-        # If in demo mode
-        if st.session_state.llm is None:
-            st.info("⚡ Demo Mode - AI responses are simulated")
-            if st.button("Exit Demo Mode", key="exit_demo"):
-                st.session_state.sarvam_initialized = False
-                st.session_state.user_api_key = None
-                st.rerun()
+        # Get fresh context with current data
+        context = prepare_inventory_context()
         
         # Chat messages
         st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
@@ -769,41 +881,45 @@ if tab_choice == "🔁 Rotor Tracker":
         
         with col1:
             if st.button("📦", key="qa_stock", help="Stock levels"):
-                query = "Show current stock levels"
+                query = "Show current stock levels for all sizes"
         with col2:
             if st.button("⏳", key="qa_pending", help="Pending orders"):
-                query = "Show pending orders"
+                query = "Show all pending orders with buyer names"
         with col3:
             if st.button("📅", key="qa_coming", help="Coming rotors"):
-                query = "Show future incoming rotors"
+                query = "Show future incoming rotors with expected dates"
         with col4:
             if st.button("💰", key="qa_price", help="Price list"):
-                query = "Show price list"
+                query = "Show price list for all sizes"
         
         # Handle quick actions
         if 'query' in locals():
             st.session_state.assistant_messages.append({"role": "user", "content": query})
             
-            # Get AI response (if in AI mode)
             if st.session_state.llm:
                 try:
-                    context = {
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
-                    }
-                    
                     from langchain_core.messages import HumanMessage, SystemMessage
+                    
+                    system_prompt = f"""You are an inventory assistant. Use this data to answer:
+                    {json.dumps(context, indent=2, default=str)}
+                    
+                    Be concise and accurate. Format numbers clearly."""
+                    
                     messages = [
-                        SystemMessage(content="You are an inventory assistant. Be concise."),
-                        HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {query}")
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=query)
                     ]
                     response = st.session_state.llm.invoke(messages)
                     st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
                 except Exception as e:
                     st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
             else:
-                # Demo response
-                st.session_state.assistant_messages.append({"role": "assistant", "content": f"[Demo] Here's information about: {query}"})
+                # Demo response with actual data
+                demo_response = f"[Demo] Based on your data:\n"
+                if "stock" in query.lower():
+                    for item in context['stock_summary'][:3]:
+                        demo_response += f"\n- {item['size']}mm: {item['current_stock']} units (₹{item['total_value']:,.0f})"
+                st.session_state.assistant_messages.append({"role": "assistant", "content": demo_response})
             
             st.rerun()
         
@@ -816,42 +932,40 @@ if tab_choice == "🔁 Rotor Tracker":
                 if user_input:
                     st.session_state.assistant_messages.append({"role": "user", "content": user_input})
                     
-                    # Get AI response (if in AI mode)
                     if st.session_state.llm:
                         try:
-                            context = {
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
-                            }
-                            
                             from langchain_core.messages import HumanMessage, SystemMessage
+                            
+                            system_prompt = f"""You are an inventory assistant. Use this data to answer:
+                            {json.dumps(context, indent=2, default=str)}"""
+                            
                             messages = [
-                                SystemMessage(content="You are an inventory assistant. Be concise."),
-                                HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {user_input}")
+                                SystemMessage(content=system_prompt),
+                                HumanMessage(content=user_input)
                             ]
                             response = st.session_state.llm.invoke(messages)
                             st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
                         except Exception as e:
                             st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
                     else:
-                        # Demo response
                         st.session_state.assistant_messages.append({"role": "assistant", "content": f"[Demo] You asked: {user_input}"})
                     
                     st.rerun()
         
-        # Clear chat button
-        if st.button("🗑️ Clear Chat", key="clear_chat"):
-            st.session_state.assistant_messages = [
-                {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
-            ]
-            st.rerun()
-        
-        # Reset API key button
-        if st.button("🔄 Change API Key", key="reset_api"):
-            st.session_state.sarvam_initialized = False
-            st.session_state.user_api_key = None
-            st.session_state.llm = None
-            st.rerun()
+        # Clear chat and reset
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🗑️ Clear Chat", key="clear_chat"):
+                st.session_state.assistant_messages = [
+                    {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
+                ]
+                st.rerun()
+        with col2:
+            if st.button("🔄 Change API Key", key="reset_api"):
+                st.session_state.sarvam_initialized = False
+                st.session_state.user_api_key = None
+                st.session_state.llm = None
+                st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -862,11 +976,12 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown("### System Status")
         if st.session_state.sarvam_initialized:
             if st.session_state.llm:
-                st.success("✅ AI Assistant: Connected (User API Key)")
+                st.success("✅ AI Assistant: Connected")
+                st.info(f"📊 Data: {len(st.session_state.inventory_data)} transactions")
             else:
                 st.info("ℹ️ AI Assistant: Demo Mode")
         else:
-            st.warning("⚠️ AI Assistant: Not configured") 
+            st.warning("⚠️ AI Assistant: Not configured")
     # ====== MOVEMENT LOG WITH FIXED FILTERS ======
     # ====== MOVEMENT LOG WITH FIXED FILTERS ======
     with tabs[1]:
