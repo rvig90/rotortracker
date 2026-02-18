@@ -15,6 +15,15 @@ import re
 
 
 import os
+import os
+import json
+from datetime import datetime
+try:
+    from langchain_sarvam import ChatSarvam
+    from langchain_core.messages import HumanMessage, SystemMessage
+    SARVAM_AVAILABLE = True
+except ImportError:
+    SARVAM_AVAILABLE = False
 
   # Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
 ROTOR_WEIGHTS = { 80: 0.5, 100: 1, 110: 1.01, 120: 1.02, 125: 1.058, 130: 1.1, 140: 1.15, 150: 1.3, 160: 1.4, 170: 1.422, 180: 1.5, 200: 1.7, 225: 1.9, 260: 2.15, 2403: 1.46, 1803: 1, 2003: 1.1 }
@@ -412,7 +421,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     
     # ====== STOCK SUMMARY ======
-    tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite"])
+    tabs = st.tabs(["📊 Stock Summary", "📋 Movement Log", "💬 Rotor Chatbot lite", "AI Assistant"])
     
     # === TAB 1: Stock Summary ===
     with tabs[0]:
@@ -2167,7 +2176,391 @@ if tab_choice == "🔁 Rotor Tracker":
               most_valuable_size = value_by_size.idxmax()
               most_valuable_value = value_by_size.max()
               st.info(f"Most valuable size: **{most_valuable_size}mm** (₹{most_valuable_value:,.2f})")
+
+# =========================
+# SARVAM AI ASSISTANT TAB
+# =========================
+
+# Add this at the top of your file with other imports
+
+
+# =========================
+# SARVAM AI SETUP (SECURE)
+# =========================
+def setup_sarvam_ai():
+    """Initialize Sarvam AI with secure API key handling"""
     
+    # Try to get API key from environment variable
+    api_key = os.getenv("SARVAM_API_KEY")
+    
+    # If not in environment, try Streamlit secrets
+    if not api_key:
+        try:
+            api_key = st.secrets.get("SARVAM_API_KEY", "")
+        except:
+            pass
+    
+    return api_key
+
+# =========================
+# INVENTORY CONTEXT FUNCTIONS
+# =========================
+def get_current_stock_data(df):
+    """Get current stock levels from dataframe"""
+    stock_data = []
+    for size in df['Size (mm)'].unique():
+        if pd.isna(size):
+            continue
+        
+        size_df = df[df['Size (mm)'] == size]
+        
+        # Calculate net stock
+        total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+        total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+        current_stock = total_inward - total_outgoing
+        
+        # Pending orders
+        pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'])]['Quantity'].sum()
+        
+        # Future incoming
+        future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+        
+        # Calculate value
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * current_stock
+        else:
+            value = st.session_state.base_rate_per_mm * size * current_stock
+        
+        stock_data.append({
+            'size': int(size),
+            'current_stock': int(current_stock),
+            'pending_orders': int(pending),
+            'future_incoming': int(future),
+            'value': float(value)
+        })
+    
+    return stock_data
+
+def get_pending_orders_data(df):
+    """Get pending orders summary"""
+    pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
+    
+    if pending_df.empty:
+        return []
+    
+    pending_data = []
+    for _, row in pending_df.iterrows():
+        if pd.isna(row['Size (mm)']) or pd.isna(row['Quantity']):
+            continue
+            
+        size = int(row['Size (mm)'])
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * row['Quantity']
+        else:
+            value = st.session_state.base_rate_per_mm * size * row['Quantity']
+        
+        pending_data.append({
+            'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+            'size': size,
+            'quantity': int(row['Quantity']),
+            'buyer': str(row['Remarks']),
+            'value': float(value)
+        })
+    
+    return pending_data
+
+def get_future_incoming_data(df):
+    """Get future incoming rotors data"""
+    future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+    
+    if future_df.empty:
+        return []
+    
+    future_data = []
+    for _, row in future_df.iterrows():
+        if pd.isna(row['Size (mm)']) or pd.isna(row['Quantity']):
+            continue
+            
+        size = int(row['Size (mm)'])
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * row['Quantity']
+        else:
+            value = st.session_state.base_rate_per_mm * size * row['Quantity']
+        
+        future_data.append({
+            'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+            'size': size,
+            'quantity': int(row['Quantity']),
+            'supplier': str(row['Remarks']),
+            'value': float(value)
+        })
+    
+    return future_data
+
+def get_recent_transactions_data(df, days=30):
+    """Get recent transactions"""
+    cutoff = datetime.now() - timedelta(days=days)
+    recent_df = df[df['Date'] >= cutoff].copy()
+    
+    if recent_df.empty:
+        return []
+    
+    recent_data = []
+    for _, row in recent_df.iterrows():
+        if pd.isna(row['Size (mm)']) or pd.isna(row['Quantity']):
+            continue
+            
+        size = int(row['Size (mm)'])
+        if size in st.session_state.fixed_prices:
+            value = st.session_state.fixed_prices[size] * row['Quantity']
+        else:
+            value = st.session_state.base_rate_per_mm * size * row['Quantity']
+        
+        recent_data.append({
+            'date': row['Date'].strftime('%Y-%m-%d'),
+            'type': str(row['Type']),
+            'size': size,
+            'quantity': int(row['Quantity']),
+            'party': str(row['Remarks']),
+            'status': str(row['Status']),
+            'pending': bool(row['Pending']),
+            'value': float(value)
+        })
+    
+    return recent_data
+
+def prepare_ai_context():
+    """Prepare inventory context for AI"""
+    df = st.session_state.data.copy()
+    
+    # Handle date column
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Get all data summaries
+    context = {
+        'as_of_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'stock_summary': get_current_stock_data(df),
+        'pending_orders': get_pending_orders_data(df),
+        'future_incoming': get_future_incoming_data(df),
+        'recent_transactions': get_recent_transactions_data(df, days=30),
+        'fixed_prices': st.session_state.fixed_prices,
+        'base_rate_per_mm': st.session_state.base_rate_per_mm,
+        'total_sizes_tracked': len(df['Size (mm)'].unique()),
+        'total_buyers': len(df[df['Type'] == 'Outgoing']['Remarks'].unique()),
+        'total_suppliers': len(df[df['Type'] == 'Inward']['Remarks'].unique())
+    }
+    
+    return context
+
+# =========================
+# THE AI ASSISTANT TAB
+# =========================
+# Add this as a new tab in your existing tabs
+# For example, if you have tabs[0], tabs[1], tabs[2], make this tabs[3]
+        
+    with tabs[3]:  # Adjust this number based on your existing tabs
+        st.subheader("AI Assistant")
+        
+        # Check if Sarvam is available
+        if not SARVAM_AVAILABLE:
+            st.warning("""
+            ⚠️ LangChain Sarvam package not installed.
+            
+            To enable AI features, install:
+            ```bash
+            pip install langchain-sarvam
+            ```
+            """)
+            st.stop()
+        
+        # Get API key securely
+        api_key = setup_sarvam_ai()
+        
+        if not api_key:
+            st.info("""
+            ### 🔒 Setup Sarvam AI API Key
+            
+            To use the AI assistant, you need to add your Sarvam API key to your environment.
+            
+            **Option 1: Environment Variable (Recommended)**
+            ```bash
+            export SARVAM_API_KEY=your_api_key_here
+            ```
+            
+            **Option 2: Streamlit Secrets**
+            Add to `.streamlit/secrets.toml`:
+            ```toml
+            SARVAM_API_KEY = "your_api_key_here"
+            ```
+            
+            **Option 3: .env file**
+            Create a `.env` file:
+            ```
+            SARVAM_API_KEY=your_api_key_here
+            ```
+            
+            Get your free API key from [dashboard.sarvam.ai](https://dashboard.sarvam.ai)
+            
+            🔐 **Your API key stays on your computer and is never shared!**
+            """)
+            st.stop()
+        
+        # Initialize Sarvam LLM
+        try:
+            llm = ChatSarvam(
+                model="sarvam-m",
+                temperature=0.2,
+                sarvam_api_key=api_key,
+                max_tokens=1024
+            )
+            st.success("✅ Sarvam AI connected successfully!")
+        except Exception as e:
+            st.error(f"❌ Failed to initialize Sarvam AI: {str(e)}")
+            st.stop()
+        
+        # System prompt for the AI
+        system_prompt = """You are an AI inventory assistant for a rotor manufacturing company. 
+        You have access to real-time inventory data and can help with:
+        
+        1. Stock checks for specific sizes
+        2. Pending orders information by buyer
+        3. Future incoming rotors by date
+        4. Transaction history
+        5. Price calculations using fixed rates or base rate
+        6. Low stock alerts
+        7. Buyer/supplier information
+        
+        Current inventory context is provided below. Use this data to answer questions accurately.
+        
+        Guidelines:
+        - Be concise and helpful
+        - Format numbers clearly (e.g., "1,234 rotors")
+        - Show calculations when relevant
+        - If asked about something not in the data, politely say you don't have that information
+        - For stock levels, mention both quantity and value when appropriate
+        - For pending orders, mention the buyer and expected dates
+        
+        Current Date: {current_date}
+        """
+        
+        # Prepare context
+        context = prepare_ai_context()
+        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Initialize chat history
+        if 'ai_chat_history' not in st.session_state:
+            st.session_state.ai_chat_history = []
+        
+        # Quick action buttons
+        st.markdown("### 🚀 Quick Actions")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            if st.button("📦 Check Stock", use_container_width=True):
+                prompt = "Show me current stock levels for all sizes"
+        with col2:
+            if st.button("⏳ Pending Orders", use_container_width=True):
+                prompt = "Show all pending orders with buyer names"
+        with col3:
+            if st.button("📅 Coming Rotors", use_container_width=True):
+                prompt = "Show future incoming rotors with expected dates"
+        with col4:
+            if st.button("💰 Price List", use_container_width=True):
+                prompt = "What are the current prices for all rotor sizes?"
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("⚠️ Low Stock", use_container_width=True):
+                prompt = "Which sizes have low stock (less than 10 units)?"
+        with col2:
+            if st.button("📊 Summary", use_container_width=True):
+                prompt = "Give me a quick summary of current inventory"
+        with col3:
+            if st.button("🏭 Top Buyers", use_container_width=True):
+                prompt = "Who are the top buyers by quantity?"
+        with col4:
+            if st.button("📈 Recent Activity", use_container_width=True):
+                prompt = "Show recent transactions from last 30 days"
+        
+        st.divider()
+        
+        # Display chat history
+        chat_container = st.container()
+        with chat_container:
+            for message in st.session_state.ai_chat_history:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+        
+        # Chat input
+        if prompt := st.chat_input("Ask me anything about your inventory..."):
+            # Add user message to history
+            st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+            
+            # Display user message
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            
+            # Get AI response
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    try:
+                        # Prepare the full context for this query
+                        full_context = prepare_ai_context()
+                        
+                        # Create messages
+                        messages = [
+                            SystemMessage(content=system_prompt.format(current_date=current_date)),
+                            HumanMessage(content=f"Current Inventory Context:\n{json.dumps(full_context, indent=2, default=str)}\n\nUser Query: {prompt}")
+                        ]
+                        
+                        # Get response from Sarvam AI
+                        response = llm.invoke(messages)
+                        
+                        # Display response
+                        st.markdown(response.content)
+                        
+                        # Add to chat history
+                        st.session_state.ai_chat_history.append({"role": "assistant", "content": response.content})
+                        
+                    except Exception as e:
+                        error_msg = f"❌ Error getting response: {str(e)}"
+                        st.error(error_msg)
+                        st.session_state.ai_chat_history.append({"role": "assistant", "content": error_msg})
+        
+        # Sidebar controls for the AI tab
+        with st.sidebar:
+            st.markdown("### 🎛️ AI Assistant Controls")
+            
+            if st.button("🗑️ Clear Chat History", use_container_width=True):
+                st.session_state.ai_chat_history = []
+                st.rerun()
+            
+            if st.button("🔄 Refresh Context", use_container_width=True):
+                st.rerun()
+            
+            st.divider()
+            
+            # Show context stats
+            st.markdown("### 📊 Current Stats")
+            context = prepare_ai_context()
+            
+            total_stock = sum(item['current_stock'] for item in context['stock_summary'])
+            total_value = sum(item['value'] for item in context['stock_summary'])
+            total_pending = len(context['pending_orders'])
+            total_future = len(context['future_incoming'])
+            
+            st.metric("Total Rotors in Stock", f"{total_stock:,}")
+            st.metric("Total Stock Value", f"₹{total_value:,.0f}")
+            st.metric("Pending Orders", total_pending)
+            st.metric("Future Incoming", total_future)
+            
+            st.divider()
+            
+            # Debug expander
+            with st.expander("🔍 View Raw Context"):
+                st.json(context, default=str)
+
         # === CASE: Buyer weight estimation ===
         
       
