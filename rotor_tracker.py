@@ -2529,7 +2529,7 @@ def prepare_ai_context():
 # First, check if we're in the right context
     with tab3:
         
-        st.markdown("AI Inventory Assistant")
+        st.subheader("AI Inventory Assistant")
         
         # Check if Sarvam is available
         if not SARVAM_AVAILABLE:
