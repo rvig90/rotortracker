@@ -41,10 +41,15 @@ if 'assistant_messages' not in st.session_state:
         {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
     ]
 
-# Custom CSS for floating widget - FIXED
+if 'user_api_key' not in st.session_state:
+    st.session_state.user_api_key = None
+
+if 'sarvam_initialized' not in st.session_state:
+    st.session_state.sarvam_initialized = False
+
+# Custom CSS for floating widget
 st.markdown("""
 <style>
-/* Floating button container */
 .floating-btn-container {
     position: fixed;
     bottom: 20px;
@@ -71,7 +76,6 @@ st.markdown("""
     transform: scale(1.05);
 }
 
-/* Assistant widget */
 .assistant-widget {
     position: fixed;
     bottom: 90px;
@@ -89,12 +93,14 @@ st.markdown("""
     padding: 10px;
 }
 
-/* Make sure Streamlit elements don't overflow */
-.stButton > button {
+.api-key-input {
+    margin-bottom: 10px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
     width: 100%;
 }
 
-/* Chat messages area */
 .chat-messages {
     flex-grow: 1;
     overflow-y: auto;
@@ -128,7 +134,6 @@ st.markdown("""
     word-wrap: break-word;
 }
 
-/* Clear fix */
 .clearfix::after {
     content: "";
     clear: both;
@@ -138,37 +143,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================
-# SARVAM AI SETUP
+# SARVAM AI SETUP WITH USER INPUT
 # =========================
-def setup_sarvam_ai():
-    """Initialize Sarvam AI with secure API key handling"""
-    try:
-        # Try to get from secrets
-        api_key = st.secrets["SARVAM_API_KEY"]
-        return api_key
-    except:
-        # Fallback to environment variable
-        import os
-        return os.getenv("SARVAM_API_KEY")
-
-# Initialize Sarvam
-api_key = setup_sarvam_ai()
-SARVAM_AVAILABLE = False
-llm = None
-
-if api_key:
+def initialize_sarvam(api_key):
+    """Initialize Sarvam AI with user-provided API key"""
     try:
         from langchain_sarvam import ChatSarvam
         from langchain_core.messages import HumanMessage, SystemMessage
+        
         llm = ChatSarvam(
             model="sarvam-m",
             temperature=0.2,
             sarvam_api_key=api_key,
             max_tokens=512
         )
-        SARVAM_AVAILABLE = True
+        return llm, None
     except Exception as e:
-        st.sidebar.error(f"Sarvam import error: {str(e)}")
+        return None, str(e)
 
 # =========================
 # MAIN APP CONTENT
@@ -203,11 +194,10 @@ with tab3:
     st.info("Your settings content here")
 
 # =========================
-# FLOATING BUTTON (Outside tabs)
+# FLOATING BUTTON
 # =========================
 st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
 
-# Use columns to create the button
 col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
     if st.button("🤖 AI Assistant", key="floating_btn"):
@@ -217,7 +207,7 @@ with col2:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# ASSISTANT WIDGET (Outside tabs)
+# ASSISTANT WIDGET
 # =========================
 if st.session_state.show_assistant:
     st.markdown('<div class="assistant-widget">', unsafe_allow_html=True)
@@ -233,26 +223,48 @@ if st.session_state.show_assistant:
     
     st.divider()
     
-    # API Status
-    if not SARVAM_AVAILABLE:
-        st.warning("⚠️ AI not configured")
-        st.code("""
-# In .streamlit/secrets.toml:
-SARVAM_API_KEY = "your_key_here"
-        """)
+    # API Key Input Section
+    if not st.session_state.sarvam_initialized:
+        st.markdown("#### 🔑 Enter Your API Key")
+        api_key_input = st.text_input(
+            "Sarvam AI API Key",
+            type="password",
+            placeholder="sk_...",
+            key="api_key_field",
+            help="Enter your Sarvam AI API key. It will be stored only for this session."
+        )
         
-        # Demo mode
-        st.markdown("### Demo Mode")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📦 Stock", key="demo_stock"):
-                st.info("Demo: Stock levels would show here")
-        with col2:
-            if st.button("⏳ Pending", key="demo_pending"):
-                st.info("Demo: Pending orders would show here")
+        if st.button("Connect", key="connect_api"):
+            if api_key_input:
+                with st.spinner("Connecting..."):
+                    llm, error = initialize_sarvam(api_key_input)
+                    if llm:
+                        st.session_state.user_api_key = api_key_input
+                        st.session_state.sarvam_initialized = True
+                        st.session_state.llm = llm
+                        st.success("✅ Connected successfully!")
+                        st.rerun()
+                    else:
+                        st.error(f"Connection failed: {error}")
+            else:
+                st.warning("Please enter your API key")
+        
+        # Demo mode option
+        if st.button("Try Demo Mode (No API Key)"):
+            st.session_state.sarvam_initialized = True
+            st.session_state.llm = None  # Demo mode
+            st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
+    
+    # If in demo mode
+    if st.session_state.llm is None:
+        st.info("⚡ Demo Mode - AI responses are simulated")
+        if st.button("Exit Demo Mode", key="exit_demo"):
+            st.session_state.sarvam_initialized = False
+            st.session_state.user_api_key = None
+            st.rerun()
     
     # Chat messages
     st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
@@ -287,21 +299,26 @@ SARVAM_API_KEY = "your_key_here"
     if 'query' in locals():
         st.session_state.assistant_messages.append({"role": "user", "content": query})
         
-        try:
-            # Prepare context
-            context = {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
-            }
-            
-            messages = [
-                SystemMessage(content="You are an inventory assistant. Be concise."),
-                HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {query}")
-            ]
-            response = llm.invoke(messages)
-            st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
-        except Exception as e:
-            st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
+        # Get AI response (if in AI mode)
+        if st.session_state.llm:
+            try:
+                context = {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
+                }
+                
+                from langchain_core.messages import HumanMessage, SystemMessage
+                messages = [
+                    SystemMessage(content="You are an inventory assistant. Be concise."),
+                    HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {query}")
+                ]
+                response = st.session_state.llm.invoke(messages)
+                st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
+            except Exception as e:
+                st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
+        else:
+            # Demo response
+            st.session_state.assistant_messages.append({"role": "assistant", "content": f"[Demo] Here's information about: {query}"})
         
         st.rerun()
     
@@ -314,20 +331,26 @@ SARVAM_API_KEY = "your_key_here"
             if user_input:
                 st.session_state.assistant_messages.append({"role": "user", "content": user_input})
                 
-                try:
-                    context = {
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
-                    }
-                    
-                    messages = [
-                        SystemMessage(content="You are an inventory assistant. Be concise."),
-                        HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {user_input}")
-                    ]
-                    response = llm.invoke(messages)
-                    st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
-                except Exception as e:
-                    st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
+                # Get AI response (if in AI mode)
+                if st.session_state.llm:
+                    try:
+                        context = {
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
+                        }
+                        
+                        from langchain_core.messages import HumanMessage, SystemMessage
+                        messages = [
+                            SystemMessage(content="You are an inventory assistant. Be concise."),
+                            HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {user_input}")
+                        ]
+                        response = st.session_state.llm.invoke(messages)
+                        st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
+                    except Exception as e:
+                        st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
+                else:
+                    # Demo response
+                    st.session_state.assistant_messages.append({"role": "assistant", "content": f"[Demo] You asked: {user_input}"})
                 
                 st.rerun()
     
@@ -338,6 +361,13 @@ SARVAM_API_KEY = "your_key_here"
         ]
         st.rerun()
     
+    # Reset API key button
+    if st.button("🔄 Change API Key", key="reset_api"):
+        st.session_state.sarvam_initialized = False
+        st.session_state.user_api_key = None
+        st.session_state.llm = None
+        st.rerun()
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
@@ -345,14 +375,13 @@ SARVAM_API_KEY = "your_key_here"
 # =========================
 with st.sidebar:
     st.markdown("### System Status")
-    if SARVAM_AVAILABLE:
-        st.success("✅ AI Assistant: Connected")
-    else:
-        st.error("❌ AI Assistant: Not configured")
-        if api_key:
-            st.info(f"API Key found: {api_key[:10]}...")
+    if st.session_state.sarvam_initialized:
+        if st.session_state.llm:
+            st.success("✅ AI Assistant: Connected (User API Key)")
         else:
-            st.warning("No API key found")
+            st.info("ℹ️ AI Assistant: Demo Mode")
+    else:
+        st.warning("⚠️ AI Assistant: Not configured")
 
 # =========================
 # YOUR MAIN APP CONTENT
