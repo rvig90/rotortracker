@@ -162,33 +162,30 @@ if 'chat_messages' not in st.session_state:
 # =========================
 # SARVAM AI SETUP
 # =========================
+# =========================
+# SARVAM AI SETUP
+# =========================
 def setup_sarvam_ai():
     """Initialize Sarvam AI with secure API key handling"""
-    api_key = os.getenv("SARVAM_API_KEY")
-    if not api_key:
-        try:
-            api_key = st.secrets.get("SARVAM_API_KEY", "")
-        except:
-            pass
-    return api_key
+    try:
+        # Direct access to the key (after fixing the format)
+        api_key = st.secrets["SARVAM_API_KEY"]
+        return api_key
+    except Exception as e:
+        # Fallback to environment variable
+        import os
+        return os.getenv("SARVAM_API_KEY")
 
-# Initialize Sarvam if available
-SARVAM_AVAILABLE = False
-llm = None
-
-try:
+# Use it in your assistant
+api_key = setup_sarvam_ai()
+if api_key:
     from langchain_sarvam import ChatSarvam
-    from langchain_core.messages import HumanMessage, SystemMessage
-    SARVAM_AVAILABLE = True
-    
-    api_key = setup_sarvam_ai()
-    if api_key:
-        llm = ChatSarvam(
-            model="sarvam-m",
-            temperature=0.2,
-            sarvam_api_key=api_key,
-            max_tokens=512
-        )
+    llm = ChatSarvam(
+        model="sarvam-m",
+        temperature=0.2,
+        sarvam_api_key=api_key,
+        max_tokens=1024
+    )
 except:
     pass
 
