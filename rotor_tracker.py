@@ -16,16 +16,286 @@ import re
 
 import os
 import os
+# Add this at the very top of your app
+
+# =========================
+# PERSISTENT CHAT WIDGET
+# =========================
+
+import streamlit as st
+import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+
+# Custom CSS for chat widget
+st.markdown("""
+<style>
+/* Chat widget container */
+.chat-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 350px;
+    height: 500px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+}
+
+/* Chat header */
+.chat-header {
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.chat-header:hover {
+    background-color: #45a049;
+}
+
+/* Chat messages area */
+.chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+/* Message bubbles */
+.user-message {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border-radius: 15px 15px 0 15px;
+    margin: 5px 0;
+    max-width: 80%;
+    float: right;
+    clear: both;
+}
+
+.assistant-message {
+    background-color: #e0e0e0;
+    color: black;
+    padding: 10px;
+    border-radius: 15px 15px 15px 0;
+    margin: 5px 0;
+    max-width: 80%;
+    float: left;
+    clear: both;
+}
+
+/* Chat input area */
+.chat-input {
+    padding: 15px;
+    background-color: white;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Floating button when minimized */
+.floating-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 15px 25px;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 999;
+    transition: all 0.3s;
+}
+
+.floating-button:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+/* Quick action buttons */
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px;
+    background-color: white;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.quick-action-btn {
+    background-color: #f0f0f0;
+    border: none;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-action-btn:hover {
+    background-color: #4CAF50;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize session state for chat widget
+if 'chat_widget_open' not in st.session_state:
+    st.session_state.chat_widget_open = False
+
+if 'chat_messages' not in st.session_state:
+    st.session_state.chat_messages = [
+        {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
+    ]
+
+# =========================
+# SARVAM AI SETUP
+# =========================
+def setup_sarvam_ai():
+    """Initialize Sarvam AI with secure API key handling"""
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        try:
+            api_key = st.secrets.get("SARVAM_API_KEY", "")
+        except:
+            pass
+    return api_key
+
+# Initialize Sarvam if available
+SARVAM_AVAILABLE = False
+llm = None
+
 try:
     from langchain_sarvam import ChatSarvam
     from langchain_core.messages import HumanMessage, SystemMessage
     SARVAM_AVAILABLE = True
-except ImportError:
-    SARVAM_AVAILABLE = False
+    
+    api_key = setup_sarvam_ai()
+    if api_key:
+        llm = ChatSarvam(
+            model="sarvam-m",
+            temperature=0.2,
+            sarvam_api_key=api_key,
+            max_tokens=512
+        )
+except:
+    pass
 
-  # Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
+# =========================
+# FLOATING BUTTON
+# =========================
+if not st.session_state.chat_widget_open:
+    if st.button("🤖 Chat with AI", key="open_chat", help="Open AI Assistant"):
+        st.session_state.chat_widget_open = True
+        st.rerun()
+
+# =========================
+# CHAT WIDGET
+# =========================
+if st.session_state.chat_widget_open:
+    # Use HTML/CSS for the widget
+    st.markdown(f"""
+    <div class="chat-widget">
+        <div class="chat-header" onclick="document.querySelector('button[data-testid=\'close-chat\']').click()">
+            <span>🤖 AI Inventory Assistant</span>
+            <span style="font-size: 20px;">&times;</span>
+        </div>
+        
+        <div class="quick-actions">
+            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-stock\']').click()">📦 Stock</button>
+            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-pending\']').click()">⏳ Pending</button>
+            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-coming\']').click()">📅 Coming</button>
+            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-price\']').click()">💰 Prices</button>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+    """, unsafe_allow_html=True)
+    
+    # Display messages
+    for msg in st.session_state.chat_messages:
+        if msg["role"] == "user":
+            st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="assistant-message">{msg["content"]}</div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+        </div>
+        <div class="chat-input">
+    """, unsafe_allow_html=True)
+    
+    # Hidden buttons for actions
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("📦", key="quick-stock", help="Check stock"):
+            user_input = "Show current stock levels"
+    with col2:
+        if st.button("⏳", key="quick-pending", help="Pending orders"):
+            user_input = "Show pending orders"
+    with col3:
+        if st.button("📅", key="quick-coming", help="Coming rotors"):
+            user_input = "Show future incoming rotors"
+    with col4:
+        if st.button("💰", key="quick-price", help="Price list"):
+            user_input = "Show price list"
+    
+    # Chat input
+    if user_input := st.chat_input("Type your question...", key="chat_input"):
+        # Add user message
+        st.session_state.chat_messages.append({"role": "user", "content": user_input})
+        
+        # Get AI response
+        if SARVAM_AVAILABLE and llm:
+            try:
+                system_prompt = """You are an AI inventory assistant. Be concise and helpful."""
+                messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_input)
+                ]
+                response = llm.invoke(messages)
+                st.session_state.chat_messages.append({"role": "assistant", "content": response.content})
+            except:
+                st.session_state.chat_messages.append({"role": "assistant", "content": "Sorry, I'm having trouble connecting."})
+        else:
+            st.session_state.chat_messages.append({"role": "assistant", "content": "AI is not configured. Please set up your API key."})
+        
+        st.rerun()
+    
+    # Close button (hidden)
+    if st.button("Close", key="close-chat"):
+        st.session_state.chat_widget_open = False
+        st.rerun()
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+# =========================
+# YOUR MAIN APP CONTENT
+# =========================
+st.title("🚀 Rotor Inventory Management System")
+
+# Your existing tabs go here
+tab1, tab2, tab3 = st.tabs(["Dashboard", "Chat", "Settings"])
+
+with tab1:
+    st.write("Your dashboard content here")
+
+with tab2:
+    st.write("Your chat content here")
+
+with tab3:
+    st.write("Your settings here")
+
+# Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
 ROTOR_WEIGHTS = { 80: 0.5, 100: 1, 110: 1.01, 120: 1.02, 125: 1.058, 130: 1.1, 140: 1.15, 150: 1.3, 160: 1.4, 170: 1.422, 180: 1.5, 200: 1.7, 225: 1.9, 260: 2.15, 2403: 1.46, 1803: 1, 2003: 1.1 }
 from uuid import uuid4
 
