@@ -281,19 +281,7 @@ if st.session_state.chat_widget_open:
 # =========================
 # YOUR MAIN APP CONTENT
 # =========================
-st.title("🚀 Rotor Inventory Management System")
 
-# Your existing tabs go here
-tab1, tab2, tab3 = st.tabs(["Dashboard", "Chat", "Settings"])
-
-with tab1:
-    st.write("Your dashboard content here")
-
-with tab2:
-    st.write("Your chat content here")
-
-with tab3:
-    st.write("Your settings here")
 
 # Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
 ROTOR_WEIGHTS = { 80: 0.5, 100: 1, 110: 1.01, 120: 1.02, 125: 1.058, 130: 1.1, 140: 1.15, 150: 1.3, 160: 1.4, 170: 1.422, 180: 1.5, 200: 1.7, 225: 1.9, 260: 2.15, 2403: 1.46, 1803: 1, 2003: 1.1 }
