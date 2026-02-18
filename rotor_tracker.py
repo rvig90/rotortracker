@@ -26,29 +26,63 @@ import streamlit as st
 import os
 import json
 from datetime import datetime, timedelta
+import pandas as pd
 
-# Custom CSS for chat widget
+# =========================
+# FLOATING AI ASSISTANT
+# =========================
+
+# Initialize session state
+if 'show_assistant' not in st.session_state:
+    st.session_state.show_assistant = False
+
+if 'assistant_messages' not in st.session_state:
+    st.session_state.assistant_messages = [
+        {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
+    ]
+
+# Custom CSS for floating widget
 st.markdown("""
 <style>
-/* Chat widget container */
-.chat-widget {
+.floating-button {
     position: fixed;
     bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 15px 25px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transition: all 0.3s;
+}
+
+.floating-button:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+.assistant-widget {
+    position: fixed;
+    bottom: 90px;
     right: 20px;
     width: 350px;
     height: 500px;
     background-color: white;
     border-radius: 10px;
     box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-    z-index: 1000;
+    z-index: 999;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid #e0e0e0;
 }
 
-/* Chat header */
-.chat-header {
+.assistant-header {
     background-color: #4CAF50;
     color: white;
     padding: 15px;
@@ -59,19 +93,46 @@ st.markdown("""
     cursor: pointer;
 }
 
-.chat-header:hover {
-    background-color: #45a049;
+.assistant-header button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
 }
 
-/* Chat messages area */
-.chat-messages {
+.quick-actions {
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.quick-action-btn {
+    background-color: white;
+    border: 1px solid #4CAF50;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #4CAF50;
+    transition: all 0.2s;
+}
+
+.quick-action-btn:hover {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.messages-container {
     flex-grow: 1;
     overflow-y: auto;
     padding: 15px;
     background-color: #f9f9f9;
 }
 
-/* Message bubbles */
 .user-message {
     background-color: #4CAF50;
     color: white;
@@ -81,6 +142,7 @@ st.markdown("""
     max-width: 80%;
     float: right;
     clear: both;
+    word-wrap: break-word;
 }
 
 .assistant-message {
@@ -92,188 +154,201 @@ st.markdown("""
     max-width: 80%;
     float: left;
     clear: both;
+    word-wrap: break-word;
 }
 
-/* Chat input area */
-.chat-input {
+.chat-input-container {
     padding: 15px;
     background-color: white;
     border-top: 1px solid #e0e0e0;
 }
 
-/* Floating button when minimized */
-.floating-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 50px;
-    padding: 15px 25px;
-    font-size: 16px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    z-index: 999;
-    transition: all 0.3s;
-}
-
-.floating-button:hover {
-    background-color: #45a049;
-    transform: scale(1.05);
-}
-
-/* Quick action buttons */
-.quick-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+.chat-input {
+    width: 100%;
     padding: 10px;
-    background-color: white;
-    border-bottom: 1px solid #e0e0e0;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    outline: none;
 }
 
-.quick-action-btn {
-    background-color: #f0f0f0;
-    border: none;
-    border-radius: 15px;
-    padding: 5px 10px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quick-action-btn:hover {
-    background-color: #4CAF50;
-    color: white;
+.chat-input:focus {
+    border-color: #4CAF50;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state for chat widget
-if 'chat_widget_open' not in st.session_state:
-    st.session_state.chat_widget_open = False
-
-if 'chat_messages' not in st.session_state:
-    st.session_state.chat_messages = [
-        {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
-    ]
-
-# =========================
-# SARVAM AI SETUP
-# =========================
 # =========================
 # SARVAM AI SETUP
 # =========================
 def setup_sarvam_ai():
     """Initialize Sarvam AI with secure API key handling"""
     try:
-        # Direct access to the key (after fixing the format)
+        # Try to get from secrets
         api_key = st.secrets["SARVAM_API_KEY"]
         return api_key
-    except Exception as e:
+    except:
         # Fallback to environment variable
         import os
         return os.getenv("SARVAM_API_KEY")
 
-# Use it in your assistant
+# Initialize Sarvam
 api_key = setup_sarvam_ai()
+SARVAM_AVAILABLE = False
+llm = None
+
 if api_key:
-    from langchain_sarvam import ChatSarvam
-    llm = ChatSarvam(
-        model="sarvam-m",
-        temperature=0.2,
-        sarvam_api_key=api_key,
-        max_tokens=1024
-    )
-except:
-    pass
+    try:
+        from langchain_sarvam import ChatSarvam
+        from langchain_core.messages import HumanMessage, SystemMessage
+        llm = ChatSarvam(
+            model="sarvam-m",
+            temperature=0.2,
+            sarvam_api_key=api_key,
+            max_tokens=512
+        )
+        SARVAM_AVAILABLE = True
+    except:
+        pass
 
 # =========================
 # FLOATING BUTTON
 # =========================
-if not st.session_state.chat_widget_open:
-    if st.button("🤖 Chat with AI", key="open_chat", help="Open AI Assistant"):
-        st.session_state.chat_widget_open = True
+if not st.session_state.show_assistant:
+    if st.button("🤖 AI Assistant", key="open_assistant"):
+        st.session_state.show_assistant = True
         st.rerun()
 
 # =========================
-# CHAT WIDGET
+# ASSISTANT WIDGET
 # =========================
-if st.session_state.chat_widget_open:
-    # Use HTML/CSS for the widget
-    st.markdown(f"""
-    <div class="chat-widget">
-        <div class="chat-header" onclick="document.querySelector('button[data-testid=\'close-chat\']').click()">
-            <span>🤖 AI Inventory Assistant</span>
-            <span style="font-size: 20px;">&times;</span>
-        </div>
-        
-        <div class="quick-actions">
-            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-stock\']').click()">📦 Stock</button>
-            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-pending\']').click()">⏳ Pending</button>
-            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-coming\']').click()">📅 Coming</button>
-            <button class="quick-action-btn" onclick="document.querySelector('button[data-testid=\'quick-price\']').click()">💰 Prices</button>
-        </div>
-        
-        <div class="chat-messages" id="chat-messages">
-    """, unsafe_allow_html=True)
+if st.session_state.show_assistant:
+    # Create columns for layout
+    col1, col2, col3 = st.columns([1, 1, 1])
     
-    # Display messages
-    for msg in st.session_state.chat_messages:
-        if msg["role"] == "user":
-            st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="assistant-message">{msg["content"]}</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-        </div>
-        <div class="chat-input">
-    """, unsafe_allow_html=True)
-    
-    # Hidden buttons for actions
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("📦", key="quick-stock", help="Check stock"):
-            user_input = "Show current stock levels"
     with col2:
-        if st.button("⏳", key="quick-pending", help="Pending orders"):
-            user_input = "Show pending orders"
-    with col3:
-        if st.button("📅", key="quick-coming", help="Coming rotors"):
-            user_input = "Show future incoming rotors"
-    with col4:
-        if st.button("💰", key="quick-price", help="Price list"):
-            user_input = "Show price list"
+        st.markdown("### 🤖 AI Assistant")
     
-    # Chat input
-    if user_input := st.chat_input("Type your question...", key="chat_input"):
-        # Add user message
-        st.session_state.chat_messages.append({"role": "user", "content": user_input})
+    with col3:
+        if st.button("✖️ Close", key="close_assistant"):
+            st.session_state.show_assistant = False
+            st.rerun()
+    
+    st.divider()
+    
+    # Show API status
+    if not SARVAM_AVAILABLE:
+        st.warning("⚠️ AI not configured. Please set up your API key in secrets.toml:")
+        st.code("""
+# .streamlit/secrets.toml
+SARVAM_API_KEY = "your_api_key_here"
+        """)
+        
+        # Still show quick actions for demo
+        st.markdown("### Quick Actions (Demo Mode)")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📦 Check Stock"):
+                st.info("Demo: Stock check would show here")
+        with col2:
+            if st.button("⏳ Pending Orders"):
+                st.info("Demo: Pending orders would show here")
+        
+        st.stop()
+    
+    # Prepare context for AI
+    def prepare_context():
+        context = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'total_sizes': len(st.session_state.data['Size (mm)'].unique()) if 'data' in st.session_state else 0
+        }
+        return context
+    
+    # Display chat messages
+    messages_container = st.container()
+    with messages_container:
+        for msg in st.session_state.assistant_messages:
+            if msg["role"] == "user":
+                st.markdown(f"**You:** {msg['content']}")
+            else:
+                st.markdown(f"**AI:** {msg['content']}")
+    
+    st.divider()
+    
+    # Quick actions
+    st.markdown("### Quick Actions")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("📦 Stock", use_container_width=True):
+            query = "Show current stock levels"
+    with col2:
+        if st.button("⏳ Pending", use_container_width=True):
+            query = "Show pending orders"
+    with col3:
+        if st.button("📅 Coming", use_container_width=True):
+            query = "Show future incoming rotors"
+    with col4:
+        if st.button("💰 Prices", use_container_width=True):
+            query = "Show price list"
+    
+    # Handle quick action query
+    if 'query' in locals():
+        st.session_state.assistant_messages.append({"role": "user", "content": query})
         
         # Get AI response
-        if SARVAM_AVAILABLE and llm:
-            try:
-                system_prompt = """You are an AI inventory assistant. Be concise and helpful."""
-                messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_input)
-                ]
-                response = llm.invoke(messages)
-                st.session_state.chat_messages.append({"role": "assistant", "content": response.content})
-            except:
-                st.session_state.chat_messages.append({"role": "assistant", "content": "Sorry, I'm having trouble connecting."})
-        else:
-            st.session_state.chat_messages.append({"role": "assistant", "content": "AI is not configured. Please set up your API key."})
+        try:
+            context = prepare_context()
+            messages = [
+                SystemMessage(content="You are an inventory assistant. Be concise."),
+                HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {query}")
+            ]
+            response = llm.invoke(messages)
+            st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
+        except Exception as e:
+            st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
         
         st.rerun()
     
-    # Close button (hidden)
-    if st.button("Close", key="close-chat"):
-        st.session_state.chat_widget_open = False
-        st.rerun()
+    # Chat input
+    user_input = st.text_input("Type your question...", key="assistant_input")
     
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    if st.button("Send", key="send_message"):
+        if user_input:
+            st.session_state.assistant_messages.append({"role": "user", "content": user_input})
+            
+            # Get AI response
+            try:
+                context = prepare_context()
+                messages = [
+                    SystemMessage(content="You are an inventory assistant. Be concise."),
+                    HumanMessage(content=f"Context: {json.dumps(context)}\n\nQuestion: {user_input}")
+                ]
+                response = llm.invoke(messages)
+                st.session_state.assistant_messages.append({"role": "assistant", "content": response.content})
+            except Exception as e:
+                st.session_state.assistant_messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
+            
+            st.rerun()
+    
+    # Clear chat button
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.assistant_messages = [
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help?"}
+        ]
+        st.rerun()
+
+# =========================
+# YOUR MAIN APP CONTENT
+# =========================
+
+
+# Show current API status in sidebar
+with st.sidebar:
+    st.markdown("### System Status")
+    if SARVAM_AVAILABLE:
+        st.success("✅ AI Assistant: Connected")
+    else:
+        st.error("❌ AI Assistant: Not configured")
 
 # =========================
 # YOUR MAIN APP CONTENT
