@@ -1084,8 +1084,13 @@ if tab_choice == "🔁 Rotor Tracker":
         return response
     def get_ai_response_with_transactions(query, context):
         """Get response from selected AI provider with transaction handling"""
-    
+        
         query_lower = query.lower()
+        
+        # SPECIAL HANDLER FOR PENDING ORDERS - DIRECT DATABASE QUERY
+        if 'pending' in query_lower and ('order' in query_lower or 'buyer' in query_lower or 'show' in query_lower):
+            pending_data = get_pending_orders_detailed()
+            return format_pending_orders_display(pending_data)
         
         # Check for transaction history queries by size
         import re
@@ -1117,40 +1122,44 @@ if tab_choice == "🔁 Rotor Tracker":
                 else:
                     return get_buyer_transaction_summary(buyer)
         
-        # If not a transaction query, proceed with normal AI response
+        # If not a special query, proceed with normal AI response
         config = st.session_state.ai_config
         provider = AI_PROVIDERS[config['provider']]
         
         # Handle Gemini's different API format
-        if provider['api_key_in_url']:
-            # Gemini puts API key in URL
+        if provider.get('api_key_in_url', False):
             url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
         else:
             url = provider['base_url']
         
         headers = provider['headers'](config['api_key'])
         
+        # Get EXACT pending data to include in context
+        exact_pending = get_pending_orders_detailed()
+        
         system_prompt = f"""You are an inventory assistant. Use ONLY this data from the Movement Log to answer:
     
         INVENTORY DATA:
         {json.dumps(context, indent=2, default=str)}
+        
+        EXACT PENDING ORDERS (from database):
+        {json.dumps(exact_pending, indent=2, default=str)}
     
         IMPORTANT INSTRUCTIONS:
-        1. When showing pending orders, ALWAYS show a SIZE-WISE BREAKDOWN for each buyer
+        1. For pending orders, use the EXACT data provided above - do NOT calculate or infer
         2. Format like this for each buyer:
            • Buyer Name:
              - Size X mm: Y units
              - Size Z mm: W units
              Total: (sum) units
         
-        3. Do NOT combine multiple sizes into one total - list each size separately
+        3. Do NOT combine multiple sizes into one total
         4. Sort sizes from smallest to largest
         5. Be concise but detailed
         """
         
         # Format messages based on provider
         if "gemini" in config['provider'].lower():
-            # Gemini uses different message format
             data = {
                 "contents": [
                     {
@@ -1165,7 +1174,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 }
             }
         else:
-            # Standard OpenAI-compatible format
             data = {
                 "model": config['model'],
                 "messages": [
@@ -1187,15 +1195,12 @@ if tab_choice == "🔁 Rotor Tracker":
             if response.status_code == 200:
                 result = response.json()
                 
-                # Parse based on provider
                 if "gemini" in config['provider'].lower():
-                    # Parse Gemini response
                     if 'candidates' in result:
                         return result['candidates'][0]['content']['parts'][0]['text']
                     else:
                         return "No response from Gemini"
                 else:
-                    # Parse standard OpenAI response
                     return result['choices'][0]['message']['content']
             else:
                 return f"Error {response.status_code}: {response.text[:200]}"
