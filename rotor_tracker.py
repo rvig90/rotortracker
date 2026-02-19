@@ -557,7 +557,7 @@ if tab_choice == "🔁 Rotor Tracker":
             if "tf" not in st.session_state: st.session_state.tf = "All"
             if "rs" not in st.session_state: st.session_state.rs = ""
             if "dr" not in st.session_state:
-                min_date = pd.to_datetime(df['Date']).min().date()
+                min_date = pd.to_datetime(df['Date']).max().date()
                 max_date = pd.to_datetime(df['Date']).max().date()
                 st.session_state.dr = [min_date, max_date]  # Fixed: was [max_date, max_date]
     
@@ -568,7 +568,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.session_state.pf = "All"
                 st.session_state.tf = "All"
                 st.session_state.rs = ""
-                min_date = pd.to_datetime(df['Date']).min().date()
+                min_date = pd.to_datetime(df['Date']).max().date()
                 max_date = pd.to_datetime(df['Date']).max().date()
                 st.session_state.dr = [min_date, max_date]
                 st.rerun()
