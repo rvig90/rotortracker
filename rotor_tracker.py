@@ -958,7 +958,130 @@ if tab_choice == "🔁 Rotor Tracker":
         total_qty = df['Quantity'].sum()
         
         return f"📊 {total} transactions | {sizes} sizes | {buyers} buyers | {total_qty:,} total units"
+    # =========================
+    # TRANSACTION HISTORY FUNCTIONS (ADD THIS)
+    # =========================
+    def get_transaction_history(size=None, buyer=None, days=None, limit=50):
+        """Get transaction history filtered by size, buyer, or time period"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return pd.DataFrame()
+        
+        df = st.session_state.data.copy()
+        
+        # Ensure proper data types
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+        
+        # Apply filters
+        if size:
+            df = df[df['Size (mm)'] == size]
+        
+        if buyer:
+            df = df[df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
+        
+        if days:
+            cutoff = datetime.now() - timedelta(days=days)
+            df = df[df['Date'] >= cutoff]
+        
+        # Sort by date (newest first)
+        df = df.sort_values('Date', ascending=False)
+        
+        # Add value calculation if price data is available
+        if 'fixed_prices' in st.session_state:
+            def calculate_value(row):
+                size_val = row['Size (mm)']
+                qty = row['Quantity']
+                if pd.isna(size_val) or pd.isna(qty):
+                    return 0
+                size_int = int(size_val)
+                if size_int in st.session_state.fixed_prices:
+                    return st.session_state.fixed_prices[size_int] * qty
+                elif 'base_rate_per_mm' in st.session_state:
+                    return st.session_state.base_rate_per_mm * size_int * qty
+                return 0
+            
+            df['Value'] = df.apply(calculate_value, axis=1)
+        
+        return df.head(limit)
     
+    def format_transaction_history(df, size=None, buyer=None):
+        """Format transaction history for display"""
+        if df.empty:
+            if size and buyer:
+                return f"No transactions found for size {size}mm and buyer '{buyer}'"
+            elif size:
+                return f"No transactions found for size {size}mm"
+            elif buyer:
+                return f"No transactions found for buyer '{buyer}'"
+            else:
+                return "No transactions found"
+        
+        # Create summary stats
+        total_inward = df[df['Type'] == 'Inward']['Quantity'].sum()
+        total_outgoing = df[df['Type'] == 'Outgoing']['Quantity'].sum()
+        net_change = total_inward - total_outgoing
+        
+        response = f"📊 **Transaction History**"
+        
+        if size and buyer:
+            response += f" for Size {size}mm - {buyer}\n\n"
+        elif size:
+            response += f" for Size {size}mm\n\n"
+        elif buyer:
+            response += f" for {buyer}\n\n"
+        else:
+            response += " (All Transactions)\n\n"
+        
+        # Summary metrics
+        response += f"**Summary:**\n"
+        response += f"• Total Inward: {int(total_inward)} units\n"
+        response += f"• Total Outgoing: {int(total_outgoing)} units\n"
+        response += f"• Net Change: {int(net_change)} units\n"
+        response += f"• Transactions: {len(df)}\n\n"
+        
+        # Detailed breakdown by type
+        response += f"**Recent Transactions:**\n"
+        
+        for _, row in df.head(10).iterrows():
+            date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
+            type_icon = "📥" if row['Type'] == 'Inward' else "📤"
+            pending_marker = " ⏳" if row.get('Pending', False) else ""
+            
+            response += f"{type_icon} {date_str} | Size {int(row['Size (mm)'])}mm | "
+            response += f"{int(row['Quantity'])} units | {row['Remarks']}{pending_marker}\n"
+            
+            if 'Value' in row and row['Value'] > 0:
+                response += f"   💰 Value: ₹{row['Value']:,.0f}\n"
+        
+        if len(df) > 10:
+            response += f"\n... and {len(df) - 10} more transactions"
+        
+        return response
+    
+    def get_buyer_transaction_summary(buyer_name, days=90):
+        """Get transaction summary for a specific buyer"""
+        df = get_transaction_history(buyer=buyer_name, days=days)
+        
+        if df.empty:
+            return f"No transactions found for {buyer_name} in the last {days} days"
+        
+        # Group by size
+        size_summary = df.groupby('Size (mm)').agg({
+            'Quantity': 'sum',
+            'Type': lambda x: list(x)
+        }).reset_index()
+        
+        response = f"📊 **Transaction Summary for {buyer_name}** (Last {days} days)\n\n"
+        
+        for _, row in size_summary.iterrows():
+            size = int(row['Size (mm)'])
+            qty = int(row['Quantity'])
+            response += f"• Size {size}mm: {qty} units\n"
+        
+        response += f"\n**Total:** {int(df['Quantity'].sum())} units"
+        
+        return response
     def get_ai_response_with_transactions(query, context):
         """Get response from selected AI provider with transaction handling"""
     
