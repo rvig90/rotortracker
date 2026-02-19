@@ -1212,7 +1212,7 @@ if tab_choice == "🔁 Rotor Tracker":
                         if user_input:
                             st.session_state.assistant_messages.append({"role": "user", "content": user_input})
                             with st.spinner("Thinking..."):
-                                response = get_ai_response(user_input, context)
+                                response = get_ai_response_with_transactions(user_input, context)
                                 st.session_state.assistant_messages.append({"role": "assistant", "content": response})
                             st.rerun()
                 
