@@ -1058,6 +1058,76 @@ if tab_choice == "🔁 Rotor Tracker":
             response += f"\n... and {len(df) - 10} more transactions"
         
         return response
+
+    def get_pending_orders_detailed():
+        """Get detailed pending orders data - EXACT what's in the database"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return {"error": "No data"}
+        
+        df = st.session_state.data.copy()
+        
+        # Get ONLY pending outgoing orders
+        pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
+        
+        if pending_df.empty:
+            return {"message": "No pending orders found"}
+        
+        # Build a detailed structure
+        pending_data = {}
+        
+        for _, row in pending_df.iterrows():
+            buyer = str(row['Remarks']) if pd.notna(row['Remarks']) else "Unknown"
+            size = int(row['Size (mm)']) if pd.notna(row['Size (mm)']) else 0
+            qty = int(row['Quantity']) if pd.notna(row['Quantity']) else 0
+            date = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else "Unknown"
+            
+            if buyer not in pending_data:
+                pending_data[buyer] = {
+                    'total': 0,
+                    'orders': []
+                }
+            
+            pending_data[buyer]['orders'].append({
+                'size': size,
+                'quantity': qty,
+                'date': date
+            })
+            pending_data[buyer]['total'] += qty
+        
+        # Sort orders by size for each buyer
+        for buyer in pending_data:
+            pending_data[buyer]['orders'].sort(key=lambda x: x['size'])
+        
+        return pending_data
+    
+    def format_pending_orders_display(pending_data):
+        """Format pending orders for display in a consistent way"""
+        if "error" in pending_data:
+            return "Unable to fetch pending orders"
+        
+        if "message" in pending_data:
+            return pending_data["message"]
+        
+        response = "📋 **Current Pending Orders:**\n\n"
+        
+        # Sort buyers by name
+        for buyer in sorted(pending_data.keys()):
+            data = pending_data[buyer]
+            response += f"**{buyer}** (Total: {data['total']} units)\n"
+            
+            for order in data['orders']:
+                response += f"  • Size {order['size']}mm: {order['quantity']} units"
+                if order['date'] != "Unknown":
+                    response += f" (from {order['date']})"
+                response += "\n"
+            response += "\n"
+        
+        # Add summary
+        total_pending = sum(data['total'] for data in pending_data.values())
+        total_buyers = len(pending_data)
+        response += f"**Summary:** {total_pending} units pending across {total_buyers} buyers"
+        
+        return response
     
     def get_buyer_transaction_summary(buyer_name, days=90):
         """Get transaction summary for a specific buyer"""
@@ -1313,24 +1383,37 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # Quick actions
-                col1, col2, col3 = st.columns(3)
+                # Quick action buttons
+                col1, col2, col3, col4, col5, col6 = st.columns(6)
                 with col1:
                     if st.button("📦 Stock", key="qa_stock", use_container_width=True):
                         query = "Show current stock levels for all sizes"
                 with col2:
                     if st.button("⏳ Pending", key="qa_pending", use_container_width=True):
-                        query = "Show all pending orders with buyer names"
+                        # This now directly calls our function without going through AI
+                        pending_data = get_pending_orders_detailed()
+                        response = format_pending_orders_display(pending_data)
+                        st.session_state.assistant_messages.append({"role": "user", "content": "Show pending orders"})
+                        st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+                        st.rerun()
                 with col3:
+                    if st.button("📜 History", key="qa_history", use_container_width=True):
+                        query = "Show recent transactions"
+                with col4:
+                    if st.button("🔍 By Size", key="qa_size", use_container_width=True):
+                        sizes = [s['size'] for s in context.get('stock_summary', [])]
+                        if sizes:
+                            size_to_query = sizes[0]
+                            query = f"Show transactions for size {size_to_query}"
+                with col5:
                     if st.button("📅 Coming", key="qa_coming", use_container_width=True):
                         query = "Show future incoming rotors"
-                
-                if 'query' in locals():
-                    st.session_state.assistant_messages.append({"role": "user", "content": query})
-                    with st.spinner("Thinking..."):
-                        response = get_ai_response_with_transactions(query, context)
-                        st.session_state.assistant_messages.append({"role": "assistant", "content": response})
-                    st.rerun()
+                with col6:
+                    if st.button("🧹 Clear", key="qa_clear", use_container_width=True):
+                        st.session_state.assistant_messages = [
+                            {"role": "assistant", "content": "👋 Chat cleared. Ask me about your inventory!"}
+                        ]
+                        st.rerun()
                 
                 # Chat input
                 user_input = st.text_input("Ask about inventory...", key="chat_input", placeholder="e.g., ajji pending")
