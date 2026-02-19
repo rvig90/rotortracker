@@ -928,11 +928,38 @@ if tab_choice == "🔁 Rotor Tracker":
         headers = provider['headers'](config['api_key'])
         
         system_prompt = f"""You are an inventory assistant. Use ONLY this data from the Movement Log to answer:
+    
+        INVENTORY DATA:
         {json.dumps(context, indent=2, default=str)}
+    
+        IMPORTANT INSTRUCTIONS:
+        1. When showing pending orders, ALWAYS show a SIZE-WISE BREAKDOWN for each buyer
+        2. Format like this for each buyer:
+           • Buyer Name:
+             - Size X mm: Y units
+             - Size Z mm: W units
+             Total: (sum) units
         
-        Be concise and accurate. Format numbers clearly.
-        When asked about specific buyers like 'ajji' or 'enova', search in the buyers list and pending orders.
-        If data is empty, say so."""
+        3. Do NOT combine multiple sizes into one total - list each size separately
+        4. Sort sizes from smallest to largest
+        5. Be concise but detailed
+        6. If data is empty, say so
+        
+        Example format:
+        Here are the pending orders:
+        
+        • anil:
+          - 120mm: 50 units
+          - 160mm: 75 units  
+          - 200mm: 80 units
+          - 260mm: 50 units
+          Total: 255 units
+        
+        • avs:
+          - 180mm: 15 units
+          - 225mm: 11 units
+          Total: 26 units
+        """
         
         data = {
             "model": config['model'],
@@ -940,8 +967,8 @@ if tab_choice == "🔁 Rotor Tracker":
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": query}
             ],
-            "temperature": 0.2,
-            "max_tokens": 500
+            "temperature": 0.1,  # Lower temperature for more consistent formatting
+            "max_tokens": 800
         }
         
         try:
