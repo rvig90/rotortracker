@@ -961,7 +961,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     def get_ai_response_with_transactions(query, context):
         """Get response from selected AI provider with transaction handling"""
-        
+    
         query_lower = query.lower()
         
         # Check for transaction history queries by size
