@@ -1066,6 +1066,10 @@ if tab_choice == "🔁 Rotor Tracker":
         
         df = st.session_state.data.copy()
         
+        # Ensure Date column is datetime
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
         # Get ONLY pending outgoing orders
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         
@@ -1079,7 +1083,20 @@ if tab_choice == "🔁 Rotor Tracker":
             buyer = str(row['Remarks']) if pd.notna(row['Remarks']) else "Unknown"
             size = int(row['Size (mm)']) if pd.notna(row['Size (mm)']) else 0
             qty = int(row['Quantity']) if pd.notna(row['Quantity']) else 0
-            date = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else "Unknown"
+            
+            # Handle date safely
+            date = "Unknown"
+            if pd.notna(row['Date']):
+                try:
+                    # If it's already a datetime object
+                    if hasattr(row['Date'], 'strftime'):
+                        date = row['Date'].strftime('%Y-%m-%d')
+                    else:
+                        # Try to convert to datetime first
+                        date_obj = pd.to_datetime(row['Date'])
+                        date = date_obj.strftime('%Y-%m-%d')
+                except:
+                    date = str(row['Date'])  # Just use the string value
             
             if buyer not in pending_data:
                 pending_data[buyer] = {
