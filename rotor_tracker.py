@@ -688,36 +688,75 @@ if tab_choice == "🔁 Rotor Tracker":
     from datetime import datetime, timedelta
     
     # Available AI Providers
+    # =========================
+    # UPDATED AI PROVIDERS CONFIGURATION (WITH GEMINI)
+    # =========================
+    
     AI_PROVIDERS = {
+        "Google Gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",  # Gemini API endpoint
+            "models": [
+                "gemini-pro",
+                "gemini-1.5-pro",
+                "gemini-1.5-flash",
+                "gemini-1.0-pro"
+            ],
+            "default_model": "gemini-pro",
+            "headers": lambda api_key: {
+                "Content-Type": "application/json"
+            },
+            "description": "Google's most capable AI models with 1M token context",
+            "requires_project_id": False,  # Gemini just needs API key in URL
+            "api_key_in_url": True  # Gemini puts API key in URL: ?key=YOUR_API_KEY
+        },
         "Sarvam AI": {
             "base_url": "https://api.sarvam.ai/v1/chat/completions",
-            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
+            "models": [
+                "sarvam-m",
+                "sarvam-2b",
+                "sarvam-7b"
+            ],
             "default_model": "sarvam-m",
             "headers": lambda api_key: {
                 "api-subscription-key": api_key,
                 "Content-Type": "application/json"
             },
-            "description": "Indian language focused models"
+            "description": "Indian language focused models with free tier",
+            "requires_project_id": False,
+            "api_key_in_url": False
         },
         "OpenRouter": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": ["deepseek/deepseek-chat:free", "google/gemini-2.0-flash-exp:free"],
+            "models": [
+                "deepseek/deepseek-chat:free",
+                "google/gemini-2.0-flash-exp:free",
+                "microsoft/phi-3.5-mini-128k:free",
+                "meta-llama/llama-3.2-3b-instruct:free"
+            ],
             "default_model": "deepseek/deepseek-chat:free",
             "headers": lambda api_key: {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
-            "description": "Access to free models"
+            "description": "Access to 65+ free models",
+            "requires_project_id": False,
+            "api_key_in_url": False
         },
         "Groq": {
             "base_url": "https://api.groq.com/openai/v1/chat/completions",
-            "models": ["llama3-70b-8192", "llama3-8b-8192"],
+            "models": [
+                "llama3-70b-8192",
+                "llama3-8b-8192",
+                "mixtral-8x7b-32768"
+            ],
             "default_model": "llama3-70b-8192",
             "headers": lambda api_key: {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
-            "description": "Ultra-fast inference"
+            "description": "Ultra-fast inference (300+ tokens/sec)",
+            "requires_project_id": False,
+            "api_key_in_url": False
         }
     }
     
