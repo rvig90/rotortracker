@@ -959,10 +959,51 @@ if tab_choice == "🔁 Rotor Tracker":
         
         return f"📊 {total} transactions | {sizes} sizes | {buyers} buyers | {total_qty:,} total units"
     
-    def get_ai_response(query, context):
-        """Get response from selected AI provider"""
+    def get_ai_response_with_transactions(query, context):
+        """Get response from selected AI provider with transaction handling"""
+        
+        query_lower = query.lower()
+        
+        # Check for transaction history queries by size
+        import re
+        size_match = re.search(r'\b(\d+)\b', query_lower)
+        if size_match and ('transaction' in query_lower or 'history' in query_lower or 'show' in query_lower):
+            size = int(size_match.group(1))
+            
+            # Check if also asking for specific buyer
+            for buyer in context.get('buyers', []):
+                buyer_lower = str(buyer).lower()
+                if buyer_lower in query_lower:
+                    df = get_transaction_history(size=size, buyer=buyer)
+                    return format_transaction_history(df, size=size, buyer=buyer)
+            
+            # Just size query
+            df = get_transaction_history(size=size)
+            return format_transaction_history(df, size=size)
+        
+        # Check for buyer transaction queries
+        for buyer in context.get('buyers', []):
+            buyer_lower = str(buyer).lower()
+            if buyer_lower in query_lower and ('transaction' in query_lower or 'history' in query_lower or 'summary' in query_lower):
+                # Check if also asking for specific size
+                size_match = re.search(r'\b(\d+)\b', query_lower)
+                if size_match:
+                    size = int(size_match.group(1))
+                    df = get_transaction_history(size=size, buyer=buyer)
+                    return format_transaction_history(df, size=size, buyer=buyer)
+                else:
+                    return get_buyer_transaction_summary(buyer)
+        
+        # If not a transaction query, proceed with normal AI response
         config = st.session_state.ai_config
         provider = AI_PROVIDERS[config['provider']]
+        
+        # Handle Gemini's different API format
+        if provider['api_key_in_url']:
+            # Gemini puts API key in URL
+            url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
+        else:
+            url = provider['base_url']
         
         headers = provider['headers'](config['api_key'])
         
@@ -982,37 +1023,39 @@ if tab_choice == "🔁 Rotor Tracker":
         3. Do NOT combine multiple sizes into one total - list each size separately
         4. Sort sizes from smallest to largest
         5. Be concise but detailed
-        6. If data is empty, say so
-        
-        Example format:
-        Here are the pending orders:
-        
-        • anil:
-          - 120mm: 50 units
-          - 160mm: 75 units  
-          - 200mm: 80 units
-          - 260mm: 50 units
-          Total: 255 units
-        
-        • avs:
-          - 180mm: 15 units
-          - 225mm: 11 units
-          Total: 26 units
         """
         
-        data = {
-            "model": config['model'],
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query}
-            ],
-            "temperature": 0.1,  # Lower temperature for more consistent formatting
-            "max_tokens": 800
-        }
+        # Format messages based on provider
+        if "gemini" in config['provider'].lower():
+            # Gemini uses different message format
+            data = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": f"{system_prompt}\n\nUser Query: {query}"}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 800
+                }
+            }
+        else:
+            # Standard OpenAI-compatible format
+            data = {
+                "model": config['model'],
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 800
+            }
         
         try:
             response = requests.post(
-                provider['base_url'],
+                url,
                 headers=headers,
                 json=data,
                 timeout=30
@@ -1020,7 +1063,17 @@ if tab_choice == "🔁 Rotor Tracker":
             
             if response.status_code == 200:
                 result = response.json()
-                return result['choices'][0]['message']['content']
+                
+                # Parse based on provider
+                if "gemini" in config['provider'].lower():
+                    # Parse Gemini response
+                    if 'candidates' in result:
+                        return result['candidates'][0]['content']['parts'][0]['text']
+                    else:
+                        return "No response from Gemini"
+                else:
+                    # Parse standard OpenAI response
+                    return result['choices'][0]['message']['content']
             else:
                 return f"Error {response.status_code}: {response.text[:200]}"
         except Exception as e:
