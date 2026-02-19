@@ -1200,7 +1200,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 if 'query' in locals():
                     st.session_state.assistant_messages.append({"role": "user", "content": query})
                     with st.spinner("Thinking..."):
-                        response = get_ai_response(query, context)
+                        response = get_ai_response_with_transactions(query, context)
                         st.session_state.assistant_messages.append({"role": "assistant", "content": response})
                     st.rerun()
                 
