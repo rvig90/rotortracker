@@ -747,46 +747,216 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # SESSION STATE INITIALIZATION
     # =========================
-    if 'show_assistant' not in st.session_state:
-        st.session_state.show_assistant = False
+    # =========================
+    # FIXED ASSISTANT WIDGET WITH VISIBLE INPUT
+    # =========================
     
-    if 'chat_messages' not in st.session_state:
-        st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help you today?"}
-        ]
-    
-    if 'ai_config' not in st.session_state:
-        st.session_state.ai_config = {
-            'provider': 'Google Gemini',
-            'model': 'gemini-pro',
-            'api_key': None,
-            'initialized': False
-        }
-    
-    if 'show_chart' not in st.session_state:
-        st.session_state.show_chart = None
-    
-    if 'stock_display' not in st.session_state:
-        st.session_state.stock_display = None
+    if st.session_state.show_assistant:
+        st.markdown('<div class="assistant-widget">', unsafe_allow_html=True)
+        
+        # Header with close button
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            st.markdown("### 🤖 AI Assistant")
+        with col2:
+            if st.button("✖️", key="close_assistant"):
+                st.session_state.show_assistant = False
+                st.rerun()
+        
+        st.divider()
+        
+        # Data Status (minimal)
+        if 'data' in st.session_state and not st.session_state.data.empty:
+            df = st.session_state.data
+            st.caption(f"📊 {len(df)} transactions | {df['Size (mm)'].nunique()} sizes | {df['Quantity'].sum():,} units")
+        
+        # Configuration Section
+        if not st.session_state.ai_config['initialized']:
+            with st.expander("⚙️ Connect AI", expanded=True):
+                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="chat_provider")
+                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="chat_model")
+                api_key = st.text_input("API Key", type="password", key="chat_api_key")
+                
+                if st.button("🔌 Connect", use_container_width=True):
+                    if api_key:
+                        st.session_state.ai_config.update({
+                            'provider': provider,
+                            'model': model,
+                            'api_key': api_key,
+                            'initialized': True
+                        })
+                        st.rerun()
+        else:
+            st.success(f"✅ Connected to {st.session_state.ai_config['provider']}")
+        
+        # ===== CHAT MESSAGES SECTION =====
+        st.markdown("### 💬 Chat")
+        
+        # Chat messages container with fixed height
+        chat_container = st.container()
+        with chat_container:
+            for msg in st.session_state.chat_messages[-8:]:  # Show last 8 messages
+                if msg["role"] == "user":
+                    st.markdown(f"**👤 You:** {msg['content']}")
+                else:
+                    st.markdown(f"**🤖 AI:** {msg['content']}")
+        
+        st.divider()
+        
+        # ===== QUICK ACTIONS =====
+        st.markdown("### Quick Actions")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📦 Stock", key="qa_stock", use_container_width=True):
+                handle_quick_action("Show stock levels")
+            if st.button("📊 Chart", key="qa_chart", use_container_width=True):
+                handle_quick_action("Show stock chart")
+        with col2:
+            if st.button("⏳ Pending", key="qa_pending", use_container_width=True):
+                handle_quick_action("Show all pending orders")
+            if st.button("📈 Predict", key="qa_predict", use_container_width=True):
+                handle_quick_action("Predict future stock")
+        with col3:
+            if st.button("📜 History", key="qa_history", use_container_width=True):
+                handle_quick_action("Show recent transactions")
+            if st.button("📅 Coming", key="qa_coming", use_container_width=True):
+                handle_quick_action("Show future incoming")
+        
+        st.divider()
+        
+        # ===== STOCK DISPLAY SECTION (if available) =====
+        if st.session_state.stock_display:
+            st.markdown("### 📊 Stock Summary")
+            st.markdown(st.session_state.stock_display, unsafe_allow_html=True)
+            if st.button("Close Stock View", key="close_stock"):
+                st.session_state.stock_display = None
+                st.rerun()
+            st.divider()
+        
+        # ===== CHART DISPLAY SECTION (if available) =====
+        if st.session_state.show_chart:
+            st.markdown("### 📈 Chart")
+            st.altair_chart(st.session_state.show_chart, use_container_width=True)
+            if st.button("Close Chart", key="close_chart"):
+                st.session_state.show_chart = None
+                st.rerun()
+            st.divider()
+        
+        # ===== INPUT SECTION - ALWAYS VISIBLE AT BOTTOM =====
+        st.markdown("### Ask me anything")
+        
+        # Create a form for better input handling
+        with st.form(key="chat_form", clear_on_submit=True):
+            # Input field - clearly visible
+            user_input = st.text_input(
+                "Type your question here...", 
+                placeholder="e.g., ajji pending, stock levels, chart, predict 130mm",
+                label_visibility="collapsed"
+            )
+            
+            # Buttons row
+            col1, col2, col3 = st.columns([1, 1, 2])
+            with col1:
+                send_clicked = st.form_submit_button("📤 Send", use_container_width=True)
+            with col2:
+                clear_clicked = st.form_submit_button("🗑️ Clear", use_container_width=True)
+            with col3:
+                stock_btn = st.form_submit_button("📊 Show Stock Grid", use_container_width=True)
+        
+        # Handle form submissions outside the form
+        if send_clicked and user_input:
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            
+            context = prepare_inventory_context()
+            response = get_ai_response(user_input, context)
+            
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
+            st.rerun()
+        
+        if clear_clicked:
+            st.session_state.chat_messages = [
+                {"role": "assistant", "content": "👋 Chat cleared. How can I help you?"}
+            ]
+            st.session_state.stock_display = None
+            st.session_state.show_chart = None
+            st.rerun()
+        
+        if stock_btn:
+            stock_html = get_stock_response()
+            if stock_html:
+                st.session_state.stock_display = stock_html
+                st.session_state.chat_messages.append({"role": "assistant", "content": "📊 Here's your stock summary:"})
+                st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # =========================
-    # HIDE STREAMLIT BRANDING
+    # UPDATED CSS FOR VISIBLE INPUT
     # =========================
-    # Add this to your CSS section
-    # Add to your CSS
     st.markdown("""
     <style>
-    /* Make sure input is visible */
-    .assistant-widget .stTextInput {
-        margin-bottom: 10px;
+    /* Assistant widget */
+    .assistant-widget {
+        position: fixed;
+        bottom: 90px;
+        right: 20px;
+        width: 450px;
+        height: 650px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        z-index: 9998;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        padding: 20px;
+    }
+    
+    /* Make input clearly visible */
+    .assistant-widget .stForm {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 10px;
+        border: 1px solid #ddd;
     }
     
     .assistant-widget .stTextInput input {
         background: white !important;
         color: black !important;
-        border: 1px solid #ddd !important;
-        padding: 10px !important;
-        font-size: 14px !important;
+        border: 2px solid #4CAF50 !important;
+        border-radius: 25px !important;
+        padding: 12px 15px !important;
+        font-size: 15px !important;
+        width: 100% !important;
+    }
+    
+    .assistant-widget .stTextInput input:focus {
+        border-color: #45a049 !important;
+        box-shadow: 0 0 5px rgba(76, 175, 80, 0.5) !important;
+    }
+    
+    /* Form buttons */
+    .assistant-widget .stForm button {
+        background-color: #4CAF50 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 20px !important;
+        padding: 8px 15px !important;
+        font-weight: bold !important;
+        transition: all 0.3s !important;
+    }
+    
+    .assistant-widget .stForm button:hover {
+        background-color: #45a049 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Clear button - different color */
+    .assistant-widget .stForm button:second-child {
+        background-color: #f44336 !important;
     }
     
     /* Quick action buttons */
@@ -794,17 +964,20 @@ if tab_choice == "🔁 Rotor Tracker":
         background-color: #4CAF50 !important;
         color: white !important;
         border: none !important;
+        border-radius: 5px !important;
         padding: 8px !important;
         font-size: 12px !important;
         margin: 2px !important;
+        transition: all 0.3s !important;
     }
     
     .quick-actions button:hover {
         background-color: #45a049 !important;
+        transform: translateY(-2px) !important;
     }
     
     /* Chat messages area */
-    .chat-container {
+    .chat-messages {
         max-height: 200px;
         overflow-y: auto;
         padding: 10px;
@@ -813,7 +986,7 @@ if tab_choice == "🔁 Rotor Tracker":
         margin-bottom: 10px;
     }
     
-    /* Stock grid inside assistant */
+    /* Stock grid */
     .stock-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -830,6 +1003,39 @@ if tab_choice == "🔁 Rotor Tracker":
         border-radius: 5px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         border-left: 3px solid #4CAF50;
+    }
+    
+    .stock-size {
+        font-weight: bold;
+        font-size: 14px;
+    }
+    
+    .stock-quantity {
+        font-size: 18px;
+        color: #4CAF50;
+        font-weight: bold;
+    }
+    
+    .stock-pending {
+        font-size: 11px;
+        color: #ff9800;
+        background: #fff3e0;
+        padding: 2px 5px;
+        border-radius: 3px;
+        display: inline-block;
+    }
+    
+    /* Section headers */
+    .assistant-widget h3 {
+        color: #333;
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+    
+    /* Divider */
+    .assistant-widget hr {
+        margin: 15px 0;
+        border-color: #eee;
     }
     </style>
     """, unsafe_allow_html=True)
