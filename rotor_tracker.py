@@ -781,6 +781,7 @@ if tab_choice == "🔁 Rotor Tracker":
     # Update your CSS to give more space for input
     st.markdown("""
     <style>
+    /* Floating button */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
@@ -798,12 +799,14 @@ if tab_choice == "🔁 Rotor Tracker":
         cursor: pointer;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
+    
+    /* Assistant widget - fixed height with proper layout */
     .assistant-widget {
         position: fixed;
         bottom: 90px;
         right: 20px;
-        width: 350px;
-        height: 600px;  /* Increased height */
+        width: 380px;
+        height: 600px;
         background-color: white;
         border-radius: 10px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
@@ -813,6 +816,8 @@ if tab_choice == "🔁 Rotor Tracker":
         overflow: hidden;
         border: 1px solid #e0e0e0;
     }
+    
+    /* Header - fixed at top */
     .assistant-header {
         padding: 12px 15px;
         background-color: #4CAF50;
@@ -822,14 +827,38 @@ if tab_choice == "🔁 Rotor Tracker":
         align-items: center;
         flex-shrink: 0;
     }
+    
+    /* Content area - scrollable */
     .assistant-content {
         flex: 1;
         overflow-y: auto;
         padding: 15px;
         display: flex;
         flex-direction: column;
-        min-height: 0;  /* Important for flexbox scrolling */
     }
+    
+    /* Data status - fixed section */
+    .data-status {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #e8f5e9;
+        border-radius: 8px;
+        border-left: 3px solid #4CAF50;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    
+    /* Config section - fixed */
+    .config-section {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        border-left: 3px solid #4CAF50;
+        flex-shrink: 0;
+    }
+    
+    /* Chat messages - scrollable area */
     .chat-messages {
         flex: 1;
         overflow-y: auto;
@@ -837,9 +866,11 @@ if tab_choice == "🔁 Rotor Tracker":
         padding: 10px;
         background-color: #f9f9f9;
         border-radius: 8px;
-        min-height: 200px;
-        max-height: 300px;
+        min-height: 150px;
+        max-height: 250px;
     }
+    
+    /* Message bubbles */
     .user-message {
         background-color: #4CAF50;
         color: white;
@@ -869,30 +900,38 @@ if tab_choice == "🔁 Rotor Tracker":
         clear: both;
         display: table;
     }
-    .config-section {
+    
+    /* Quick actions - fixed at bottom */
+    .quick-actions {
+        display: flex;
+        gap: 5px;
         margin-bottom: 15px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-radius: 8px;
-        border-left: 3px solid #4CAF50;
+        flex-wrap: wrap;
         flex-shrink: 0;
     }
-    .data-status {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #e8f5e9;
-        border-radius: 8px;
-        border-left: 3px solid #4CAF50;
-        font-size: 12px;
-        flex-shrink: 0;
+    .quick-actions button {
+        flex: 1;
+        min-width: 60px;
+        font-size: 11px;
+        padding: 5px;
     }
+    
+    /* Input section - ALWAYS VISIBLE at bottom */
     .input-section {
         flex-shrink: 0;
         margin-top: auto;
+        background-color: white;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+    .stTextInput {
+        margin-bottom: 5px;
     }
     .stTextInput > div > input {
         font-size: 14px;
         padding: 8px 12px;
+        border-radius: 20px;
+        border: 1px solid #ddd;
     }
     </style>
     """, unsafe_allow_html=True)
