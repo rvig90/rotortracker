@@ -691,6 +691,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH WORKING CHAT
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -699,6 +703,16 @@ if tab_choice == "🔁 Rotor Tracker":
     import requests
     import json
     import re
+    
+    # =========================
+    # PAGE CONFIG
+    # =========================
+    st.set_page_config(
+        page_title="Rotor Tracker",
+        page_icon="🔄",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     
     # =========================
     # AVAILABLE AI PROVIDERS
@@ -736,9 +750,9 @@ if tab_choice == "🔁 Rotor Tracker":
     if 'show_assistant' not in st.session_state:
         st.session_state.show_assistant = False
     
-    if 'assistant_messages' not in st.session_state:
-        st.session_state.assistant_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I can show charts, predict trends, and analyze your data."}
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = [
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. How can I help you today?"}
         ]
     
     if 'ai_config' not in st.session_state:
@@ -749,9 +763,6 @@ if tab_choice == "🔁 Rotor Tracker":
             'initialized': False
         }
     
-    if 'button_query' not in st.session_state:
-        st.session_state.button_query = None
-    
     if 'show_chart' not in st.session_state:
         st.session_state.show_chart = None
     
@@ -759,159 +770,243 @@ if tab_choice == "🔁 Rotor Tracker":
         st.session_state.stock_display = None
     
     # =========================
-    # CUSTOM CSS
-    # =========================
-    # =========================
-    # SEMI-TRANSPARENT ASSISTANT
-    # =========================
-    # =========================
-    # FIX AI ASSISTANT WIDGET BACKGROUND
+    # HIDE STREAMLIT BRANDING
     # =========================
     st.markdown("""
     <style>
-    /* Assistant widget - match gradient theme */
+    /* Hide Streamlit branding */
+    #MainMenu {display: none !important;}
+    footer {display: none !important;}
+    header {display: none !important;}
+    .stDeployButton {display: none !important;}
+    .stStatusWidget {display: none !important;}
+    .viewerBadge_container__1QSob {display: none !important;}
+    
+    /* Remove top padding */
+    .main > div {
+        margin-top: -80px !important;
+        padding-top: 0 !important;
+    }
+    
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    /* Floating button */
+    .floating-btn-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+    
+    .floating-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s;
+    }
+    
+    .floating-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    /* Assistant widget */
     .assistant-widget {
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%) !important;
-        backdrop-filter: blur(10px) !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-        color: white !important;
+        position: fixed;
+        bottom: 90px;
+        right: 20px;
+        width: 450px;
+        height: 650px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        z-index: 9998;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #e0e0e0;
+        padding: 15px;
     }
     
-    /* Make all text white inside assistant */
-    .assistant-widget * {
-        color: white !important;
+    /* Chat messages container */
+    .chat-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        margin: 10px 0;
+        max-height: 300px;
     }
     
-    /* Chat messages area - semi-transparent */
-    .chat-messages {
-        background: rgba(255, 255, 255, 0.1) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-    }
-    
-    /* Assistant messages - keep dark text for readability */
-    .assistant-message {
-        background: white !important;
-        color: #333 !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
-    }
-    
-    /* User messages - keep gradient */
     .user-message {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 18px 18px 0 18px;
+        margin: 5px 0;
+        max-width: 80%;
+        float: right;
+        clear: both;
+        word-wrap: break-word;
     }
     
-    /* Data status card - transparent */
-    .data-status {
-        background: rgba(255, 255, 255, 0.1) !important;
-        backdrop-filter: blur(5px) !important;
-        border-left: 4px solid white !important;
-        color: white !important;
+    .assistant-message {
+        background-color: #e0e0e0;
+        color: black;
+        padding: 10px 15px;
+        border-radius: 18px 18px 18px 0;
+        margin: 5px 0;
+        max-width: 80%;
+        float: left;
+        clear: both;
+        word-wrap: break-word;
     }
     
-    /* Config section - transparent */
-    .config-section {
-        background: rgba(255, 255, 255, 0.1) !important;
-        backdrop-filter: blur(5px) !important;
-        border-left: 4px solid white !important;
+    .clearfix::after {
+        content: "";
+        clear: both;
+        display: table;
     }
     
-    /* Stock cards inside assistant */
-    .assistant-widget .stock-card {
-        background: rgba(255, 255, 255, 0.15) !important;
-        backdrop-filter: blur(5px) !important;
-        border-left: 4px solid white !important;
+    /* Quick actions grid */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        margin: 10px 0;
     }
     
-    .assistant-widget .stock-card .stock-size,
-    .assistant-widget .stock-card .stock-quantity {
-        color: white !important;
-    }
-    
-    /* Quick action buttons */
     .quick-actions button {
-        background: rgba(255, 255, 255, 0.2) !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        color: white !important;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.3s;
     }
     
     .quick-actions button:hover {
-        background: white !important;
-        color: #667eea !important;
+        background-color: #45a049;
+        transform: translateY(-2px);
     }
     
-    /* Input field */
-    .input-section .stTextInput > div > input {
-        background: rgba(255, 255, 255, 0.15) !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        color: white !important;
+    /* Stock grid */
+    .stock-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        margin: 10px 0;
     }
     
-    .input-section .stTextInput > div > input::placeholder {
-        color: rgba(255,255,255,0.7) !important;
+    .stock-card {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #4CAF50;
+        transition: transform 0.2s;
     }
     
-    /* Send button */
-    .input-section .stButton button {
-        background: white !important;
-        color: #667eea !important;
-        border: none !important;
+    .stock-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     
-    .input-section .stButton button:hover {
-        background: rgba(255,255,255,0.9) !important;
+    .stock-size {
+        font-size: 16px;
+        font-weight: bold;
+        color: #1e1e1e;
+        margin-bottom: 5px;
     }
     
-    /* Clear chat button */
-    .input-section .stButton button:last-child {
-        background: rgba(255,255,255,0.2) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
+    .stock-quantity {
+        font-size: 20px;
+        font-weight: bold;
+        color: #4CAF50;
+        margin-bottom: 5px;
     }
     
-    .input-section .stButton button:last-child:hover {
-        background: rgba(255,255,255,0.3) !important;
+    .stock-pending {
+        font-size: 11px;
+        color: #ff9800;
+        background: #fff3e0;
+        padding: 2px 6px;
+        border-radius: 10px;
+        display: inline-block;
+    }
+    
+    .stock-warning {
+        border-left-color: #ff9800;
+    }
+    
+    .stock-critical {
+        border-left-color: #f44336;
     }
     
     /* Stock summary */
     .stock-summary {
-        background: rgba(255, 255, 255, 0.2) !important;
-        backdrop-filter: blur(5px) !important;
-        color: white !important;
+        margin: 10px 0;
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        font-weight: bold;
     }
     
     /* Chart container */
     .chart-container {
-        background: rgba(255, 255, 255, 0.1) !important;
-        backdrop-filter: blur(5px) !important;
+        margin: 10px 0;
+        padding: 15px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border-left: 4px solid #2196F3;
     }
     
-    /* Close buttons */
-    .assistant-widget button {
-        background: rgba(255,255,255,0.2) !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        color: white !important;
+    /* Form styling */
+    .stForm {
+        background-color: transparent;
+        padding: 0;
     }
     
-    .assistant-widget button:hover {
-        background: rgba(255,255,255,0.3) !important;
+    .stForm [data-testid="stForm"] {
+        border: none;
+        padding: 0;
     }
     
-    /* Select boxes */
-    .assistant-widget .stSelectbox > div > div {
-        background: rgba(255,255,255,0.15) !important;
-        color: white !important;
-        border-color: rgba(255,255,255,0.3) !important;
+    /* Input field */
+    .stTextInput > div > input {
+        border-radius: 20px;
+        border: 1px solid #ddd;
+        padding: 10px 15px;
     }
     
-    .assistant-widget .stSelectbox svg {
-        fill: white !important;
+    /* Buttons */
+    .stButton > button {
+        border-radius: 20px;
+        border: none;
+        transition: all 0.3s;
     }
     
-    /* Hide any remaining white backgrounds */
-    .assistant-widget div:not(.user-message):not(.assistant-message) {
-        background: transparent !important;
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -921,13 +1016,12 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     
     def prepare_inventory_context():
-        """Prepare inventory context without modifying datetime objects"""
+        """Prepare inventory context"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return {"error": "No data in Movement Log"}
         
         df = st.session_state.data.copy()
         
-        # Calculate stock summary
         stock_summary = []
         for size in df['Size (mm)'].unique():
             if pd.isna(size):
@@ -949,7 +1043,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 'future_incoming': int(future)
             })
         
-        # Get pending orders
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         pending_by_buyer = {}
         for buyer in pending_df['Remarks'].unique():
@@ -964,7 +1057,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 ]
             }
         
-        # Get future incoming
         future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
         future_incoming = []
         for _, row in future_df.iterrows():
@@ -1002,7 +1094,7 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     
     def format_stock_display(stock_data):
-        """Format stock levels in a beautiful grid"""
+        """Format stock levels in a grid"""
         if not stock_data:
             return "No stock data available"
         
@@ -1036,7 +1128,7 @@ if tab_choice == "🔁 Rotor Tracker":
         total_future = sum(item['future_incoming'] for item in stock_data)
         
         html += f"""
-        <div style="margin-top:20px; padding:15px; background:#e8f5e9; border-radius:8px;">
+        <div class="stock-summary">
             <strong>📊 Summary:</strong> {total_stock:,} total units | 
             ⏳ {total_pending:,} pending | 
             📅 {total_future:,} incoming
@@ -1219,7 +1311,7 @@ if tab_choice == "🔁 Rotor Tracker":
         
         query_lower = query.lower()
         
-        # Handle stock requests with beautiful display
+        # Handle stock requests
         if 'stock' in query_lower and ('level' in query_lower or 'show' in query_lower):
             stock_html = get_stock_response()
             if stock_html:
@@ -1244,10 +1336,10 @@ if tab_choice == "🔁 Rotor Tracker":
                 if fig:
                     st.session_state.show_chart = fig
                     return "📊 Here's your activity trend:"
-            return "I couldn't generate that chart. Try 'stock chart', 'pending chart', or 'trend chart'"
+            return "I couldn't generate that chart."
         
         # Handle prediction requests
-        if 'predict' in query_lower or 'forecast' in query_lower or 'future' in query_lower:
+        if 'predict' in query_lower or 'forecast' in query_lower:
             size_match = re.search(r'(\d+)', query_lower)
             size = int(size_match.group(1)) if size_match else None
             fig = create_prediction_chart(size)
@@ -1256,7 +1348,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 return f"📈 Here's your 30-day stock prediction" + (f" for size {size}mm" if size else "")
         
         # Handle coming/future requests
-        if ('coming' in query_lower or 'future' in query_lower) and ('rotor' in query_lower or 'incoming' in query_lower):
+        if ('coming' in query_lower or 'future' in query_lower):
             future_items = context.get('future_incoming', [])
             if future_items:
                 response = "📅 **Future Incoming Rotors:**\n\n"
@@ -1269,7 +1361,7 @@ if tab_choice == "🔁 Rotor Tracker":
             return "No future incoming rotors found"
         
         # Handle pending requests
-        if 'pending' in query_lower and ('order' in query_lower or 'show' in query_lower):
+        if 'pending' in query_lower:
             pending = context.get('pending_by_buyer', {})
             if pending:
                 response = "⏳ **Pending Orders:**\n\n"
@@ -1284,6 +1376,9 @@ if tab_choice == "🔁 Rotor Tracker":
             return "No pending orders found"
         
         # If no special handling, use AI
+        if not st.session_state.ai_config['initialized']:
+            return "⚠️ Please connect to an AI provider first."
+        
         config = st.session_state.ai_config
         provider = AI_PROVIDERS[config['provider']]
         
@@ -1328,6 +1423,27 @@ if tab_choice == "🔁 Rotor Tracker":
             return f"Connection error"
     
     # =========================
+    # HELPER FUNCTION FOR QUICK ACTIONS
+    # =========================
+    def handle_quick_action(query):
+        """Handle quick action button clicks"""
+        st.session_state.chat_messages.append({"role": "user", "content": query})
+        
+        context = prepare_inventory_context()
+        response = get_ai_response(query, context)
+        
+        st.session_state.chat_messages.append({"role": "assistant", "content": response})
+        st.rerun()
+    
+    # =========================
+    # MAIN APP CONTENT
+    # =========================
+    st.title("🔄 Rotor Inventory Management System")
+    
+    # Your existing tabs/content here
+    # ... (your existing movement log code)
+    
+    # =========================
     # FLOATING BUTTON
     # =========================
     st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
@@ -1344,43 +1460,39 @@ if tab_choice == "🔁 Rotor Tracker":
     if st.session_state.show_assistant:
         st.markdown('<div class="assistant-widget">', unsafe_allow_html=True)
         
-        # Header
-        st.markdown(f'''
-        <div class="assistant-header">
-            <span>🤖 AI Assistant</span>
-            <button onclick="document.querySelector('button[data-testid=\"close_assistant\"]').click()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer;">✖️</button>
-        </div>
-        ''', unsafe_allow_html=True)
+        # Header with close button
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            st.markdown("### 🤖 AI Assistant")
+        with col2:
+            if st.button("✖️", key="close_assistant"):
+                st.session_state.show_assistant = False
+                st.rerun()
         
-        if st.button("Close", key="close_assistant"):
-            st.session_state.show_assistant = False
-            st.rerun()
-        
-        st.markdown('<div class="assistant-content">', unsafe_allow_html=True)
+        st.divider()
         
         # Data Status
-        st.markdown('<div class="data-status">', unsafe_allow_html=True)
         st.markdown("#### 📊 Movement Log")
-        st.markdown(get_data_summary())
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.info(get_data_summary())
         
-        # Configuration
+        # Configuration Section
         if not st.session_state.ai_config['initialized']:
-            st.markdown('<div class="config-section">', unsafe_allow_html=True)
-            st.markdown("#### ⚙️ Connect AI")
-            
-            provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="provider_select")
-            model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="model_select")
-            api_key = st.text_input("API Key", type="password", key="api_key_input")
-            
-            if st.button("🔌 Connect", use_container_width=True):
-                if api_key:
-                    st.session_state.ai_config.update({
-                        'provider': provider, 'model': model,
-                        'api_key': api_key, 'initialized': True
-                    })
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.expander("⚙️ Connect AI Provider", expanded=True):
+                provider = st.selectbox("Select Provider", options=list(AI_PROVIDERS.keys()), key="chat_provider")
+                model = st.selectbox("Select Model", options=AI_PROVIDERS[provider]['models'], key="chat_model")
+                api_key = st.text_input("API Key", type="password", key="chat_api_key")
+                
+                if st.button("🔌 Connect", use_container_width=True):
+                    if api_key:
+                        st.session_state.ai_config.update({
+                            'provider': provider,
+                            'model': model,
+                            'api_key': api_key,
+                            'initialized': True
+                        })
+                        st.rerun()
+        
+        st.divider()
         
         # Show stock display if available
         if st.session_state.stock_display:
@@ -1398,75 +1510,73 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         
-        # Chat messages
-        st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
-        for msg in st.session_state.assistant_messages[-8:]:
+        # Chat Messages
+        st.markdown("### 💬 Chat")
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        
+        for msg in st.session_state.chat_messages:
             if msg["role"] == "user":
                 st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="assistant-message">{msg["content"]}</div>', unsafe_allow_html=True)
+        
         st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick actions
+        st.divider()
+        
+        # Quick Actions
+        st.markdown("### Quick Actions")
         st.markdown('<div class="quick-actions">', unsafe_allow_html=True)
-        cols = st.columns(6)
-        actions = [
-            ("📦 Stock", "Show stock levels"),
-            ("⏳ Pending", "Show pending orders"),
-            ("📜 History", "Show recent transactions"),
-            ("📊 Chart", "Show stock chart"),
-            ("📈 Predict", "Predict future stock"),
-            ("📅 Coming", "Show future incoming")
-        ]
-        for i, (label, query) in enumerate(actions):
-            with cols[i]:
-                if st.button(label, key=f"qa_{i}", use_container_width=True):
-                    if label == "📦 Stock":
-                        stock_html = get_stock_response()
-                        st.session_state.stock_display = stock_html
-                        st.session_state.assistant_messages.append({"role": "user", "content": "Show stock levels"})
-                        st.session_state.assistant_messages.append({"role": "assistant", "content": "📊 Here are your current stock levels:"})
-                    else:
-                        st.session_state.button_query = query
-                    st.rerun()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📦 Stock", use_container_width=True):
+                handle_quick_action("Show stock levels")
+            if st.button("📊 Chart", use_container_width=True):
+                handle_quick_action("Show stock chart")
+        with col2:
+            if st.button("⏳ Pending", use_container_width=True):
+                handle_quick_action("Show pending orders")
+            if st.button("📈 Predict", use_container_width=True):
+                handle_quick_action("Predict future stock")
+        with col3:
+            if st.button("📜 History", use_container_width=True):
+                handle_quick_action("Show recent transactions")
+            if st.button("📅 Coming", use_container_width=True):
+                handle_quick_action("Show future incoming")
+        
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Handle button queries
-        if st.session_state.button_query:
-            query = st.session_state.button_query
-            st.session_state.button_query = None
-            st.session_state.assistant_messages.append({"role": "user", "content": query})
+        st.divider()
+        
+        # Chat Input Form
+        with st.form(key="chat_form"):
+            user_input = st.text_input("Type your question here...", key="chat_input")
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                submit = st.form_submit_button("📤 Send", use_container_width=True)
+            with col2:
+                clear = st.form_submit_button("🗑️ Clear Chat", use_container_width=True)
+        
+        # Handle form submissions
+        if submit and user_input:
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
             
             context = prepare_inventory_context()
-            response = get_ai_response(query, context)
-            st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+            response = get_ai_response(user_input, context)
+            
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
             st.rerun()
         
-        # Input section
-        st.markdown('<div class="input-section">', unsafe_allow_html=True)
-        
-        user_input = st.text_input("Ask about inventory...", key="chat_input",
-                                   placeholder="e.g., stock levels, pending orders, show chart")
-        
-        col1, col2 = st.columns([4, 1])
-        with col2:
-            if st.button("Send", use_container_width=True):
-                if user_input:
-                    st.session_state.assistant_messages.append({"role": "user", "content": user_input})
-                    context = prepare_inventory_context()
-                    response = get_ai_response(user_input, context)
-                    st.session_state.assistant_messages.append({"role": "assistant", "content": response})
-                    st.rerun()
-        
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            st.session_state.assistant_messages = [
-                {"role": "assistant", "content": "👋 Chat cleared. Ask me about your inventory!"}
+        if clear:
+            st.session_state.chat_messages = [
+                {"role": "assistant", "content": "👋 Chat cleared. How can I help you?"}
             ]
+            st.session_state.stock_display = None
+            st.session_state.show_chart = None
             st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     # === TAB 3: Rotor Trend ===
 
