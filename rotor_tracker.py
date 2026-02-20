@@ -779,10 +779,10 @@ if tab_choice == "🔁 Rotor Tracker":
     /* Assistant popup - SMALL, RIGHT CORNER */
     .assistant-popup {
         position: fixed;
-        bottom: 90px;
+        bottom: 9px;
         right: 20px;
-        width: 350px;
-        height: 500px;
+        width: 3px;
+        height: 5px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
