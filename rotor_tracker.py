@@ -683,105 +683,80 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # AI ASSISTANT (FLOATING WIDGET)
     # =========================
+    # =========================
+    # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
+    # =========================
+    
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from datetime import datetime, timedelta
     import requests
     import json
-    from datetime import datetime, timedelta
+    import re
     
-    # Available AI Providers
     # =========================
-    # UPDATED AI PROVIDERS CONFIGURATION (WITH GEMINI)
+    # AVAILABLE AI PROVIDERS
     # =========================
-    
     AI_PROVIDERS = {
         "Google Gemini": {
-            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",  # Gemini API endpoint
-            "models": [
-                "gemini-pro",
-                "gemini-1.5-pro",
-                "gemini-1.5-flash",
-                "gemini-1.0-pro"
-            ],
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
+            "models": ["gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash"],
             "default_model": "gemini-pro",
-            "headers": lambda api_key: {
-                "Content-Type": "application/json"
-            },
-            "description": "Google's most capable AI models with 1M token context",
-            "requires_project_id": False,  # Gemini just needs API key in URL
-            "api_key_in_url": True  # Gemini puts API key in URL: ?key=YOUR_API_KEY
+            "headers": lambda api_key: {"Content-Type": "application/json"},
+            "description": "Google's most capable AI models",
+            "api_key_in_url": True
         },
         "Sarvam AI": {
             "base_url": "https://api.sarvam.ai/v1/chat/completions",
-            "models": [
-                "sarvam-m",
-                "sarvam-2b",
-                "sarvam-7b"
-            ],
+            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
             "default_model": "sarvam-m",
-            "headers": lambda api_key: {
-                "api-subscription-key": api_key,
-                "Content-Type": "application/json"
-            },
-            "description": "Indian language focused models with free tier",
-            "requires_project_id": False,
+            "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
+            "description": "Indian language focused models",
             "api_key_in_url": False
         },
         "OpenRouter": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": [
-                "deepseek/deepseek-chat:free",
-                "google/gemini-2.0-flash-exp:free",
-                "microsoft/phi-3.5-mini-128k:free",
-                "meta-llama/llama-3.2-3b-instruct:free"
-            ],
+            "models": ["deepseek/deepseek-chat:free", "google/gemini-2.0-flash-exp:free"],
             "default_model": "deepseek/deepseek-chat:free",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
+            "headers": lambda api_key: {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             "description": "Access to 65+ free models",
-            "requires_project_id": False,
-            "api_key_in_url": False
-        },
-        "Groq": {
-            "base_url": "https://api.groq.com/openai/v1/chat/completions",
-            "models": [
-                "llama3-70b-8192",
-                "llama3-8b-8192",
-                "mixtral-8x7b-32768"
-            ],
-            "default_model": "llama3-70b-8192",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            "description": "Ultra-fast inference (300+ tokens/sec)",
-            "requires_project_id": False,
             "api_key_in_url": False
         }
     }
     
-    # Initialize AI session state
+    # =========================
+    # SESSION STATE INITIALIZATION
+    # =========================
     if 'show_assistant' not in st.session_state:
         st.session_state.show_assistant = False
     
     if 'assistant_messages' not in st.session_state:
         st.session_state.assistant_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. Using data from your Movement Log."}
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I can show charts, predict trends, and analyze your data."}
         ]
     
     if 'ai_config' not in st.session_state:
         st.session_state.ai_config = {
-            'provider': 'Sarvam AI',
-            'model': 'sarvam-m',
+            'provider': 'Google Gemini',
+            'model': 'gemini-pro',
             'api_key': None,
             'initialized': False
         }
     
-    # Custom CSS for floating widget
-    # Update your CSS to give more space for input
+    if 'button_query' not in st.session_state:
+        st.session_state.button_query = None
+    
+    if 'show_chart' not in st.session_state:
+        st.session_state.show_chart = None
+    
+    # =========================
+    # CUSTOM CSS
+    # =========================
     st.markdown("""
     <style>
-    /* Floating button */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
@@ -799,14 +774,12 @@ if tab_choice == "🔁 Rotor Tracker":
         cursor: pointer;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
-    
-    /* Assistant widget - fixed height with proper layout */
     .assistant-widget {
         position: fixed;
         bottom: 90px;
         right: 20px;
-        width: 380px;
-        height: 600px;
+        width: 400px;
+        height: 650px;
         background-color: white;
         border-radius: 10px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
@@ -816,8 +789,6 @@ if tab_choice == "🔁 Rotor Tracker":
         overflow: hidden;
         border: 1px solid #e0e0e0;
     }
-    
-    /* Header - fixed at top */
     .assistant-header {
         padding: 12px 15px;
         background-color: #4CAF50;
@@ -827,8 +798,6 @@ if tab_choice == "🔁 Rotor Tracker":
         align-items: center;
         flex-shrink: 0;
     }
-    
-    /* Content area - scrollable */
     .assistant-content {
         flex: 1;
         overflow-y: auto;
@@ -836,8 +805,13 @@ if tab_choice == "🔁 Rotor Tracker":
         display: flex;
         flex-direction: column;
     }
-    
-    /* Data status - fixed section */
+    .chart-container {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        border-left: 3px solid #2196F3;
+    }
     .data-status {
         margin-bottom: 15px;
         padding: 10px;
@@ -847,8 +821,6 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 12px;
         flex-shrink: 0;
     }
-    
-    /* Config section - fixed */
     .config-section {
         margin-bottom: 15px;
         padding: 10px;
@@ -857,8 +829,6 @@ if tab_choice == "🔁 Rotor Tracker":
         border-left: 3px solid #4CAF50;
         flex-shrink: 0;
     }
-    
-    /* Chat messages - scrollable area */
     .chat-messages {
         flex: 1;
         overflow-y: auto;
@@ -869,8 +839,6 @@ if tab_choice == "🔁 Rotor Tracker":
         min-height: 150px;
         max-height: 250px;
     }
-    
-    /* Message bubbles */
     .user-message {
         background-color: #4CAF50;
         color: white;
@@ -881,7 +849,6 @@ if tab_choice == "🔁 Rotor Tracker":
         float: right;
         clear: both;
         font-size: 13px;
-        word-wrap: break-word;
     }
     .assistant-message {
         background-color: #e0e0e0;
@@ -893,15 +860,12 @@ if tab_choice == "🔁 Rotor Tracker":
         float: left;
         clear: both;
         font-size: 13px;
-        word-wrap: break-word;
     }
     .clearfix::after {
         content: "";
         clear: both;
         display: table;
     }
-    
-    /* Quick actions - fixed at bottom */
     .quick-actions {
         display: flex;
         gap: 5px;
@@ -915,8 +879,6 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 11px;
         padding: 5px;
     }
-    
-    /* Input section - ALWAYS VISIBLE at bottom */
     .input-section {
         flex-shrink: 0;
         margin-top: auto;
@@ -924,33 +886,36 @@ if tab_choice == "🔁 Rotor Tracker":
         padding-top: 10px;
         border-top: 1px solid #eee;
     }
-    .stTextInput {
-        margin-bottom: 5px;
-    }
     .stTextInput > div > input {
         font-size: 14px;
         padding: 8px 12px;
         border-radius: 20px;
         border: 1px solid #ddd;
     }
+    .prediction-badge {
+        background-color: #ff9800;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        margin-left: 5px;
+    }
     </style>
     """, unsafe_allow_html=True)
     
-    # Data preparation functions
+    # =========================
+    # DATA ANALYSIS FUNCTIONS
+    # =========================
+    
     def prepare_inventory_context():
-        """Prepare inventory context from st.session_state.data"""
+        """Prepare inventory context without modifying datetime objects"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return {"error": "No data in Movement Log"}
         
         df = st.session_state.data.copy()
         
-        # Ensure proper data types
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
-        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
-        
-        # Calculate current stock for each size
-        stock_data = []
+        # Calculate stock summary (preserve original dates)
+        stock_summary = []
         for size in df['Size (mm)'].unique():
             if pd.isna(size):
                 continue
@@ -964,14 +929,14 @@ if tab_choice == "🔁 Rotor Tracker":
             pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
             future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
             
-            stock_data.append({
+            stock_summary.append({
                 'size': int(size),
-                'current_stock': int(current_stock) if not pd.isna(current_stock) else 0,
-                'pending_orders': int(pending) if not pd.isna(pending) else 0,
-                'future_incoming': int(future) if not pd.isna(future) else 0
+                'current_stock': int(current_stock),
+                'pending_orders': int(pending),
+                'future_incoming': int(future)
             })
         
-        # Get pending orders by buyer
+        # Get pending orders (without formatting dates)
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         pending_by_buyer = {}
         for buyer in pending_df['Remarks'].unique():
@@ -979,32 +944,42 @@ if tab_choice == "🔁 Rotor Tracker":
                 continue
             buyer_df = pending_df[pending_df['Remarks'] == buyer]
             pending_by_buyer[str(buyer)] = {
-                'total_quantity': int(buyer_df['Quantity'].sum()),
-                'sizes': buyer_df['Size (mm)'].tolist()
+                'total': int(buyer_df['Quantity'].sum()),
+                'orders': [
+                    {'size': int(row['Size (mm)']), 'qty': int(row['Quantity'])}
+                    for _, row in buyer_df.iterrows()
+                ]
             }
         
-        # Get all unique buyers
-        all_buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
+        # Get future incoming (preserve dates)
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+        future_incoming = []
+        for _, row in future_df.iterrows():
+            future_incoming.append({
+                'date': row['Date'],  # Keep as original (datetime or string)
+                'size': int(row['Size (mm)']),
+                'qty': int(row['Quantity']),
+                'supplier': row['Remarks']
+            })
         
-        context = {
+        # Monthly trends
+        df['Month'] = pd.to_datetime(df['Date']).dt.to_period('M').astype(str)
+        monthly_trends = df.groupby(['Month', 'Type']).agg({
+            'Quantity': 'sum'
+        }).reset_index().to_dict('records')
+        
+        return {
             'as_of_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stock_summary': stock_summary,
+            'pending_by_buyer': pending_by_buyer,
+            'future_incoming': future_incoming,
+            'monthly_trends': monthly_trends,
             'total_transactions': len(df),
-            'stock_summary': stock_data,
-            'pending_orders_summary': {
-                'total_pending': int(pending_df['Quantity'].sum()) if not pending_df.empty else 0,
-                'by_buyer': pending_by_buyer
-            },
-            'buyers': [str(b) for b in all_buyers if b and str(b).strip()],
-            'date_range': {
-                'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A',
-                'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A'
-            }
+            'buyers': df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
         }
-        
-        return context
     
     def get_data_summary():
-        """Get quick summary of Movement Log data"""
+        """Get quick summary without date formatting"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return "No data in Movement Log"
         
@@ -1014,289 +989,206 @@ if tab_choice == "🔁 Rotor Tracker":
         buyers = df[df['Type'] == 'Outgoing']['Remarks'].nunique()
         total_qty = df['Quantity'].sum()
         
-        return f"📊 {total} transactions | {sizes} sizes | {buyers} buyers | {total_qty:,} total units"
-    # =========================
-    # TRANSACTION HISTORY FUNCTIONS (ADD THIS)
-    # =========================
-    def get_transaction_history(size=None, buyer=None, days=None, limit=50):
-        """Get transaction history filtered by size, buyer, or time period"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return pd.DataFrame()
-        
-        df = st.session_state.data.copy()
-        
-        # Ensure proper data types
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
-        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
-        
-        # Apply filters
-        if size:
-            df = df[df['Size (mm)'] == size]
-        
-        if buyer:
-            df = df[df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
-        
-        if days:
-            cutoff = datetime.now() - timedelta(days=days)
-            df = df[df['Date'] >= cutoff]
-        
-        # Sort by date (newest first)
-        df = df.sort_values('Date', ascending=False)
-        
-        # Add value calculation if price data is available
-        if 'fixed_prices' in st.session_state:
-            def calculate_value(row):
-                size_val = row['Size (mm)']
-                qty = row['Quantity']
-                if pd.isna(size_val) or pd.isna(qty):
-                    return 0
-                size_int = int(size_val)
-                if size_int in st.session_state.fixed_prices:
-                    return st.session_state.fixed_prices[size_int] * qty
-                elif 'base_rate_per_mm' in st.session_state:
-                    return st.session_state.base_rate_per_mm * size_int * qty
-                return 0
-            
-            df['Value'] = df.apply(calculate_value, axis=1)
-        
-        return df.head(limit)
+        return f"📊 {total} transactions | {sizes} sizes | {buyers} buyers | {total_qty:,} units"
     
-    def format_transaction_history(df, size=None, buyer=None):
-        """Format transaction history for display"""
-        if df.empty:
-            if size and buyer:
-                return f"No transactions found for size {size}mm and buyer '{buyer}'"
-            elif size:
-                return f"No transactions found for size {size}mm"
-            elif buyer:
-                return f"No transactions found for buyer '{buyer}'"
-            else:
-                return "No transactions found"
-        
-        # Create summary stats
-        total_inward = df[df['Type'] == 'Inward']['Quantity'].sum()
-        total_outgoing = df[df['Type'] == 'Outgoing']['Quantity'].sum()
-        net_change = total_inward - total_outgoing
-        
-        response = f"📊 **Transaction History**"
-        
-        if size and buyer:
-            response += f" for Size {size}mm - {buyer}\n\n"
-        elif size:
-            response += f" for Size {size}mm\n\n"
-        elif buyer:
-            response += f" for {buyer}\n\n"
-        else:
-            response += " (All Transactions)\n\n"
-        
-        # Summary metrics
-        response += f"**Summary:**\n"
-        response += f"• Total Inward: {int(total_inward)} units\n"
-        response += f"• Total Outgoing: {int(total_outgoing)} units\n"
-        response += f"• Net Change: {int(net_change)} units\n"
-        response += f"• Transactions: {len(df)}\n\n"
-        
-        # Detailed breakdown by type
-        response += f"**Recent Transactions:**\n"
-        
-        for _, row in df.head(10).iterrows():
-            date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
-            type_icon = "📥" if row['Type'] == 'Inward' else "📤"
-            pending_marker = " ⏳" if row.get('Pending', False) else ""
-            
-            response += f"{type_icon} {date_str} | Size {int(row['Size (mm)'])}mm | "
-            response += f"{int(row['Quantity'])} units | {row['Remarks']}{pending_marker}\n"
-            
-            if 'Value' in row and row['Value'] > 0:
-                response += f"   💰 Value: ₹{row['Value']:,.0f}\n"
-        
-        if len(df) > 10:
-            response += f"\n... and {len(df) - 10} more transactions"
-        
-        return response
-
-    def get_pending_orders_detailed():
-        """Get detailed pending orders data - EXACT what's in the database"""
+    # =========================
+    # CHART GENERATION FUNCTIONS
+    # =========================
+    
+    def create_stock_chart():
+        """Create bar chart of current stock levels"""
         if 'data' not in st.session_state or st.session_state.data.empty:
-            return {"error": "No data"}
+            return None
         
         df = st.session_state.data.copy()
+        stock_data = []
         
-        # Ensure Date column is datetime
-        if 'Date' in df.columns:
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        for size in df['Size (mm)'].unique():
+            if pd.isna(size):
+                continue
+            size_df = df[df['Size (mm)'] == size]
+            total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current_stock = total_inward - total_outgoing
+            
+            if current_stock > 0:
+                stock_data.append({'Size': f"{int(size)}mm", 'Stock': int(current_stock)})
         
-        # Get ONLY pending outgoing orders
+        if not stock_data:
+            return None
+        
+        stock_df = pd.DataFrame(stock_data)
+        fig = px.bar(stock_df, x='Size', y='Stock', title='Current Stock Levels',
+                     color='Stock', color_continuous_scale='greens')
+        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
+    
+    def create_pending_chart():
+        """Create pie chart of pending orders by buyer"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return None
+        
+        df = st.session_state.data
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         
         if pending_df.empty:
-            return {"message": "No pending orders found"}
+            return None
         
-        # Build a detailed structure
-        pending_data = {}
-        
-        for _, row in pending_df.iterrows():
-            buyer = str(row['Remarks']) if pd.notna(row['Remarks']) else "Unknown"
-            size = int(row['Size (mm)']) if pd.notna(row['Size (mm)']) else 0
-            qty = int(row['Quantity']) if pd.notna(row['Quantity']) else 0
-            
-            # Handle date safely
-            date = "Unknown"
-            if pd.notna(row['Date']):
-                try:
-                    # If it's already a datetime object
-                    if hasattr(row['Date'], 'strftime'):
-                        date = row['Date'].strftime('%Y-%m-%d')
-                    else:
-                        # Try to convert to datetime first
-                        date_obj = pd.to_datetime(row['Date'])
-                        date = date_obj.strftime('%Y-%m-%d')
-                except:
-                    date = str(row['Date'])  # Just use the string value
-            
-            if buyer not in pending_data:
-                pending_data[buyer] = {
-                    'total': 0,
-                    'orders': []
-                }
-            
-            pending_data[buyer]['orders'].append({
-                'size': size,
-                'quantity': qty,
-                'date': date
-            })
-            pending_data[buyer]['total'] += qty
-        
-        # Sort orders by size for each buyer
-        for buyer in pending_data:
-            pending_data[buyer]['orders'].sort(key=lambda x: x['size'])
-        
-        return pending_data
+        buyer_totals = pending_df.groupby('Remarks')['Quantity'].sum().reset_index()
+        fig = px.pie(buyer_totals, values='Quantity', names='Remarks', 
+                     title='Pending Orders by Buyer')
+        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
     
-    def format_pending_orders_display(pending_data):
-        """Format pending orders for display in a consistent way"""
-        if "error" in pending_data:
-            return "Unable to fetch pending orders"
+    def create_trend_chart(days=90):
+        """Create line chart of inward/outward trends"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return None
         
-        if "message" in pending_data:
-            return pending_data["message"]
-        
-        response = "📋 **Current Pending Orders:**\n\n"
-        
-        # Sort buyers by name
-        for buyer in sorted(pending_data.keys()):
-            data = pending_data[buyer]
-            response += f"**{buyer}** (Total: {data['total']} units)\n"
-            
-            for order in data['orders']:
-                response += f"  • Size {order['size']}mm: {order['quantity']} units"
-                if order['date'] != "Unknown":
-                    response += f" (from {order['date']})"
-                response += "\n"
-            response += "\n"
-        
-        # Add summary
-        total_pending = sum(data['total'] for data in pending_data.values())
-        total_buyers = len(pending_data)
-        response += f"**Summary:** {total_pending} units pending across {total_buyers} buyers"
-        
-        return response
-    
-    def get_buyer_transaction_summary(buyer_name, days=90):
-        """Get transaction summary for a specific buyer"""
-        df = get_transaction_history(buyer=buyer_name, days=days)
+        df = st.session_state.data.copy()
+        cutoff = datetime.now() - timedelta(days=days)
+        df = df[pd.to_datetime(df['Date']) >= cutoff]
         
         if df.empty:
-            return f"No transactions found for {buyer_name} in the last {days} days"
+            return None
         
-        # Group by size
-        size_summary = df.groupby('Size (mm)').agg({
-            'Quantity': 'sum',
-            'Type': lambda x: list(x)
-        }).reset_index()
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['DateOnly'] = df['Date'].dt.date
         
-        response = f"📊 **Transaction Summary for {buyer_name}** (Last {days} days)\n\n"
+        trends = df.groupby(['DateOnly', 'Type'])['Quantity'].sum().reset_index()
         
-        for _, row in size_summary.iterrows():
-            size = int(row['Size (mm)'])
-            qty = int(row['Quantity'])
-            response += f"• Size {size}mm: {qty} units\n"
+        fig = px.line(trends, x='DateOnly', y='Quantity', color='Type',
+                      title=f'Last {days} Days Activity')
+        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
+    
+    def create_prediction_chart(size=None):
+        """Create prediction chart for future stock"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return None
         
-        response += f"\n**Total:** {int(df['Quantity'].sum())} units"
+        df = st.session_state.data.copy()
         
-        return response
-    def get_ai_response_with_transactions(query, context):
-        """Get response from selected AI provider with transaction handling"""
+        if size:
+            df = df[df['Size (mm)'] == size]
+        
+        if df.empty:
+            return None
+        
+        # Calculate historical daily averages
+        df['Date'] = pd.to_datetime(df['Date'])
+        daily_avg_in = df[df['Type'] == 'Inward'].groupby(df['Date'].dt.date)['Quantity'].mean().mean()
+        daily_avg_out = df[df['Type'] == 'Outgoing'].groupby(df['Date'].dt.date)['Quantity'].mean().mean()
+        
+        # Generate predictions for next 30 days
+        future_dates = [(datetime.now() + timedelta(days=i)).date() for i in range(1, 31)]
+        
+        # Simple moving average prediction
+        pred_data = []
+        current_stock = 0
+        for size_val in df['Size (mm)'].unique():
+            size_df = df[df['Size (mm)'] == size_val]
+            total_in = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current_stock += total_in - total_out
+        
+        for i, date in enumerate(future_dates):
+            pred_in = daily_avg_in * (1 + np.random.normal(0, 0.1))  # Add some noise
+            pred_out = daily_avg_out * (1 + np.random.normal(0, 0.1))
+            current_stock += pred_in - pred_out
+            pred_data.append({'Date': date, 'Predicted Stock': max(0, current_stock)})
+        
+        pred_df = pd.DataFrame(pred_data)
+        fig = px.line(pred_df, x='Date', y='Predicted Stock', 
+                      title='30-Day Stock Prediction')
+        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
+    
+    # =========================
+    # AI RESPONSE FUNCTION
+    # =========================
+    
+    def get_ai_response(query, context):
+        """Get response from selected AI provider"""
         
         query_lower = query.lower()
         
-        # SPECIAL HANDLER FOR "COMING" or "FUTURE" QUERIES
+        # Handle chart requests
+        if 'chart' in query_lower or 'graph' in query_lower or 'visualize' in query_lower:
+            if 'stock' in query_lower:
+                fig = create_stock_chart()
+                if fig:
+                    st.session_state.show_chart = fig
+                    return "📊 Here's your stock chart:"
+            elif 'pending' in query_lower:
+                fig = create_pending_chart()
+                if fig:
+                    st.session_state.show_chart = fig
+                    return "📊 Here's your pending orders chart:"
+            elif 'trend' in query_lower or 'activity' in query_lower:
+                fig = create_trend_chart()
+                if fig:
+                    st.session_state.show_chart = fig
+                    return "📊 Here's your activity trend:"
+            return "I couldn't generate that chart. Try 'stock chart', 'pending chart', or 'trend chart'"
+        
+        # Handle prediction requests
+        if 'predict' in query_lower or 'forecast' in query_lower or 'future' in query_lower:
+            size_match = re.search(r'(\d+)', query_lower)
+            size = int(size_match.group(1)) if size_match else None
+            fig = create_prediction_chart(size)
+            if fig:
+                st.session_state.show_chart = fig
+                return f"📈 Here's your 30-day stock prediction" + (f" for size {size}mm" if size else "")
+        
+        # Handle coming/future requests
         if ('coming' in query_lower or 'future' in query_lower) and ('rotor' in query_lower or 'incoming' in query_lower):
-            if 'data' in st.session_state and not st.session_state.data.empty:
-                df = st.session_state.data.copy()
-                future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
-                
-                if future_df.empty:
-                    return "No future incoming rotors found"
-                
-                # Format response
+            future_items = context.get('future_incoming', [])
+            if future_items:
                 response = "📅 **Future Incoming Rotors:**\n\n"
-                future_df = future_df.sort_values('Date')
-                
-                for _, row in future_df.iterrows():
-                    date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
-                    response += f"• {date_str}: Size {int(row['Size (mm)'])}mm, {int(row['Quantity'])} units from {row['Remarks']}\n"
-                
-                total_qty = future_df['Quantity'].sum()
-                response += f"\n**Total:** {int(total_qty)} units coming"
+                for item in future_items[:10]:
+                    date_str = str(item['date']) if not pd.isna(item['date']) else 'Date TBD'
+                    response += f"• {date_str}: Size {item['size']}mm, {item['qty']} units from {item['supplier']}\n"
+                total = sum(item['qty'] for item in future_items)
+                response += f"\n**Total:** {total} units"
                 return response
+            return "No future incoming rotors found"
         
-        # SPECIAL HANDLER FOR PENDING ORDERS
-        if 'pending' in query_lower and ('order' in query_lower or 'buyer' in query_lower or 'show' in query_lower):
-            pending_data = get_pending_orders_detailed()
-            return format_pending_orders_display(pending_data)
+        # Handle pending requests
+        if 'pending' in query_lower and ('order' in query_lower or 'show' in query_lower):
+            pending = context.get('pending_by_buyer', {})
+            if pending:
+                response = "⏳ **Pending Orders:**\n\n"
+                for buyer, data in pending.items():
+                    response += f"**{buyer}** (Total: {data['total']} units)\n"
+                    for order in data['orders']:
+                        response += f"  • Size {order['size']}mm: {order['qty']} units\n"
+                    response += "\n"
+                total_pending = sum(data['total'] for data in pending.values())
+                response += f"**Summary:** {total_pending} units pending"
+                return response
+            return "No pending orders found"
         
-        # Check for transaction history queries by size
-        import re
-        size_match = re.search(r'\b(\d+)\b', query_lower)
-        if size_match and ('transaction' in query_lower or 'history' in query_lower or 'show' in query_lower):
-            size = int(size_match.group(1))
-            
-            # Check if also asking for specific buyer
-            for buyer in context.get('buyers', []):
-                buyer_lower = str(buyer).lower()
-                if buyer_lower in query_lower:
-                    df = get_transaction_history(size=size, buyer=buyer)
-                    return format_transaction_history(df, size=size, buyer=buyer)
-            
-            # Just size query
-            df = get_transaction_history(size=size)
-            return format_transaction_history(df, size=size)
+        # Handle stock requests
+        if 'stock' in query_lower and ('level' in query_lower or 'show' in query_lower):
+            stock = context.get('stock_summary', [])
+            if stock:
+                response = "📦 **Current Stock Levels:**\n\n"
+                for item in sorted(stock, key=lambda x: x['size']):
+                    if item['current_stock'] > 0:
+                        response += f"• Size {item['size']}mm: {item['current_stock']} units"
+                        if item['pending_orders'] > 0:
+                            response += f" (⚠️ {item['pending_orders']} pending)"
+                        response += "\n"
+                total_stock = sum(item['current_stock'] for item in stock)
+                response += f"\n**Total:** {total_stock} units"
+                return response
+            return "No stock data found"
         
-        # Check for buyer transaction queries
-        for buyer in context.get('buyers', []):
-            buyer_lower = str(buyer).lower()
-            if buyer_lower in query_lower and ('transaction' in query_lower or 'history' in query_lower or 'summary' in query_lower):
-                # Check if also asking for specific size
-                size_match = re.search(r'\b(\d+)\b', query_lower)
-                if size_match:
-                    size = int(size_match.group(1))
-                    df = get_transaction_history(size=size, buyer=buyer)
-                    return format_transaction_history(df, size=size, buyer=buyer)
-                else:
-                    return get_buyer_transaction_summary(buyer)
-        
-        # Check for "recent transactions" or "history" without specific size/buyer
-        if ('recent' in query_lower or 'history' in query_lower) and not size_match:
-            df = get_transaction_history(days=30)
-            return format_transaction_history(df)
-        
-        # If not a special query, proceed with normal AI response
+        # If no special handling, use AI
         config = st.session_state.ai_config
         provider = AI_PROVIDERS[config['provider']]
         
-        # Handle Gemini's different API format
         if provider.get('api_key_in_url', False):
             url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
         else:
@@ -1304,44 +1196,16 @@ if tab_choice == "🔁 Rotor Tracker":
         
         headers = provider['headers'](config['api_key'])
         
-        # Get EXACT pending data to include in context
-        exact_pending = get_pending_orders_detailed()
-        
-        system_prompt = f"""You are an inventory assistant. Use ONLY this data from the Movement Log to answer:
-    
-        INVENTORY DATA:
+        system_prompt = f"""You are an inventory assistant. Use this data:
         {json.dumps(context, indent=2, default=str)}
         
-        EXACT PENDING ORDERS (from database):
-        {json.dumps(exact_pending, indent=2, default=str)}
-    
-        IMPORTANT INSTRUCTIONS:
-        1. For pending orders, use the EXACT data provided above - do NOT calculate or infer
-        2. Format like this for each buyer:
-           • Buyer Name:
-             - Size X mm: Y units
-             - Size Z mm: W units
-             Total: (sum) units
+        Answer questions about inventory, stock levels, and orders.
+        Be concise and helpful."""
         
-        3. Do NOT combine multiple sizes into one total
-        4. Sort sizes from smallest to largest
-        5. Be concise but detailed
-        """
-        
-        # Format messages based on provider
         if "gemini" in config['provider'].lower():
             data = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": f"{system_prompt}\n\nUser Query: {query}"}
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "maxOutputTokens": 800
-                }
+                "contents": [{"parts": [{"text": f"{system_prompt}\n\nUser: {query}"}]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500}
             }
         else:
             data = {
@@ -1351,33 +1215,23 @@ if tab_choice == "🔁 Rotor Tracker":
                     {"role": "user", "content": query}
                 ],
                 "temperature": 0.1,
-                "max_tokens": 800
+                "max_tokens": 500
             }
         
         try:
-            response = requests.post(
-                url,
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             if response.status_code == 200:
                 result = response.json()
-                
                 if "gemini" in config['provider'].lower():
-                    if 'candidates' in result:
-                        return result['candidates'][0]['content']['parts'][0]['text']
-                    else:
-                        return "No response from Gemini"
-                else:
-                    return result['choices'][0]['message']['content']
-            else:
-                return f"Error {response.status_code}: {response.text[:200]}"
+                    return result['candidates'][0]['content']['parts'][0]['text']
+                return result['choices'][0]['message']['content']
+            return f"Error: {response.status_code}"
         except Exception as e:
-            return f"Connection error: {str(e)}"
+            return f"Connection error"
     
-    # Floating button
+    # =========================
+    # FLOATING BUTTON
+    # =========================
     st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -1386,7 +1240,9 @@ if tab_choice == "🔁 Rotor Tracker":
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Assistant widget
+    # =========================
+    # ASSISTANT WIDGET
+    # =========================
     if st.session_state.show_assistant:
         st.markdown('<div class="assistant-widget">', unsafe_allow_html=True)
         
@@ -1394,11 +1250,10 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown(f'''
         <div class="assistant-header">
             <span>🤖 AI Assistant</span>
-            <button onclick="document.querySelector('button[data-testid=\"close_assistant\"]').click()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer;">✖️</button>
+            <button onclick="document.querySelector('button[data-testid=\"close_assistant\"]').click()">✖️</button>
         </div>
         ''', unsafe_allow_html=True)
         
-        # Hidden close button
         if st.button("Close", key="close_assistant"):
             st.session_state.show_assistant = False
             st.rerun()
@@ -1407,149 +1262,98 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # Data Status
         st.markdown('<div class="data-status">', unsafe_allow_html=True)
-        st.markdown("#### 📊 Movement Log Data")
+        st.markdown("#### 📊 Movement Log")
         st.markdown(get_data_summary())
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Configuration Section
-        st.markdown('<div class="config-section">', unsafe_allow_html=True)
-        st.markdown("#### ⚙️ AI Configuration")
+        # Configuration
+        if not st.session_state.ai_config['initialized']:
+            st.markdown('<div class="config-section">', unsafe_allow_html=True)
+            st.markdown("#### ⚙️ Connect AI")
+            
+            provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="provider_select")
+            model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="model_select")
+            api_key = st.text_input("API Key", type="password", key="api_key_input")
+            
+            if st.button("🔌 Connect", use_container_width=True):
+                if api_key:
+                    st.session_state.ai_config.update({
+                        'provider': provider, 'model': model,
+                        'api_key': api_key, 'initialized': True
+                    })
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        provider = st.selectbox(
-            "Select AI Provider",
-            options=list(AI_PROVIDERS.keys()),
-            index=0,
-            key="provider_select"
-        )
-        
-        st.caption(AI_PROVIDERS[provider]['description'])
-        
-        model = st.selectbox(
-            "Select Model",
-            options=AI_PROVIDERS[provider]['models'],
-            key="model_select"
-        )
-        
-        api_key = st.text_input(
-            "Enter your API Key",
-            type="password",
-            placeholder="Enter your API key...",
-            key="api_key_input"
-        )
-        
-        if st.button("🔌 Connect", key="connect_ai", use_container_width=True):
-            if api_key:
-                st.session_state.ai_config.update({
-                    'provider': provider,
-                    'model': model,
-                    'api_key': api_key,
-                    'initialized': True
-                })
-                st.session_state.assistant_messages.append({
-                    "role": "assistant", 
-                    "content": f"✅ Connected to {provider} with model {model}"
-                })
+        # Show chart if generated
+        if st.session_state.show_chart:
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.plotly_chart(st.session_state.show_chart, use_container_width=True)
+            if st.button("Close Chart"):
+                st.session_state.show_chart = None
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Chat messages
+        st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
+        for msg in st.session_state.assistant_messages[-8:]:
+            if msg["role"] == "user":
+                st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
             else:
-                st.warning("Please enter an API key")
-        
-        if st.session_state.ai_config['initialized']:
-            if st.button("⏹️ Disconnect", key="disconnect_ai", use_container_width=True):
-                st.session_state.ai_config['initialized'] = False
-                st.session_state.ai_config['api_key'] = None
-                st.session_state.assistant_messages = [{
-                    "role": "assistant", 
-                    "content": "👋 Disconnected. Select a model and connect to continue."
-                }]
-                st.rerun()
-        
+                st.markdown(f'<div class="assistant-message">{msg["content"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Chat section
-        if st.session_state.ai_config['initialized']:
-            context = prepare_inventory_context()
+        # Quick actions
+        st.markdown('<div class="quick-actions">', unsafe_allow_html=True)
+        cols = st.columns(6)
+        actions = [
+            ("📦 Stock", "Show stock levels"),
+            ("⏳ Pending", "Show pending orders"),
+            ("📜 History", "Show recent transactions"),
+            ("📊 Chart", "Show stock chart"),
+            ("📈 Predict", "Predict future stock"),
+            ("📅 Coming", "Show future incoming")
+        ]
+        for i, (label, query) in enumerate(actions):
+            with cols[i]:
+                if st.button(label, key=f"qa_{i}", use_container_width=True):
+                    st.session_state.button_query = query
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Handle button queries
+        if st.session_state.button_query:
+            query = st.session_state.button_query
+            st.session_state.button_query = None
+            st.session_state.assistant_messages.append({"role": "user", "content": query})
             
-            if "error" in context:
-                st.warning("⚠️ No data in Movement Log. Please add some transactions.")
-            else:
-                st.success(f"✅ Connected to {st.session_state.ai_config['provider']}")
-                
-                st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
-                for msg in st.session_state.assistant_messages[-8:]:
-                    if msg["role"] == "user":
-                        st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="assistant-message">{msg["content"]}</div>', unsafe_allow_html=True)
-                st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Quick action buttons
-                # Quick action buttons
-                col1, col2, col3, col4, col5, col6 = st.columns(6)
-                
-                # Use session state to store button clicks
-                if 'button_query' not in st.session_state:
-                    st.session_state.button_query = None
-                
-                with col1:
-                    if st.button("📦 Stock", key="qa_stock", use_container_width=True):
-                        st.session_state.button_query = "Show current stock levels for all sizes"
-                
-                with col2:
-                    if st.button("⏳ Pending", key="qa_pending", use_container_width=True):
-                        # Direct database query for pending orders (no AI)
-                        pending_data = get_pending_orders_detailed()
-                        response = format_pending_orders_display(pending_data)
-                        st.session_state.assistant_messages.append({"role": "user", "content": "Show pending orders"})
-                        st.session_state.assistant_messages.append({"role": "assistant", "content": response})
-                        st.rerun()
-                
-                with col3:
-                    if st.button("📜 History", key="qa_history", use_container_width=True):
-                        st.session_state.button_query = "Show recent transactions from the last 30 days"
-                
-                with col4:
-                    if st.button("🔍 By Size", key="qa_size", use_container_width=True):
-                        # Get available sizes from context
-                        if 'stock_summary' in context and context['stock_summary']:
-                            sizes = [s['size'] for s in context['stock_summary']]
-                            if sizes:
-                                # Use the most common size or first size
-                                most_common_size = max(set(sizes), key=sizes.count) if sizes else sizes[0]
-                                st.session_state.button_query = f"Show transactions for size {most_common_size}mm"
-                            else:
-                                st.session_state.button_query = "Show transactions for size 1803mm"  # Default
-                        else:
-                            st.session_state.button_query = "Show transactions for size 1803mm"  # Default
-                
-                with col5:
-                    if st.button("📅 Coming", key="qa_coming", use_container_width=True):
-                        st.session_state.button_query = "Show future incoming rotors with expected dates"
-                
-                with col6:
-                    if st.button("🧹 Clear", key="qa_clear", use_container_width=True):
-                        st.session_state.assistant_messages = [
-                            {"role": "assistant", "content": "👋 Chat cleared. Ask me about your inventory!"}
-                        ]
-                        st.session_state.button_query = None
-                        st.rerun()
-                
-                # Handle button queries
-                if st.session_state.button_query:
-                    query = st.session_state.button_query
-                    st.session_state.button_query = None  # Reset
-                    
-                    st.session_state.assistant_messages.append({"role": "user", "content": query})
-                    
-                    with st.spinner("Thinking..."):
-                        # Check if this is a pending query (already handled above)
-                        if "pending" not in query.lower():
-                            context = prepare_inventory_context()
-                            response = get_ai_response_with_transactions(query, context)
-                            st.session_state.assistant_messages.append({"role": "assistant", "content": response})
-                    
+            context = prepare_inventory_context()
+            response = get_ai_response(query, context)
+            st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+            st.rerun()
+        
+        # Input section
+        st.markdown('<div class="input-section">', unsafe_allow_html=True)
+        
+        user_input = st.text_input("Ask about inventory...", key="chat_input",
+                                   placeholder="e.g., stock levels, pending orders, show chart")
+        
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("Send", use_container_width=True):
+                if user_input:
+                    st.session_state.assistant_messages.append({"role": "user", "content": user_input})
+                    context = prepare_inventory_context()
+                    response = get_ai_response(user_input, context)
+                    st.session_state.assistant_messages.append({"role": "assistant", "content": response})
                     st.rerun()
         
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.assistant_messages = [
+                {"role": "assistant", "content": "👋 Chat cleared. Ask me about your inventory!"}
+            ]
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     # === TAB 3: Rotor Trend ===
