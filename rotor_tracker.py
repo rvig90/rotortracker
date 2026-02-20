@@ -687,11 +687,14 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
-    import plotly.express as px
-    import plotly.graph_objects as go
+    import altair as alt
     from datetime import datetime, timedelta
     import requests
     import json
@@ -752,34 +755,116 @@ if tab_choice == "🔁 Rotor Tracker":
     if 'show_chart' not in st.session_state:
         st.session_state.show_chart = None
     
+    if 'stock_display' not in st.session_state:
+        st.session_state.stock_display = None
+    
     # =========================
     # CUSTOM CSS
     # =========================
     st.markdown("""
     <style>
+    /* Fix white screen issue */
+    .stApp {
+        background-color: #f0f2f6;
+    }
+    
+    /* Main container styling */
+    .main > div {
+        padding: 1rem;
+        background-color: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    /* Stock display grid */
+    .stock-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    
+    .stock-card {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #4CAF50;
+        transition: transform 0.2s;
+    }
+    
+    .stock-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .stock-size {
+        font-size: 18px;
+        font-weight: bold;
+        color: #1e1e1e;
+        margin-bottom: 8px;
+    }
+    
+    .stock-quantity {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4CAF50;
+        margin-bottom: 5px;
+    }
+    
+    .stock-pending {
+        font-size: 12px;
+        color: #ff9800;
+        background: #fff3e0;
+        padding: 3px 8px;
+        border-radius: 12px;
+        display: inline-block;
+    }
+    
+    .stock-warning {
+        border-left-color: #ff9800;
+    }
+    
+    .stock-critical {
+        border-left-color: #f44336;
+    }
+    
+    /* Floating button */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
         right: 20px;
         z-index: 9999;
     }
+    
     .floating-btn {
         background-color: #4CAF50;
         color: white;
         border: none;
         border-radius: 50px;
-        padding: 12px 20px;
+        padding: 12px 24px;
         font-size: 14px;
         font-weight: bold;
         cursor: pointer;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        transition: all 0.3s;
     }
+    
+    .floating-btn:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+    
+    /* Assistant widget */
     .assistant-widget {
         position: fixed;
         bottom: 90px;
         right: 20px;
         width: 400px;
-        height: 650px;
+        height: 600px;
         background-color: white;
         border-radius: 10px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
@@ -789,6 +874,7 @@ if tab_choice == "🔁 Rotor Tracker":
         overflow: hidden;
         border: 1px solid #e0e0e0;
     }
+    
     .assistant-header {
         padding: 12px 15px;
         background-color: #4CAF50;
@@ -798,6 +884,7 @@ if tab_choice == "🔁 Rotor Tracker":
         align-items: center;
         flex-shrink: 0;
     }
+    
     .assistant-content {
         flex: 1;
         overflow-y: auto;
@@ -805,6 +892,7 @@ if tab_choice == "🔁 Rotor Tracker":
         display: flex;
         flex-direction: column;
     }
+    
     .chart-container {
         margin-bottom: 15px;
         padding: 10px;
@@ -812,6 +900,7 @@ if tab_choice == "🔁 Rotor Tracker":
         border-radius: 8px;
         border-left: 3px solid #2196F3;
     }
+    
     .data-status {
         margin-bottom: 15px;
         padding: 10px;
@@ -821,6 +910,7 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 12px;
         flex-shrink: 0;
     }
+    
     .config-section {
         margin-bottom: 15px;
         padding: 10px;
@@ -829,6 +919,7 @@ if tab_choice == "🔁 Rotor Tracker":
         border-left: 3px solid #4CAF50;
         flex-shrink: 0;
     }
+    
     .chat-messages {
         flex: 1;
         overflow-y: auto;
@@ -839,6 +930,7 @@ if tab_choice == "🔁 Rotor Tracker":
         min-height: 150px;
         max-height: 250px;
     }
+    
     .user-message {
         background-color: #4CAF50;
         color: white;
@@ -849,7 +941,9 @@ if tab_choice == "🔁 Rotor Tracker":
         float: right;
         clear: both;
         font-size: 13px;
+        word-wrap: break-word;
     }
+    
     .assistant-message {
         background-color: #e0e0e0;
         color: black;
@@ -860,12 +954,15 @@ if tab_choice == "🔁 Rotor Tracker":
         float: left;
         clear: both;
         font-size: 13px;
+        word-wrap: break-word;
     }
+    
     .clearfix::after {
         content: "";
         clear: both;
         display: table;
     }
+    
     .quick-actions {
         display: flex;
         gap: 5px;
@@ -873,12 +970,14 @@ if tab_choice == "🔁 Rotor Tracker":
         flex-wrap: wrap;
         flex-shrink: 0;
     }
+    
     .quick-actions button {
         flex: 1;
         min-width: 60px;
         font-size: 11px;
         padding: 5px;
     }
+    
     .input-section {
         flex-shrink: 0;
         margin-top: auto;
@@ -886,12 +985,14 @@ if tab_choice == "🔁 Rotor Tracker":
         padding-top: 10px;
         border-top: 1px solid #eee;
     }
+    
     .stTextInput > div > input {
         font-size: 14px;
         padding: 8px 12px;
         border-radius: 20px;
         border: 1px solid #ddd;
     }
+    
     .prediction-badge {
         background-color: #ff9800;
         color: white;
@@ -899,6 +1000,12 @@ if tab_choice == "🔁 Rotor Tracker":
         border-radius: 12px;
         font-size: 10px;
         margin-left: 5px;
+    }
+    
+    /* Ensure main content has proper background */
+    .block-container {
+        background-color: #f0f2f6;
+        padding: 2rem 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -914,7 +1021,7 @@ if tab_choice == "🔁 Rotor Tracker":
         
         df = st.session_state.data.copy()
         
-        # Calculate stock summary (preserve original dates)
+        # Calculate stock summary
         stock_summary = []
         for size in df['Size (mm)'].unique():
             if pd.isna(size):
@@ -936,7 +1043,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 'future_incoming': int(future)
             })
         
-        # Get pending orders (without formatting dates)
+        # Get pending orders
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         pending_by_buyer = {}
         for buyer in pending_df['Remarks'].unique():
@@ -951,35 +1058,28 @@ if tab_choice == "🔁 Rotor Tracker":
                 ]
             }
         
-        # Get future incoming (preserve dates)
+        # Get future incoming
         future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
         future_incoming = []
         for _, row in future_df.iterrows():
             future_incoming.append({
-                'date': row['Date'],  # Keep as original (datetime or string)
+                'date': row['Date'],
                 'size': int(row['Size (mm)']),
                 'qty': int(row['Quantity']),
                 'supplier': row['Remarks']
             })
-        
-        # Monthly trends
-        df['Month'] = pd.to_datetime(df['Date']).dt.to_period('M').astype(str)
-        monthly_trends = df.groupby(['Month', 'Type']).agg({
-            'Quantity': 'sum'
-        }).reset_index().to_dict('records')
         
         return {
             'as_of_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'stock_summary': stock_summary,
             'pending_by_buyer': pending_by_buyer,
             'future_incoming': future_incoming,
-            'monthly_trends': monthly_trends,
             'total_transactions': len(df),
             'buyers': df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
         }
     
     def get_data_summary():
-        """Get quick summary without date formatting"""
+        """Get quick summary"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return "No data in Movement Log"
         
@@ -990,6 +1090,85 @@ if tab_choice == "🔁 Rotor Tracker":
         total_qty = df['Quantity'].sum()
         
         return f"📊 {total} transactions | {sizes} sizes | {buyers} buyers | {total_qty:,} units"
+    
+    # =========================
+    # STOCK DISPLAY FUNCTIONS
+    # =========================
+    
+    def format_stock_display(stock_data):
+        """Format stock levels in a beautiful grid"""
+        if not stock_data:
+            return "No stock data available"
+        
+        html = '<div class="stock-grid">'
+        
+        for item in sorted(stock_data, key=lambda x: x['size']):
+            card_class = "stock-card"
+            if item['current_stock'] < 10:
+                card_class += " stock-critical"
+            elif item['pending_orders'] > item['current_stock'] * 0.5:
+                card_class += " stock-warning"
+            
+            html += f"""
+            <div class="{card_class}">
+                <div class="stock-size">{item['size']}mm</div>
+                <div class="stock-quantity">{item['current_stock']:,} units</div>
+            """
+            
+            if item['pending_orders'] > 0:
+                html += f'<div class="stock-pending">⏳ {item["pending_orders"]} pending</div>'
+            
+            if item['future_incoming'] > 0:
+                html += f'<div style="font-size:11px; color:#2196F3; margin-top:5px;">📅 {item["future_incoming"]} coming</div>'
+            
+            html += "</div>"
+        
+        html += "</div>"
+        
+        total_stock = sum(item['current_stock'] for item in stock_data)
+        total_pending = sum(item['pending_orders'] for item in stock_data)
+        total_future = sum(item['future_incoming'] for item in stock_data)
+        
+        html += f"""
+        <div style="margin-top:20px; padding:15px; background:#e8f5e9; border-radius:8px;">
+            <strong>📊 Summary:</strong> {total_stock:,} total units | 
+            ⏳ {total_pending:,} pending | 
+            📅 {total_future:,} incoming
+        </div>
+        """
+        
+        return html
+    
+    def get_stock_response():
+        """Get formatted stock levels"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return "No data available"
+        
+        df = st.session_state.data.copy()
+        stock_data = []
+        
+        for size in sorted(df['Size (mm)'].unique()):
+            if pd.isna(size):
+                continue
+            
+            size_df = df[df['Size (mm)'] == size]
+            
+            total_inward = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_outgoing = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current_stock = total_inward - total_outgoing
+            
+            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
+            future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+            
+            if current_stock > 0 or pending > 0 or future > 0:
+                stock_data.append({
+                    'size': int(size),
+                    'current_stock': int(current_stock),
+                    'pending_orders': int(pending),
+                    'future_incoming': int(future)
+                })
+        
+        return format_stock_display(stock_data)
     
     # =========================
     # CHART GENERATION FUNCTIONS
@@ -1018,13 +1197,18 @@ if tab_choice == "🔁 Rotor Tracker":
             return None
         
         stock_df = pd.DataFrame(stock_data)
-        fig = px.bar(stock_df, x='Size', y='Stock', title='Current Stock Levels',
-                     color='Stock', color_continuous_scale='greens')
-        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-        return fig
+        chart = alt.Chart(stock_df).mark_bar(color='#4CAF50').encode(
+            x=alt.X('Size', sort=None, axis=alt.Axis(labelAngle=-45)),
+            y='Stock',
+            tooltip=['Size', 'Stock']
+        ).properties(
+            title='Current Stock Levels',
+            height=300
+        ).interactive()
+        return chart
     
     def create_pending_chart():
-        """Create pie chart of pending orders by buyer"""
+        """Create bar chart of pending orders by buyer"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return None
         
@@ -1035,10 +1219,17 @@ if tab_choice == "🔁 Rotor Tracker":
             return None
         
         buyer_totals = pending_df.groupby('Remarks')['Quantity'].sum().reset_index()
-        fig = px.pie(buyer_totals, values='Quantity', names='Remarks', 
-                     title='Pending Orders by Buyer')
-        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-        return fig
+        buyer_totals.columns = ['Buyer', 'Quantity']
+        
+        chart = alt.Chart(buyer_totals).mark_bar(color='#FF9800').encode(
+            x='Buyer',
+            y='Quantity',
+            tooltip=['Buyer', 'Quantity']
+        ).properties(
+            title='Pending Orders by Buyer',
+            height=300
+        ).interactive()
+        return chart
     
     def create_trend_chart(days=90):
         """Create line chart of inward/outward trends"""
@@ -1057,10 +1248,16 @@ if tab_choice == "🔁 Rotor Tracker":
         
         trends = df.groupby(['DateOnly', 'Type'])['Quantity'].sum().reset_index()
         
-        fig = px.line(trends, x='DateOnly', y='Quantity', color='Type',
-                      title=f'Last {days} Days Activity')
-        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-        return fig
+        chart = alt.Chart(trends).mark_line().encode(
+            x='DateOnly:T',
+            y='Quantity:Q',
+            color='Type:N',
+            tooltip=['DateOnly', 'Type', 'Quantity']
+        ).properties(
+            title=f'Last {days} Days Activity',
+            height=300
+        ).interactive()
+        return chart
     
     def create_prediction_chart(size=None):
         """Create prediction chart for future stock"""
@@ -1075,15 +1272,12 @@ if tab_choice == "🔁 Rotor Tracker":
         if df.empty:
             return None
         
-        # Calculate historical daily averages
         df['Date'] = pd.to_datetime(df['Date'])
         daily_avg_in = df[df['Type'] == 'Inward'].groupby(df['Date'].dt.date)['Quantity'].mean().mean()
         daily_avg_out = df[df['Type'] == 'Outgoing'].groupby(df['Date'].dt.date)['Quantity'].mean().mean()
         
-        # Generate predictions for next 30 days
         future_dates = [(datetime.now() + timedelta(days=i)).date() for i in range(1, 31)]
         
-        # Simple moving average prediction
         pred_data = []
         current_stock = 0
         for size_val in df['Size (mm)'].unique():
@@ -1092,17 +1286,23 @@ if tab_choice == "🔁 Rotor Tracker":
             total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
             current_stock += total_in - total_out
         
-        for i, date in enumerate(future_dates):
-            pred_in = daily_avg_in * (1 + np.random.normal(0, 0.1))  # Add some noise
+        for date in future_dates:
+            pred_in = daily_avg_in * (1 + np.random.normal(0, 0.1))
             pred_out = daily_avg_out * (1 + np.random.normal(0, 0.1))
             current_stock += pred_in - pred_out
             pred_data.append({'Date': date, 'Predicted Stock': max(0, current_stock)})
         
         pred_df = pd.DataFrame(pred_data)
-        fig = px.line(pred_df, x='Date', y='Predicted Stock', 
-                      title='30-Day Stock Prediction')
-        fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-        return fig
+        
+        chart = alt.Chart(pred_df).mark_line(color='#2196F3').encode(
+            x='Date:T',
+            y='Predicted Stock:Q',
+            tooltip=['Date', 'Predicted Stock']
+        ).properties(
+            title='30-Day Stock Prediction',
+            height=300
+        ).interactive()
+        return chart
     
     # =========================
     # AI RESPONSE FUNCTION
@@ -1112,6 +1312,14 @@ if tab_choice == "🔁 Rotor Tracker":
         """Get response from selected AI provider"""
         
         query_lower = query.lower()
+        
+        # Handle stock requests with beautiful display
+        if 'stock' in query_lower and ('level' in query_lower or 'show' in query_lower):
+            stock_html = get_stock_response()
+            if stock_html:
+                st.session_state.stock_display = stock_html
+                return "📊 **Current Stock Levels:**"
+            return "No stock data found"
         
         # Handle chart requests
         if 'chart' in query_lower or 'graph' in query_lower or 'visualize' in query_lower:
@@ -1168,22 +1376,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 response += f"**Summary:** {total_pending} units pending"
                 return response
             return "No pending orders found"
-        
-        # Handle stock requests
-        if 'stock' in query_lower and ('level' in query_lower or 'show' in query_lower):
-            stock = context.get('stock_summary', [])
-            if stock:
-                response = "📦 **Current Stock Levels:**\n\n"
-                for item in sorted(stock, key=lambda x: x['size']):
-                    if item['current_stock'] > 0:
-                        response += f"• Size {item['size']}mm: {item['current_stock']} units"
-                        if item['pending_orders'] > 0:
-                            response += f" (⚠️ {item['pending_orders']} pending)"
-                        response += "\n"
-                total_stock = sum(item['current_stock'] for item in stock)
-                response += f"\n**Total:** {total_stock} units"
-                return response
-            return "No stock data found"
         
         # If no special handling, use AI
         config = st.session_state.ai_config
@@ -1250,7 +1442,7 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown(f'''
         <div class="assistant-header">
             <span>🤖 AI Assistant</span>
-            <button onclick="document.querySelector('button[data-testid=\"close_assistant\"]').click()">✖️</button>
+            <button onclick="document.querySelector('button[data-testid=\"close_assistant\"]').click()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer;">✖️</button>
         </div>
         ''', unsafe_allow_html=True)
         
@@ -1284,10 +1476,17 @@ if tab_choice == "🔁 Rotor Tracker":
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         
+        # Show stock display if available
+        if st.session_state.stock_display:
+            st.markdown(st.session_state.stock_display, unsafe_allow_html=True)
+            if st.button("Close Stock View"):
+                st.session_state.stock_display = None
+                st.rerun()
+        
         # Show chart if generated
         if st.session_state.show_chart:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.plotly_chart(st.session_state.show_chart, use_container_width=True)
+            st.altair_chart(st.session_state.show_chart, use_container_width=True)
             if st.button("Close Chart"):
                 st.session_state.show_chart = None
                 st.rerun()
@@ -1317,7 +1516,14 @@ if tab_choice == "🔁 Rotor Tracker":
         for i, (label, query) in enumerate(actions):
             with cols[i]:
                 if st.button(label, key=f"qa_{i}", use_container_width=True):
-                    st.session_state.button_query = query
+                    if label == "📦 Stock":
+                        stock_html = get_stock_response()
+                        st.session_state.stock_display = stock_html
+                        st.session_state.assistant_messages.append({"role": "user", "content": "Show stock levels"})
+                        st.session_state.assistant_messages.append({"role": "assistant", "content": "📊 Here are your current stock levels:"})
+                    else:
+                        st.session_state.button_query = query
+                    st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Handle button queries
