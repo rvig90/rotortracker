@@ -764,42 +764,154 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # SEMI-TRANSPARENT ASSISTANT
     # =========================
+    # =========================
+    # FIX AI ASSISTANT WIDGET BACKGROUND
+    # =========================
     st.markdown("""
     <style>
+    /* Assistant widget - match gradient theme */
     .assistant-widget {
-        background: rgba(0, 0, 0, 0.8) !important;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%) !important;
         backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        color: white !important;
+    }
+    
+    /* Make all text white inside assistant */
+    .assistant-widget * {
+        color: white !important;
+    }
+    
+    /* Chat messages area - semi-transparent */
+    .chat-messages {
+        background: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255,255,255,0.1) !important;
     }
     
-    .assistant-header {
-        background: rgba(0, 0, 0, 0.3) !important;
-        border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-    }
-    
-    .chat-messages {
-        background: rgba(255,255,255,0.05) !important;
-    }
-    
-    .user-message {
-        background: #4CAF50 !important;
-    }
-    
+    /* Assistant messages - keep dark text for readability */
     .assistant-message {
-        background: rgba(255,255,255,0.1) !important;
+        background: white !important;
+        color: #333 !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* User messages - keep gradient */
+    .user-message {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+    }
+    
+    /* Data status card - transparent */
+    .data-status {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(5px) !important;
+        border-left: 4px solid white !important;
         color: white !important;
     }
     
-    /* Make all text white */
-    .assistant-widget, .assistant-widget * {
+    /* Config section - transparent */
+    .config-section {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(5px) !important;
+        border-left: 4px solid white !important;
+    }
+    
+    /* Stock cards inside assistant */
+    .assistant-widget .stock-card {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(5px) !important;
+        border-left: 4px solid white !important;
+    }
+    
+    .assistant-widget .stock-card .stock-size,
+    .assistant-widget .stock-card .stock-quantity {
         color: white !important;
     }
     
-    /* Input fields */
-    .stTextInput > div > input {
-        background: rgba(255,255,255,0.1) !important;
+    /* Quick action buttons */
+    .quick-actions button {
+        background: rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
         color: white !important;
-        border-color: rgba(255,255,255,0.2) !important;
+    }
+    
+    .quick-actions button:hover {
+        background: white !important;
+        color: #667eea !important;
+    }
+    
+    /* Input field */
+    .input-section .stTextInput > div > input {
+        background: rgba(255, 255, 255, 0.15) !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+        color: white !important;
+    }
+    
+    .input-section .stTextInput > div > input::placeholder {
+        color: rgba(255,255,255,0.7) !important;
+    }
+    
+    /* Send button */
+    .input-section .stButton button {
+        background: white !important;
+        color: #667eea !important;
+        border: none !important;
+    }
+    
+    .input-section .stButton button:hover {
+        background: rgba(255,255,255,0.9) !important;
+    }
+    
+    /* Clear chat button */
+    .input-section .stButton button:last-child {
+        background: rgba(255,255,255,0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+    }
+    
+    .input-section .stButton button:last-child:hover {
+        background: rgba(255,255,255,0.3) !important;
+    }
+    
+    /* Stock summary */
+    .stock-summary {
+        background: rgba(255, 255, 255, 0.2) !important;
+        backdrop-filter: blur(5px) !important;
+        color: white !important;
+    }
+    
+    /* Chart container */
+    .chart-container {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(5px) !important;
+    }
+    
+    /* Close buttons */
+    .assistant-widget button {
+        background: rgba(255,255,255,0.2) !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+        color: white !important;
+    }
+    
+    .assistant-widget button:hover {
+        background: rgba(255,255,255,0.3) !important;
+    }
+    
+    /* Select boxes */
+    .assistant-widget .stSelectbox > div > div {
+        background: rgba(255,255,255,0.15) !important;
+        color: white !important;
+        border-color: rgba(255,255,255,0.3) !important;
+    }
+    
+    .assistant-widget .stSelectbox svg {
+        fill: white !important;
+    }
+    
+    /* Hide any remaining white backgrounds */
+    .assistant-widget div:not(.user-message):not(.assistant-message) {
+        background: transparent !important;
     }
     </style>
     """, unsafe_allow_html=True)
