@@ -699,6 +699,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # CLEAN AI ASSISTANT - NO WHITE OVERLAY
     # =========================
     
+    # =========================
+    # FIXED AI ASSISTANT - SMALL POPUP, WORKING AI
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -747,7 +751,7 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # CSS - NO WHITE OVERLAY
+    # CSS - SMALL POPUP, NO OVERLAY
     # =========================
     st.markdown("""
     <style>
@@ -756,7 +760,7 @@ if tab_choice == "🔁 Rotor Tracker":
         position: fixed;
         bottom: 20px;
         right: 20px;
-        z-index: 9999;
+        z-index: 1000;
     }
     
     .floating-btn {
@@ -769,19 +773,20 @@ if tab_choice == "🔁 Rotor Tracker":
         font-weight: bold;
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 1000;
     }
     
-    /* Assistant popup - CLEAN, NO OVERLAY */
+    /* Assistant popup - SMALL, RIGHT CORNER */
     .assistant-popup {
         position: fixed;
         bottom: 90px;
         right: 20px;
-        width: 380px;
-        height: 550px;
+        width: 350px;
+        height: 500px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-        z-index: 9998;
+        z-index: 1001;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -792,58 +797,75 @@ if tab_choice == "🔁 Rotor Tracker":
     .popup-header {
         background: #4CAF50;
         color: white;
-        padding: 15px 20px;
+        padding: 12px 15px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-weight: bold;
     }
     
     .popup-header button {
         background: none;
         border: none;
         color: white;
-        font-size: 20px;
+        font-size: 18px;
         cursor: pointer;
+        padding: 0 5px;
     }
     
     /* Content */
     .popup-content {
         flex: 1;
-        padding: 15px;
+        padding: 12px;
         overflow-y: auto;
         background: white;
     }
     
-    /* Chat messages */
+    /* Status bar */
+    .status-bar {
+        background: #f0f2f6;
+        padding: 6px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    
+    /* Chat area - FIXED HEIGHT */
     .chat-area {
-        height: 250px;
+        height: 220px;
         overflow-y: auto;
-        padding: 10px;
-        background: #f5f5f5;
+        padding: 8px;
+        background: #f9f9f9;
         border-radius: 8px;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #eee;
     }
     
     .user-msg {
         background: #4CAF50;
         color: white;
-        padding: 8px 12px;
+        padding: 6px 10px;
         border-radius: 15px 15px 0 15px;
-        margin: 5px 0;
+        margin: 4px 0;
         max-width: 85%;
         float: right;
         clear: both;
+        font-size: 12px;
+        word-wrap: break-word;
     }
     
     .ai-msg {
         background: #e0e0e0;
         color: black;
-        padding: 8px 12px;
+        padding: 6px 10px;
         border-radius: 15px 15px 15px 0;
-        margin: 5px 0;
+        margin: 4px 0;
         max-width: 85%;
         float: left;
         clear: both;
+        font-size: 12px;
+        word-wrap: break-word;
     }
     
     .clearfix::after {
@@ -852,37 +874,57 @@ if tab_choice == "🔁 Rotor Tracker":
         display: table;
     }
     
+    /* Quick buttons */
+    .quick-buttons {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 10px;
+    }
+    
+    .quick-buttons button {
+        flex: 1;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 6px;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    .quick-buttons button:hover {
+        background: #45a049;
+    }
+    
     /* Input area */
     .input-area {
-        margin-top: 10px;
-        padding: 10px;
-        background: white;
-        border-top: 1px solid #eee;
+        margin-top: 5px;
     }
     
     .input-area input {
         width: 100%;
-        padding: 12px;
+        padding: 8px 12px;
         border: 2px solid #4CAF50;
-        border-radius: 25px;
-        font-size: 14px;
-        margin-bottom: 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        margin-bottom: 8px;
         outline: none;
     }
     
     .button-row {
         display: flex;
-        gap: 10px;
+        gap: 8px;
     }
     
     .button-row button {
         flex: 1;
-        padding: 10px;
+        padding: 6px;
         border: none;
         border-radius: 20px;
+        font-size: 11px;
         font-weight: bold;
         cursor: pointer;
-        transition: all 0.3s;
     }
     
     .send-btn {
@@ -895,13 +937,10 @@ if tab_choice == "🔁 Rotor Tracker":
         color: white;
     }
     
-    /* Status bar */
-    .status-bar {
-        background: #f0f2f6;
-        padding: 8px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        margin-bottom: 10px;
+    /* Make sure main app content is not covered */
+    .main-content {
+        margin-right: 0;
+        transition: margin-right 0.3s;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -921,7 +960,7 @@ if tab_choice == "🔁 Rotor Tracker":
             return None
         
         # Case-insensitive search
-        buyer_match = pending_df[pending_df['Remarks'].str.lower() == buyer_name.lower()]
+        buyer_match = pending_df[pending_df['Remarks'].str.lower().str.contains(buyer_name.lower(), na=False)]
         
         if buyer_match.empty:
             return None
@@ -992,67 +1031,118 @@ if tab_choice == "🔁 Rotor Tracker":
         return result
     
     # =========================
-    # AI RESPONSE
+    # AI RESPONSE FUNCTION (WITH REAL AI)
     # =========================
     def get_ai_response(user_input):
-        """Process user input and return response"""
+        """Process user input and return response using AI if connected"""
         
         text = user_input.lower().strip()
         
+        # If AI is connected, use it
+        if st.session_state.ai_config['initialized']:
+            try:
+                config = st.session_state.ai_config
+                provider = AI_PROVIDERS[config['provider']]
+                
+                # Get context from data
+                context = {
+                    'total_transactions': len(st.session_state.data) if 'data' in st.session_state else 0,
+                    'stock_summary': get_stock_summary(),
+                    'pending_orders': get_all_pending()
+                }
+                
+                if provider.get('api_key_in_url', False):
+                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
+                else:
+                    url = provider['base_url']
+                
+                headers = provider['headers'](config['api_key'])
+                
+                system_prompt = f"""You are an inventory assistant. Use this data to answer:
+                Stock: {json.dumps(context['stock_summary'])}
+                Pending: {json.dumps(context['pending_orders'])}
+                
+                Be concise and helpful."""
+                
+                if "gemini" in config['provider'].lower():
+                    data = {
+                        "contents": [{"parts": [{"text": f"{system_prompt}\n\nUser: {user_input}"}]}],
+                        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
+                    }
+                else:
+                    data = {
+                        "model": config['model'],
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_input}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 300
+                    }
+                
+                response = requests.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code == 200:
+                    result = response.json()
+                    if "gemini" in config['provider'].lower():
+                        return result['candidates'][0]['content']['parts'][0]['text']
+                    return result['choices'][0]['message']['content']
+                else:
+                    return f"Error: {response.status_code}"
+            except Exception as e:
+                return f"AI Error: {str(e)}"
+        
+        # Fallback to rule-based if AI not connected
         # Check for specific buyer pending
         buyers = ['ajji', 'enova', 'anil', 'tri', 'avs', 'kkm', 'aggarwal']
         for buyer in buyers:
             if buyer in text and 'pending' in text:
                 orders = get_buyer_pending(buyer)
                 if orders:
-                    response = f"⏳ **Pending orders for {buyer.title()}:**\n\n"
+                    response = f"⏳ **Pending for {buyer.title()}:**\n"
                     total = 0
                     for order in orders:
-                        response += f"• Size {order['size']}mm: {order['qty']} units\n"
+                        response += f"• {order['size']}mm: {order['qty']} units\n"
                         total += order['qty']
                     response += f"\n**Total:** {total} units"
                     return response
                 else:
-                    return f"No pending orders found for {buyer.title()}"
+                    return f"No pending for {buyer.title()}"
         
         # Check for all pending
-        if 'pending' in text and ('all' in text or 'show' in text):
+        if 'pending' in text:
             pending = get_all_pending()
             if pending:
-                response = "⏳ **All Pending Orders:**\n\n"
+                response = "⏳ **All Pending:**\n\n"
                 total_all = 0
                 for buyer, data in pending.items():
                     response += f"**{buyer}**\n"
-                    buyer_total = 0
                     for order in data['orders']:
-                        response += f"  • Size {order['size']}mm: {order['qty']} units\n"
-                        buyer_total += order['qty']
-                    response += f"  Total: {buyer_total} units\n\n"
-                    total_all += buyer_total
-                response += f"**Overall Total:** {total_all} units"
+                        response += f"  • {order['size']}mm: {order['qty']} units\n"
+                    response += f"  Total: {data['total']} units\n\n"
+                    total_all += data['total']
+                response += f"**Overall:** {total_all} units"
                 return response
-            return "No pending orders found"
+            return "No pending orders"
         
         # Check for stock
         if 'stock' in text:
             stock = get_stock_summary()
             if stock:
-                response = "📦 **Current Stock Levels:**\n\n"
+                response = "📦 **Stock:**\n\n"
                 total = 0
                 for item in stock:
                     response += f"• {item['size']}mm: {item['stock']} units"
                     if item['pending'] > 0:
-                        response += f" (⏳ {item['pending']} pending)"
+                        response += f" (⏳ {item['pending']})"
                     response += "\n"
                     total += item['stock']
-                response += f"\n**Total Stock:** {total} units"
+                response += f"\n**Total:** {total} units"
                 return response
         
-        # Default response if no patterns match
-        return "I can help you with:\n• Stock levels (type 'stock')\n• Pending orders (type 'pending')\n• Specific buyer (e.g., 'ajji pending')"
+        return "Try: 'stock', 'pending', or 'ajji pending'"
     
     # =========================
-    # HANDLE QUICK ACTION
+    # HANDLE ACTION
     # =========================
     def handle_action(query):
         """Handle button clicks"""
@@ -1064,65 +1154,72 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # FLOATING BUTTON
     # =========================
-    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
-    if st.button("🤖 AI Assistant", key="open_ai"):
-        st.session_state.show_assistant = not st.session_state.show_assistant
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col3:
+        if st.button("🤖 AI Assistant", key="open_ai"):
+            st.session_state.show_assistant = not st.session_state.show_assistant
+            st.rerun()
     
     # =========================
-    # ASSISTANT POPUP
+    # ASSISTANT POPUP (SMALL, RIGHT CORNER)
     # =========================
     if st.session_state.show_assistant:
         st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
         
         # Header
-        st.markdown(f'''
-        <div class="popup-header">
-            <span>🤖 AI Assistant</span>
-            <button onclick="document.querySelector('button[data-testid=\"close_popup\"]').click()">✖️</button>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        # Hidden close button
-        if st.button("Close", key="close_popup"):
-            st.session_state.show_assistant = False
-            st.rerun()
-        
-        st.markdown('<div class="popup-content">', unsafe_allow_html=True)
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            st.markdown("### 🤖 AI Assistant")
+        with col2:
+            if st.button("✖️", key="close_popup"):
+                st.session_state.show_assistant = False
+                st.rerun()
         
         # Status
-        status = "✅ Connected" if st.session_state.ai_config['initialized'] else "⚠️ Not connected"
-        st.markdown(f'<div class="status-bar">{status}</div>', unsafe_allow_html=True)
+        if st.session_state.ai_config['initialized']:
+            st.success(f"✅ Connected", icon="✅")
+        else:
+            # Simple connect option
+            with st.expander("🔌 Connect AI"):
+                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
+                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
+                api_key = st.text_input("API Key", type="password", key="popup_key")
+                if st.button("Connect", key="connect_btn"):
+                    if api_key:
+                        st.session_state.ai_config.update({
+                            'provider': provider,
+                            'model': model,
+                            'api_key': api_key,
+                            'initialized': True
+                        })
+                        st.rerun()
         
         # Chat area
-        st.markdown('<div class="chat-area">', unsafe_allow_html=True)
-        for msg in st.session_state.chat_messages[-6:]:
-            if msg["role"] == "user":
-                st.markdown(f'<div class="user-msg">{msg["content"]}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="ai-msg">{msg["content"]}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        chat_container = st.container()
+        with chat_container:
+            for msg in st.session_state.chat_messages[-5:]:
+                if msg["role"] == "user":
+                    st.markdown(f"**You:** {msg['content']}")
+                else:
+                    st.markdown(f"**AI:** {msg['content']}")
+        
+        st.divider()
         
         # Quick buttons
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("📦 Stock", key="btn_stock"):
+            if st.button("📦 Stock", key="popup_stock", use_container_width=True):
                 handle_action("Show stock")
         with col2:
-            if st.button("⏳ Pending", key="btn_pending"):
-                handle_action("Show all pending")
+            if st.button("⏳ Pending", key="popup_pending", use_container_width=True):
+                handle_action("Show pending")
         with col3:
-            if st.button("❓ Help", key="btn_help"):
+            if st.button("❓ Help", key="popup_help", use_container_width=True):
                 handle_action("Help")
         
         # Input area
-        st.markdown('<div class="input-area">', unsafe_allow_html=True)
-        
-        # Use form for input
-        with st.form(key="chat_form", clear_on_submit=True):
-            user_input = st.text_input("", placeholder="e.g., ajji pending, stock...", label_visibility="collapsed")
+        with st.form(key="popup_form", clear_on_submit=True):
+            user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
@@ -1141,9 +1238,7 @@ if tab_choice == "🔁 Rotor Tracker":
             ]
             st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)  # Close input-area
-        st.markdown('</div>', unsafe_allow_html=True)  # Close popup-content
-        st.markdown('</div>', unsafe_allow_html=True)  # Close assistant-popup
+        st.markdown('</div>', unsafe_allow_html=True)
     # === TAB 3: Rotor Trend ===
 
         
