@@ -772,241 +772,115 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # HIDE STREAMLIT BRANDING
     # =========================
+    # Add this to your CSS section
     st.markdown("""
     <style>
-    /* Hide Streamlit branding */
-    #MainMenu {display: none !important;}
-    footer {display: none !important;}
-    header {display: none !important;}
-    .stDeployButton {display: none !important;}
-    .stStatusWidget {display: none !important;}
-    .viewerBadge_container__1QSob {display: none !important;}
-    
-    /* Remove top padding */
-    .main > div {
-        margin-top: -80px !important;
-        padding-top: 0 !important;
-    }
-    
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0 !important;
-        max-width: 100% !important;
-    }
-    
-    /* Floating button */
-    .floating-btn-container {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-    }
-    
-    .floating-btn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 50px;
-        padding: 15px 30px;
-        font-size: 16px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        transition: all 0.3s;
-    }
-    
-    .floating-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-    }
-    
-    /* Assistant widget */
+    /* Fix white background in assistant */
     .assistant-widget {
-        position: fixed;
-        bottom: 90px;
-        right: 20px;
-        width: 450px;
-        height: 650px;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        z-index: 9998;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        border: 1px solid #e0e0e0;
-        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
     }
     
-    /* Chat messages container */
-    .chat-container {
-        flex: 1;
-        overflow-y: auto;
-        padding: 15px;
-        background-color: #f9f9f9;
-        border-radius: 10px;
-        margin: 10px 0;
-        max-height: 300px;
+    /* Make all text white */
+    .assistant-widget, 
+    .assistant-widget h1, 
+    .assistant-widget h2, 
+    .assistant-widget h3, 
+    .assistant-widget h4, 
+    .assistant-widget p,
+    .assistant-widget span,
+    .assistant-widget div:not(.user-message):not(.assistant-message) {
+        color: white !important;
     }
     
-    .user-message {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 18px 18px 0 18px;
-        margin: 5px 0;
-        max-width: 80%;
-        float: right;
-        clear: both;
-        word-wrap: break-word;
+    /* Chat container background */
+    .assistant-widget .chat-container {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
     }
     
+    /* Assistant messages - keep readable */
     .assistant-message {
-        background-color: #e0e0e0;
-        color: black;
-        padding: 10px 15px;
-        border-radius: 18px 18px 18px 0;
-        margin: 5px 0;
-        max-width: 80%;
-        float: left;
-        clear: both;
-        word-wrap: break-word;
+        background: white !important;
+        color: #333 !important;
     }
     
-    .clearfix::after {
-        content: "";
-        clear: both;
-        display: table;
+    /* User messages */
+    .user-message {
+        background: #4CAF50 !important;
+        color: white !important;
     }
     
-    /* Quick actions grid */
-    .quick-actions {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 5px;
-        margin: 10px 0;
+    /* Info boxes */
+    .assistant-widget .stAlert {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
     }
     
-    .quick-actions button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 8px;
-        font-size: 12px;
-        cursor: pointer;
-        transition: all 0.3s;
+    /* Stock cards */
+    .assistant-widget .stock-card {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(5px) !important;
     }
     
-    .quick-actions button:hover {
-        background-color: #45a049;
-        transform: translateY(-2px);
+    .assistant-widget .stock-size,
+    .assistant-widget .stock-quantity {
+        color: white !important;
     }
     
-    /* Stock grid */
-    .stock-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 10px;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        margin: 10px 0;
+    /* Quick action buttons */
+    .assistant-widget .quick-actions button {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
     }
     
-    .stock-card {
-        background: white;
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #4CAF50;
-        transition: transform 0.2s;
-    }
-    
-    .stock-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-    
-    .stock-size {
-        font-size: 16px;
-        font-weight: bold;
-        color: #1e1e1e;
-        margin-bottom: 5px;
-    }
-    
-    .stock-quantity {
-        font-size: 20px;
-        font-weight: bold;
-        color: #4CAF50;
-        margin-bottom: 5px;
-    }
-    
-    .stock-pending {
-        font-size: 11px;
-        color: #ff9800;
-        background: #fff3e0;
-        padding: 2px 6px;
-        border-radius: 10px;
-        display: inline-block;
-    }
-    
-    .stock-warning {
-        border-left-color: #ff9800;
-    }
-    
-    .stock-critical {
-        border-left-color: #f44336;
-    }
-    
-    /* Stock summary */
-    .stock-summary {
-        margin: 10px 0;
-        padding: 15px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px;
-        font-weight: bold;
-    }
-    
-    /* Chart container */
-    .chart-container {
-        margin: 10px 0;
-        padding: 15px;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        border-left: 4px solid #2196F3;
-    }
-    
-    /* Form styling */
-    .stForm {
-        background-color: transparent;
-        padding: 0;
-    }
-    
-    .stForm [data-testid="stForm"] {
-        border: none;
-        padding: 0;
+    .assistant-widget .quick-actions button:hover {
+        background: white !important;
+        color: #667eea !important;
     }
     
     /* Input field */
-    .stTextInput > div > input {
-        border-radius: 20px;
-        border: 1px solid #ddd;
-        padding: 10px 15px;
+    .assistant-widget .stTextInput > div > input {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
     }
     
-    /* Buttons */
-    .stButton > button {
-        border-radius: 20px;
-        border: none;
-        transition: all 0.3s;
+    .assistant-widget .stTextInput > div > input::placeholder {
+        color: rgba(255,255,255,0.7) !important;
     }
     
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    /* Form buttons */
+    .assistant-widget .stButton > button {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+    }
+    
+    .assistant-widget .stButton > button:hover {
+        background: white !important;
+        color: #667eea !important;
+    }
+    
+    /* Select boxes */
+    .assistant-widget .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        border-color: rgba(255,255,255,0.3) !important;
+    }
+    
+    /* Dividers */
+    .assistant-widget hr {
+        border-color: rgba(255,255,255,0.2) !important;
+    }
+    
+    /* Stock summary */
+    .assistant-widget .stock-summary {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1360,20 +1234,74 @@ if tab_choice == "🔁 Rotor Tracker":
                 return response
             return "No future incoming rotors found"
         
-        # Handle pending requests
-        if 'pending' in query_lower:
-            pending = context.get('pending_by_buyer', {})
-            if pending:
-                response = "⏳ **Pending Orders:**\n\n"
-                for buyer, data in pending.items():
-                    response += f"**{buyer}** (Total: {data['total']} units)\n"
-                    for order in data['orders']:
-                        response += f"  • Size {order['size']}mm: {order['qty']} units\n"
-                    response += "\n"
-                total_pending = sum(data['total'] for data in pending.values())
-                response += f"**Summary:** {total_pending} units pending"
-                return response
-            return "No pending orders found"
+        # =========================
+        # FIXED AI RESPONSE FUNCTION - HANDLES SPECIFIC BUYER QUERIES
+        # =========================
+        
+        
+            
+            # ===== HANDLE SPECIFIC BUYER PENDING QUERIES =====
+            # Check for patterns like "ajji pending", "enova pending", "tri pending", etc.
+            if 'pending' in query_lower:
+                # Try to extract buyer name from query
+                words = query_lower.split()
+                buyer_name = None
+                
+                # Common buyer names to check
+                common_buyers = ['ajji', 'enova', 'tri', 'anil', 'avs', 'aggarwal', 'kkm', 'alpha', 'beta', 'gamma', 'delta']
+                
+                # Look for buyer name in query
+                for word in words:
+                    if word in common_buyers or (len(word) > 2 and word not in ['pending', 'show', 'list', 'orders']):
+                        buyer_name = word
+                        break
+                
+                # Also check in context buyers list
+                if not buyer_name and 'buyers' in context:
+                    for buyer in context.get('buyers', []):
+                        buyer_lower = str(buyer).lower()
+                        if buyer_lower in query_lower:
+                            buyer_name = buyer_lower
+                            break
+                
+                if buyer_name:
+                    # Get filtered pending orders for this specific buyer
+                    pending = context.get('pending_by_buyer', {})
+                    
+                    # Find matching buyer (case insensitive)
+                    matching_buyer = None
+                    for b in pending.keys():
+                        if buyer_name in b.lower() or b.lower() in buyer_name:
+                            matching_buyer = b
+                            break
+                    
+                    if matching_buyer and matching_buyer in pending:
+                        data = pending[matching_buyer]
+                        response = f"⏳ **Pending Orders for {matching_buyer}:**\n\n"
+                        for order in data['orders']:
+                            response += f"  • Size {order['size']}mm: {order['qty']} units\n"
+                        response += f"\n**Total:** {data['total']} units pending"
+                        return response
+                    else:
+                        return f"No pending orders found for '{buyer_name}'"
+            
+            # ===== HANDLE ALL PENDING ORDERS =====
+            if 'pending' in query_lower and ('all' in query_lower or 'list' in query_lower or 'show' in query_lower):
+                pending = context.get('pending_by_buyer', {})
+                if pending:
+                    response = "⏳ **All Pending Orders:**\n\n"
+                    for buyer, data in pending.items():
+                        response += f"**{buyer}** (Total: {data['total']} units)\n"
+                        for order in data['orders']:
+                            response += f"  • Size {order['size']}mm: {order['qty']} units\n"
+                        response += "\n"
+                    total_pending = sum(data['total'] for data in pending.values())
+                    response += f"**Summary:** {total_pending} units pending across {len(pending)} buyers"
+                    return response
+                return "No pending orders found"
+            
+            # Rest of your existing code...
+            # [Keep all your other handlers here]
         
         # If no special handling, use AI
         if not st.session_state.ai_config['initialized']:
@@ -1526,6 +1454,7 @@ if tab_choice == "🔁 Rotor Tracker":
         st.divider()
         
         # Quick Actions
+        # Update the quick action buttons section
         st.markdown("### Quick Actions")
         st.markdown('<div class="quick-actions">', unsafe_allow_html=True)
         
@@ -1536,8 +1465,8 @@ if tab_choice == "🔁 Rotor Tracker":
             if st.button("📊 Chart", use_container_width=True):
                 handle_quick_action("Show stock chart")
         with col2:
-            if st.button("⏳ Pending", use_container_width=True):
-                handle_quick_action("Show pending orders")
+            if st.button("⏳ All Pending", use_container_width=True):
+                handle_quick_action("Show all pending orders")
             if st.button("📈 Predict", use_container_width=True):
                 handle_quick_action("Predict future stock")
         with col3:
@@ -1545,37 +1474,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 handle_quick_action("Show recent transactions")
             if st.button("📅 Coming", use_container_width=True):
                 handle_quick_action("Show future incoming")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.divider()
-        
-        # Chat Input Form
-        with st.form(key="chat_form"):
-            user_input = st.text_input("Type your question here...", key="chat_input")
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                submit = st.form_submit_button("📤 Send", use_container_width=True)
-            with col2:
-                clear = st.form_submit_button("🗑️ Clear Chat", use_container_width=True)
-        
-        # Handle form submissions
-        if submit and user_input:
-            st.session_state.chat_messages.append({"role": "user", "content": user_input})
-            
-            context = prepare_inventory_context()
-            response = get_ai_response(user_input, context)
-            
-            st.session_state.chat_messages.append({"role": "assistant", "content": response})
-            st.rerun()
-        
-        if clear:
-            st.session_state.chat_messages = [
-                {"role": "assistant", "content": "👋 Chat cleared. How can I help you?"}
-            ]
-            st.session_state.stock_display = None
-            st.session_state.show_chart = None
-            st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
     # === TAB 3: Rotor Trend ===
