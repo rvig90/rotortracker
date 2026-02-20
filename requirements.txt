@@ -16,3 +16,4 @@ spacy
 langchain-sarvam
 sarvamai
 plotly
+numpy
