@@ -778,6 +778,7 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # Custom CSS for floating widget
+    # Update your CSS to give more space for input
     st.markdown("""
     <style>
     .floating-btn-container {
@@ -802,7 +803,7 @@ if tab_choice == "🔁 Rotor Tracker":
         bottom: 90px;
         right: 20px;
         width: 350px;
-        max-height: 550px;
+        height: 600px;  /* Increased height */
         background-color: white;
         border-radius: 10px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.2);
@@ -819,20 +820,25 @@ if tab_choice == "🔁 Rotor Tracker":
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-shrink: 0;
     }
     .assistant-content {
-        padding: 15px;
+        flex: 1;
         overflow-y: auto;
-        max-height: 450px;
-        background-color: white;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;  /* Important for flexbox scrolling */
     }
     .chat-messages {
-        max-height: 250px;
+        flex: 1;
         overflow-y: auto;
         margin-bottom: 15px;
         padding: 10px;
         background-color: #f9f9f9;
         border-radius: 8px;
+        min-height: 200px;
+        max-height: 300px;
     }
     .user-message {
         background-color: #4CAF50;
@@ -844,6 +850,7 @@ if tab_choice == "🔁 Rotor Tracker":
         float: right;
         clear: both;
         font-size: 13px;
+        word-wrap: break-word;
     }
     .assistant-message {
         background-color: #e0e0e0;
@@ -855,6 +862,7 @@ if tab_choice == "🔁 Rotor Tracker":
         float: left;
         clear: both;
         font-size: 13px;
+        word-wrap: break-word;
     }
     .clearfix::after {
         content: "";
@@ -867,6 +875,7 @@ if tab_choice == "🔁 Rotor Tracker":
         background-color: #f5f5f5;
         border-radius: 8px;
         border-left: 3px solid #4CAF50;
+        flex-shrink: 0;
     }
     .data-status {
         margin-bottom: 15px;
@@ -875,6 +884,15 @@ if tab_choice == "🔁 Rotor Tracker":
         border-radius: 8px;
         border-left: 3px solid #4CAF50;
         font-size: 12px;
+        flex-shrink: 0;
+    }
+    .input-section {
+        flex-shrink: 0;
+        margin-top: auto;
+    }
+    .stTextInput > div > input {
+        font-size: 14px;
+        padding: 8px 12px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1174,7 +1192,28 @@ if tab_choice == "🔁 Rotor Tracker":
         
         query_lower = query.lower()
         
-        # SPECIAL HANDLER FOR PENDING ORDERS - DIRECT DATABASE QUERY
+        # SPECIAL HANDLER FOR "COMING" or "FUTURE" QUERIES
+        if ('coming' in query_lower or 'future' in query_lower) and ('rotor' in query_lower or 'incoming' in query_lower):
+            if 'data' in st.session_state and not st.session_state.data.empty:
+                df = st.session_state.data.copy()
+                future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+                
+                if future_df.empty:
+                    return "No future incoming rotors found"
+                
+                # Format response
+                response = "📅 **Future Incoming Rotors:**\n\n"
+                future_df = future_df.sort_values('Date')
+                
+                for _, row in future_df.iterrows():
+                    date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
+                    response += f"• {date_str}: Size {int(row['Size (mm)'])}mm, {int(row['Quantity'])} units from {row['Remarks']}\n"
+                
+                total_qty = future_df['Quantity'].sum()
+                response += f"\n**Total:** {int(total_qty)} units coming"
+                return response
+        
+        # SPECIAL HANDLER FOR PENDING ORDERS
         if 'pending' in query_lower and ('order' in query_lower or 'buyer' in query_lower or 'show' in query_lower):
             pending_data = get_pending_orders_detailed()
             return format_pending_orders_display(pending_data)
@@ -1208,6 +1247,11 @@ if tab_choice == "🔁 Rotor Tracker":
                     return format_transaction_history(df, size=size, buyer=buyer)
                 else:
                     return get_buyer_transaction_summary(buyer)
+        
+        # Check for "recent transactions" or "history" without specific size/buyer
+        if ('recent' in query_lower or 'history' in query_lower) and not size_match:
+            df = get_transaction_history(days=30)
+            return format_transaction_history(df)
         
         # If not a special query, proceed with normal AI response
         config = st.session_state.ai_config
