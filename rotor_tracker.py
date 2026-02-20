@@ -761,251 +761,45 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # CUSTOM CSS
     # =========================
+    # =========================
+    # SEMI-TRANSPARENT ASSISTANT
+    # =========================
     st.markdown("""
     <style>
-    /* Fix white screen issue */
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    
-    /* Main container styling */
-    .main > div {
-        padding: 1rem;
-        background-color: #ffffff;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    /* Stock display grid */
-    .stock-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
-        padding: 15px;
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        margin: 10px 0;
-    }
-    
-    .stock-card {
-        background: white;
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #4CAF50;
-        transition: transform 0.2s;
-    }
-    
-    .stock-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-    
-    .stock-size {
-        font-size: 18px;
-        font-weight: bold;
-        color: #1e1e1e;
-        margin-bottom: 8px;
-    }
-    
-    .stock-quantity {
-        font-size: 24px;
-        font-weight: bold;
-        color: #4CAF50;
-        margin-bottom: 5px;
-    }
-    
-    .stock-pending {
-        font-size: 12px;
-        color: #ff9800;
-        background: #fff3e0;
-        padding: 3px 8px;
-        border-radius: 12px;
-        display: inline-block;
-    }
-    
-    .stock-warning {
-        border-left-color: #ff9800;
-    }
-    
-    .stock-critical {
-        border-left-color: #f44336;
-    }
-    
-    /* Floating button */
-    .floating-btn-container {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-    }
-    
-    .floating-btn {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 50px;
-        padding: 12px 24px;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: all 0.3s;
-    }
-    
-    .floating-btn:hover {
-        background-color: #45a049;
-        transform: scale(1.05);
-    }
-    
-    /* Assistant widget */
     .assistant-widget {
-        position: fixed;
-        bottom: 90px;
-        right: 20px;
-        width: 400px;
-        height: 600px;
-        background-color: white;
-        border-radius: 10px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-        z-index: 9998;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        border: 1px solid #e0e0e0;
+        background: rgba(0, 0, 0, 0.8) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
     }
     
     .assistant-header {
-        padding: 12px 15px;
-        background-color: #4CAF50;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-shrink: 0;
-    }
-    
-    .assistant-content {
-        flex: 1;
-        overflow-y: auto;
-        padding: 15px;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .chart-container {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-radius: 8px;
-        border-left: 3px solid #2196F3;
-    }
-    
-    .data-status {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #e8f5e9;
-        border-radius: 8px;
-        border-left: 3px solid #4CAF50;
-        font-size: 12px;
-        flex-shrink: 0;
-    }
-    
-    .config-section {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-radius: 8px;
-        border-left: 3px solid #4CAF50;
-        flex-shrink: 0;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.1) !important;
     }
     
     .chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #f9f9f9;
-        border-radius: 8px;
-        min-height: 150px;
-        max-height: 250px;
+        background: rgba(255,255,255,0.05) !important;
     }
     
     .user-message {
-        background-color: #4CAF50;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 15px 15px 0 15px;
-        margin: 5px 0;
-        max-width: 85%;
-        float: right;
-        clear: both;
-        font-size: 13px;
-        word-wrap: break-word;
+        background: #4CAF50 !important;
     }
     
     .assistant-message {
-        background-color: #e0e0e0;
-        color: black;
-        padding: 8px 12px;
-        border-radius: 15px 15px 15px 0;
-        margin: 5px 0;
-        max-width: 85%;
-        float: left;
-        clear: both;
-        font-size: 13px;
-        word-wrap: break-word;
+        background: rgba(255,255,255,0.1) !important;
+        color: white !important;
     }
     
-    .clearfix::after {
-        content: "";
-        clear: both;
-        display: table;
+    /* Make all text white */
+    .assistant-widget, .assistant-widget * {
+        color: white !important;
     }
     
-    .quick-actions {
-        display: flex;
-        gap: 5px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        flex-shrink: 0;
-    }
-    
-    .quick-actions button {
-        flex: 1;
-        min-width: 60px;
-        font-size: 11px;
-        padding: 5px;
-    }
-    
-    .input-section {
-        flex-shrink: 0;
-        margin-top: auto;
-        background-color: white;
-        padding-top: 10px;
-        border-top: 1px solid #eee;
-    }
-    
+    /* Input fields */
     .stTextInput > div > input {
-        font-size: 14px;
-        padding: 8px 12px;
-        border-radius: 20px;
-        border: 1px solid #ddd;
-    }
-    
-    .prediction-badge {
-        background-color: #ff9800;
-        color: white;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 10px;
-        margin-left: 5px;
-    }
-    
-    /* Ensure main content has proper background */
-    .block-container {
-        background-color: #f0f2f6;
-        padding: 2rem 1rem;
+        background: rgba(255,255,255,0.1) !important;
+        color: white !important;
+        border-color: rgba(255,255,255,0.2) !important;
     }
     </style>
     """, unsafe_allow_html=True)
