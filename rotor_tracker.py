@@ -1401,53 +1401,70 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.markdown('</div>', unsafe_allow_html=True)
                 
                 # Quick action buttons
+                # Quick action buttons
                 col1, col2, col3, col4, col5, col6 = st.columns(6)
+                
+                # Use session state to store button clicks
+                if 'button_query' not in st.session_state:
+                    st.session_state.button_query = None
+                
                 with col1:
                     if st.button("📦 Stock", key="qa_stock", use_container_width=True):
-                        query = "Show current stock levels for all sizes"
+                        st.session_state.button_query = "Show current stock levels for all sizes"
+                
                 with col2:
                     if st.button("⏳ Pending", key="qa_pending", use_container_width=True):
-                        # This now directly calls our function without going through AI
+                        # Direct database query for pending orders (no AI)
                         pending_data = get_pending_orders_detailed()
                         response = format_pending_orders_display(pending_data)
                         st.session_state.assistant_messages.append({"role": "user", "content": "Show pending orders"})
                         st.session_state.assistant_messages.append({"role": "assistant", "content": response})
                         st.rerun()
+                
                 with col3:
                     if st.button("📜 History", key="qa_history", use_container_width=True):
-                        query = "Show recent transactions"
+                        st.session_state.button_query = "Show recent transactions from the last 30 days"
+                
                 with col4:
                     if st.button("🔍 By Size", key="qa_size", use_container_width=True):
-                        sizes = [s['size'] for s in context.get('stock_summary', [])]
-                        if sizes:
-                            size_to_query = sizes[0]
-                            query = f"Show transactions for size {size_to_query}"
+                        # Get available sizes from context
+                        if 'stock_summary' in context and context['stock_summary']:
+                            sizes = [s['size'] for s in context['stock_summary']]
+                            if sizes:
+                                # Use the most common size or first size
+                                most_common_size = max(set(sizes), key=sizes.count) if sizes else sizes[0]
+                                st.session_state.button_query = f"Show transactions for size {most_common_size}mm"
+                            else:
+                                st.session_state.button_query = "Show transactions for size 1803mm"  # Default
+                        else:
+                            st.session_state.button_query = "Show transactions for size 1803mm"  # Default
+                
                 with col5:
                     if st.button("📅 Coming", key="qa_coming", use_container_width=True):
-                        query = "Show future incoming rotors"
+                        st.session_state.button_query = "Show future incoming rotors with expected dates"
+                
                 with col6:
                     if st.button("🧹 Clear", key="qa_clear", use_container_width=True):
                         st.session_state.assistant_messages = [
                             {"role": "assistant", "content": "👋 Chat cleared. Ask me about your inventory!"}
                         ]
+                        st.session_state.button_query = None
                         st.rerun()
                 
-                # Chat input
-                user_input = st.text_input("Ask about inventory...", key="chat_input", placeholder="e.g., ajji pending")
-                col1, col2 = st.columns([4, 1])
-                with col2:
-                    if st.button("Send", key="send_btn", use_container_width=True):
-                        if user_input:
-                            st.session_state.assistant_messages.append({"role": "user", "content": user_input})
-                            with st.spinner("Thinking..."):
-                                response = get_ai_response_with_transactions(user_input, context)
-                                st.session_state.assistant_messages.append({"role": "assistant", "content": response})
-                            st.rerun()
-                
-                if st.button("🗑️ Clear Chat", key="clear_chat", use_container_width=True):
-                    st.session_state.assistant_messages = [
-                        {"role": "assistant", "content": f"👋 Chat cleared. Connected to {st.session_state.ai_config['provider']}."}
-                    ]
+                # Handle button queries
+                if st.session_state.button_query:
+                    query = st.session_state.button_query
+                    st.session_state.button_query = None  # Reset
+                    
+                    st.session_state.assistant_messages.append({"role": "user", "content": query})
+                    
+                    with st.spinner("Thinking..."):
+                        # Check if this is a pending query (already handled above)
+                        if "pending" not in query.lower():
+                            context = prepare_inventory_context()
+                            response = get_ai_response_with_transactions(query, context)
+                            st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+                    
                     st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -3521,42 +3538,31 @@ def prepare_ai_context():
             st.rerun()
         
         # Chat input
-        if prompt := st.chat_input("Ask me anything about your inventory..."):
-            # Add user message to history
-            st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
-            
-            # Display user message
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            
-            # Get AI response
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    try:
-                        # Prepare the full context for this query
-                        full_context = prepare_ai_context()
-                        
-                        # Create messages
-                        messages = [
-                            SystemMessage(content=system_prompt.format(current_date=current_date)),
-                            HumanMessage(content=f"Current Inventory Context:\n{json.dumps(full_context, indent=2, default=str)}\n\nUser Query: {prompt}")
-                        ]
-                        
-                        # Get response from Sarvam AI
-                        response = llm.invoke(messages)
-                        
-                        # Display response
-                        st.markdown(response.content)
-                        
-                        # Add to chat history
-                        st.session_state.ai_chat_history.append({"role": "assistant", "content": response.content})
-                        
-                    except Exception as e:
-                        error_msg = f"❌ Error getting response: {str(e)}"
-                        st.error(error_msg)
-                        st.session_state.ai_chat_history.append({"role": "assistant", "content": error_msg})
-            
-            st.rerun()
+        # Chat input
+        user_input = st.text_input(
+            "Ask about inventory...", 
+            key="chat_input", 
+            placeholder="e.g., show transactions for size 130 | history for ajji | pending orders"
+        )
+        
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("Send", key="send_btn", use_container_width=True):
+                if user_input:
+                    st.session_state.assistant_messages.append({"role": "user", "content": user_input})
+                    
+                    # Special handling for pending queries
+                    if "pending" in user_input.lower() and ("order" in user_input.lower() or "show" in user_input.lower()):
+                        pending_data = get_pending_orders_detailed()
+                        response = format_pending_orders_display(pending_data)
+                        st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+                    else:
+                        with st.spinner("Thinking..."):
+                            context = prepare_inventory_context()
+                            response = get_ai_response_with_transactions(user_input, context)
+                            st.session_state.assistant_messages.append({"role": "assistant", "content": response})
+                    
+                    st.rerun()
         
         # Sidebar controls for the AI tab
         with st.sidebar:
