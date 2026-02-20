@@ -773,114 +773,63 @@ if tab_choice == "🔁 Rotor Tracker":
     # HIDE STREAMLIT BRANDING
     # =========================
     # Add this to your CSS section
+    # Add to your CSS
     st.markdown("""
     <style>
-    /* Fix white background in assistant */
-    .assistant-widget {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border: none !important;
+    /* Make sure input is visible */
+    .assistant-widget .stTextInput {
+        margin-bottom: 10px;
     }
     
-    /* Make all text white */
-    .assistant-widget, 
-    .assistant-widget h1, 
-    .assistant-widget h2, 
-    .assistant-widget h3, 
-    .assistant-widget h4, 
-    .assistant-widget p,
-    .assistant-widget span,
-    .assistant-widget div:not(.user-message):not(.assistant-message) {
-        color: white !important;
-    }
-    
-    /* Chat container background */
-    .assistant-widget .chat-container {
-        background: rgba(255, 255, 255, 0.1) !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-    }
-    
-    /* Assistant messages - keep readable */
-    .assistant-message {
+    .assistant-widget .stTextInput input {
         background: white !important;
-        color: #333 !important;
-    }
-    
-    /* User messages */
-    .user-message {
-        background: #4CAF50 !important;
-        color: white !important;
-    }
-    
-    /* Info boxes */
-    .assistant-widget .stAlert {
-        background: rgba(255, 255, 255, 0.15) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-    }
-    
-    /* Stock cards */
-    .assistant-widget .stock-card {
-        background: rgba(255, 255, 255, 0.15) !important;
-        backdrop-filter: blur(5px) !important;
-    }
-    
-    .assistant-widget .stock-size,
-    .assistant-widget .stock-quantity {
-        color: white !important;
+        color: black !important;
+        border: 1px solid #ddd !important;
+        padding: 10px !important;
+        font-size: 14px !important;
     }
     
     /* Quick action buttons */
-    .assistant-widget .quick-actions button {
-        background: rgba(255, 255, 255, 0.2) !important;
+    .quick-actions button {
+        background-color: #4CAF50 !important;
         color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
+        border: none !important;
+        padding: 8px !important;
+        font-size: 12px !important;
+        margin: 2px !important;
     }
     
-    .assistant-widget .quick-actions button:hover {
-        background: white !important;
-        color: #667eea !important;
+    .quick-actions button:hover {
+        background-color: #45a049 !important;
     }
     
-    /* Input field */
-    .assistant-widget .stTextInput > div > input {
-        background: rgba(255, 255, 255, 0.15) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
+    /* Chat messages area */
+    .chat-container {
+        max-height: 200px;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        margin-bottom: 10px;
     }
     
-    .assistant-widget .stTextInput > div > input::placeholder {
-        color: rgba(255,255,255,0.7) !important;
+    /* Stock grid inside assistant */
+    .stock-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+        margin: 10px 0;
     }
     
-    /* Form buttons */
-    .assistant-widget .stButton > button {
-        background: rgba(255, 255, 255, 0.2) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-    }
-    
-    .assistant-widget .stButton > button:hover {
-        background: white !important;
-        color: #667eea !important;
-    }
-    
-    /* Select boxes */
-    .assistant-widget .stSelectbox > div > div {
-        background: rgba(255, 255, 255, 0.15) !important;
-        color: white !important;
-        border-color: rgba(255,255,255,0.3) !important;
-    }
-    
-    /* Dividers */
-    .assistant-widget hr {
-        border-color: rgba(255,255,255,0.2) !important;
-    }
-    
-    /* Stock summary */
-    .assistant-widget .stock-summary {
-        background: rgba(255, 255, 255, 0.2) !important;
-        color: white !important;
+    .stock-card {
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-left: 3px solid #4CAF50;
     }
     </style>
     """, unsafe_allow_html=True)
