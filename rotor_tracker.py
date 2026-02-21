@@ -1093,7 +1093,7 @@ if tab_choice == "🔁 Rotor Tracker":
                         response = "📅 **Future Incoming Rotors:**\n\n"
                         total = 0
                         for item in future:
-                            response += f"• {item['date']}: Size {item['size']}mm - {item['qty']} \n"
+                            response += f"> {item['date']}: Size {item['size']}mm - {item['qty']} \n"
                             
                         
                         return response
