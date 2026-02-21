@@ -1180,7 +1180,7 @@ if tab_choice == "🔁 Rotor Tracker":
         st.rerun()
     
     # Also update your form submission handler
-    with st.form(key="popup_form", clear_on_submit=True):
+    with st.form(key="assistant_chat_form", clear_on_submit=True):
         user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors, stock")
         col1, col2 = st.columns(2)
         with col1:
@@ -1213,28 +1213,31 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # ASSISTANT POPUP (SMALL, RIGHT CORNER)
     # =========================
+    # =========================
+    # FIXED ASSISTANT POPUP WITH UNIQUE FORM KEY
+    # =========================
+    
     if st.session_state.show_assistant:
         st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
         
         # Header
         col1, col2 = st.columns([6, 1])
         with col1:
-            st.markdown("### 🤖 AI Assistant")
+            st.markdown("### 🤖 Assistant")
         with col2:
-            if st.button("✖️", key="close_popup"):
+            if st.button("✖️", key="close_assistant_unique"):
                 st.session_state.show_assistant = False
                 st.rerun()
         
-        # Status
+        # Connection status
         if st.session_state.ai_config['initialized']:
             st.success(f"✅ Connected", icon="✅")
         else:
-            # Simple connect option
             with st.expander("🔌 Connect AI"):
-                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
-                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
-                api_key = st.text_input("API Key", type="password", key="popup_key")
-                if st.button("Connect", key="connect_btn"):
+                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="assistant_provider")
+                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="assistant_model")
+                api_key = st.text_input("API Key", type="password", key="assistant_key")
+                if st.button("Connect", key="assistant_connect_btn"):
                     if api_key:
                         st.session_state.ai_config.update({
                             'provider': provider,
@@ -1244,48 +1247,49 @@ if tab_choice == "🔁 Rotor Tracker":
                         })
                         st.rerun()
         
-        # Chat area
-        chat_container = st.container()
-        with chat_container:
-            for msg in st.session_state.chat_messages[-5:]:
-                if msg["role"] == "user":
-                    st.markdown(f"**You:** {msg['content']}")
-                else:
-                    st.markdown(f"**AI:** {msg['content']}")
+        # Chat messages
+        for msg in st.session_state.chat_messages[-5:]:
+            if msg["role"] == "user":
+                st.markdown(f"**You:** {msg['content']}")
+            else:
+                st.markdown(f"**AI:** {msg['content']}")
         
         st.divider()
         
         # Quick buttons
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("📦 Stock", key="popup_stock", use_container_width=True):
+            if st.button("📦 Stock", key="assistant_stock_btn", use_container_width=True):
                 handle_action("Show stock")
         with col2:
-            if st.button("⏳ Pending", key="popup_pending", use_container_width=True):
+            if st.button("⏳ Pending", key="assistant_pending_btn", use_container_width=True):
                 handle_action("Show pending")
         with col3:
-            if st.button("❓ Help", key="popup_help", use_container_width=True):
+            if st.button("📅 Coming", key="assistant_coming_btn", use_container_width=True):
+                handle_action("Show coming rotors")
+        with col4:
+            if st.button("❓ Help", key="assistant_help_btn", use_container_width=True):
                 handle_action("Help")
         
-        # Input area
-        with st.form(key="popup_form", clear_on_submit=True):
-            user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending")
+        # CHAT FORM WITH UNIQUE KEY
+        with st.form(key="assistant_chat_form", clear_on_submit=True):  # CHANGED: unique key
+            user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
             with col2:
                 clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
         
+        # Handle form submissions
         if send and user_input:
-            st.session_state.chat_messages.append({"role": "user", "content": user_input})
             response = get_ai_response(user_input)
-            st.session_state.chat_messages.append({"role": "assistant", "content": response})
             st.rerun()
         
         if clear:
             st.session_state.chat_messages = [
                 {"role": "assistant", "content": "👋 Chat cleared. Ask me about inventory!"}
             ]
+            st.session_state.conversation_history = []  # Clear AI memory
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
