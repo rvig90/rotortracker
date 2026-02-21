@@ -1066,140 +1066,139 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # AI RESPONSE FUNCTION (WITH REAL AI)
     # =========================
+    # =========================
+    # FIXED AI WITH CONVERSATION MEMORY
+    # =========================
+    
+    # Add to your session state initialization
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    
+    # Update the get_ai_response function with memory
     def get_ai_response(user_input):
-        """Process user input and return response using AI if connected"""
+        """Process user input with conversation memory"""
         
         text = user_input.lower().strip()
         
-        # If AI is connected, use it
+        # If AI is connected, use it with memory
         if st.session_state.ai_config['initialized']:
             try:
                 config = st.session_state.ai_config
                 provider = AI_PROVIDERS[config['provider']]
                 
-                # Get context from data
+                # Get current context
                 context = {
                     'total_transactions': len(st.session_state.data) if 'data' in st.session_state else 0,
                     'stock_summary': get_stock_summary(),
                     'pending_orders': get_all_pending(),
                     'future_incoming': get_future_incoming()
                 }
-
-                # Update the get_ai_response function to handle future incoming queries
-           
-                if 'future' in text or 'coming' in text or 'incoming' in text:
-                    future = get_future_incoming()
-                    if future:
-                        response = "📅 **Future Incoming Rotors:**\n\n"
-                        total = 0
-                        for item in future:
-                            response += f"> {item['date']}: Size {item['size']}mm - {item['qty']} \n"
-                            
-                        
-                        return response
-                    else:
-                        return "No future incoming rotors found"
                 
-                # Rest of your existing code...
-                # [Keep all your other handlers here]
-                if provider.get('api_key_in_url', False):
-                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
-                else:
-                    url = provider['base_url']
+                # Build conversation history
+                messages = []
                 
-                headers = provider['headers'](config['api_key'])
-                
-                system_prompt = f"""You are an inventory assistant. Use this data to answer:
-                Stock: {json.dumps(context['stock_summary'])}
-                Pending: {json.dumps(context['pending_orders'])}
-                
-                Be concise and helpful."""
-                
+                # System prompt with context
+                system_prompt = f"""You are an inventory assistant. You have access to this data:
+    
+    CURRENT STOCK:
+    {json.dumps(context['stock_summary'], indent=2)}
+    
+    PENDING ORDERS:
+    {json.dumps(context['pending_orders'], indent=2)}
+    
+    FUTURE INCOMING:
+    {json.dumps(context['future_incoming'], indent=2)}
+    
+    Instructions:
+    1. Be helpful and conversational
+    2. Remember what was discussed earlier in the conversation
+    3. When showing future incoming rotors, group them by size
+    4. Answer naturally and concisely
+    5. If asked about something not in the data, say you don't have that information"""
+    
+                # Add system message based on provider
                 if "gemini" in config['provider'].lower():
+                    # For Gemini, we'll combine history in a different way
+                    conversation_text = system_prompt + "\n\n"
+                    for msg in st.session_state.conversation_history[-10:]:  # Last 10 messages
+                        role = "User" if msg["role"] == "user" else "Assistant"
+                        conversation_text += f"{role}: {msg['content']}\n"
+                    conversation_text += f"User: {user_input}"
+                    
+                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
+                    headers = provider['headers'](config['api_key'])
                     data = {
-                        "contents": [{"parts": [{"text": f"{system_prompt}\n\nUser: {user_input}"}]}],
-                        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
+                        "contents": [{"parts": [{"text": conversation_text}]}],
+                        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500}
                     }
                 else:
+                    # For OpenAI-compatible APIs
+                    messages = [{"role": "system", "content": system_prompt}]
+                    
+                    # Add conversation history
+                    for msg in st.session_state.conversation_history[-10:]:
+                        messages.append({"role": msg["role"], "content": msg["content"]})
+                    
+                    # Add current user message
+                    messages.append({"role": "user", "content": user_input})
+                    
+                    url = provider['base_url']
+                    headers = provider['headers'](config['api_key'])
                     data = {
                         "model": config['model'],
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_input}
-                        ],
+                        "messages": messages,
                         "temperature": 0.1,
-                        "max_tokens": 300
+                        "max_tokens": 500
                     }
                 
                 response = requests.post(url, headers=headers, json=data, timeout=10)
+                
                 if response.status_code == 200:
                     result = response.json()
                     if "gemini" in config['provider'].lower():
-                        return result['candidates'][0]['content']['parts'][0]['text']
-                    return result['choices'][0]['message']['content']
+                        ai_response = result['candidates'][0]['content']['parts'][0]['text']
+                    else:
+                        ai_response = result['choices'][0]['message']['content']
+                    
+                    # Save to conversation history
+                    st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                    st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+                    
+                    return ai_response
                 else:
-                    return f"Error: {response.status_code}"
+                    return fallback_response(user_input)
             except Exception as e:
-                return f"AI Error: {str(e)}"
+                return fallback_response(user_input)
         
-        # Fallback to rule-based if AI not connected
-        # Check for specific buyer pending
-        buyers = ['ajji', 'enova', 'anil', 'tri', 'avs', 'kkm', 'aggarwal']
-        for buyer in buyers:
-            if buyer in text and 'pending' in text:
-                orders = get_buyer_pending(buyer)
-                if orders:
-                    response = f"⏳ **Pending for {buyer.title()}:**\n"
-                    total = 0
-                    for order in orders:
-                        response += f"• {order['size']}mm: {order['qty']} units\n"
-                        total += order['qty']
-                    response += f"\n**Total:** {total} units"
-                    return response
-                else:
-                    return f"No pending for {buyer.title()}"
-        
-        # Check for all pending
-        if 'pending' in text:
-            pending = get_all_pending()
-            if pending:
-                response = "⏳ **All Pending:**\n\n"
-                total_all = 0
-                for buyer, data in pending.items():
-                    response += f"**{buyer}**\n"
-                    for order in data['orders']:
-                        response += f"  • {order['size']}mm: {order['qty']} units\n"
-                    response += f"  Total: {data['total']} units\n\n"
-                    total_all += data['total']
-                response += f"**Overall:** {total_all} units"
-                return response
-            return "No pending orders"
-        
-        # Check for stock
-        if 'stock' in text:
-            stock = get_stock_summary()
-            if stock:
-                response = "📦 **Stock:**\n\n"
-                total = 0
-                for item in stock:
-                    response += f"• {item['size']}mm: {item['stock']} units"
-                    if item['pending'] > 0:
-                        response += f" (⏳ {item['pending']})"
-                    response += "\n"
-                    total += item['stock']
-                response += f"\n**Total:** {total} units"
-                return response
-        
-        return "Try: 'stock', 'pending', or 'ajji pending'"
+        # If AI not connected, use rule-based but still maintain some "memory" via context
+        return fallback_response(user_input)
     
-    # =========================
-    # HANDLE ACTION
-    # =========================
+    # Update handle_action to use the new function
     def handle_action(query):
         """Handle button clicks"""
-        st.session_state.chat_messages.append({"role": "user", "content": query})
         response = get_ai_response(query)
-        st.session_state.chat_messages.append({"role": "assistant", "content": response})
+        st.rerun()
+    
+    # Also update your form submission handler
+    with st.form(key="popup_form", clear_on_submit=True):
+        user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors, stock")
+        col1, col2 = st.columns(2)
+        with col1:
+            send = st.form_submit_button("📤 Send", use_container_width=True)
+        with col2:
+            clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
+    
+    if send and user_input:
+        # The get_ai_response function now handles history internally
+        response = get_ai_response(user_input)
+        st.rerun()
+    
+    if clear:
+        # Clear both chat display AND conversation history
+        st.session_state.chat_messages = [
+            {"role": "assistant", "content": "👋 Chat cleared. Ask me about inventory!"}
+        ]
+        st.session_state.conversation_history = []  # Clear AI memory too
         st.rerun()
     
     # =========================
