@@ -1081,7 +1081,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 context = {
                     'total_transactions': len(st.session_state.data) if 'data' in st.session_state else 0,
                     'stock_summary': get_stock_summary(),
-                    'pending_orders': get_all_pending()
+                    'pending_orders': get_all_pending(),
                     'future_incoming': get_future_incoming()
                 }
 
