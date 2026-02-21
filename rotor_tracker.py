@@ -971,8 +971,8 @@ if tab_choice == "🔁 Rotor Tracker":
             result.append({
                 'date': date_str,
                 'size': int(row['Size (mm)']),
-                'qty': int(row['Quantity']),
-                'supplier': str(row['Remarks'])
+                'qty': int(row['Quantity'])
+                
             })
         
         # Sort by date
@@ -1093,9 +1093,9 @@ if tab_choice == "🔁 Rotor Tracker":
                         response = "📅 **Future Incoming Rotors:**\n\n"
                         total = 0
                         for item in future:
-                            response += f"• {item['date']}: Size {item['size']}mm, {item['qty']} units from {item['supplier']}\n"
-                            total += item['qty']
-                        response += f"\n**Total Coming:** {total} units"
+                            response += f"• {item['date']}: Size {item['size']}mm, {item['qty']} units}\n"
+                            
+                        
                         return response
                     else:
                         return "No future incoming rotors found"
