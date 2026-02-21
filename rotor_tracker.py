@@ -703,6 +703,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # FIXED AI ASSISTANT - SMALL POPUP, WORKING AI
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH FULL MEMORY & INVENTORY AWARENESS
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -710,6 +714,7 @@ if tab_choice == "🔁 Rotor Tracker":
     import requests
     import json
     import re
+    import time
     
     # =========================
     # AVAILABLE AI PROVIDERS
@@ -728,19 +733,29 @@ if tab_choice == "🔁 Rotor Tracker":
             "default_model": "sarvam-m",
             "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
             "api_key_in_url": False
+        },
+        "OpenRouter": {
+            "base_url": "https://openrouter.ai/api/v1/chat/completions",
+            "models": ["deepseek/deepseek-chat:free", "google/gemini-2.0-flash-exp:free"],
+            "default_model": "deepseek/deepseek-chat:free",
+            "headers": lambda api_key: {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            "api_key_in_url": False
         }
     }
     
     # =========================
-    # SESSION STATE
+    # SESSION STATE INITIALIZATION
     # =========================
     if 'show_assistant' not in st.session_state:
         st.session_state.show_assistant = False
     
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI assistant. Ask me about inventory!"}
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I know everything about your inventory. Ask me anything!"}
         ]
+    
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
     
     if 'ai_config' not in st.session_state:
         st.session_state.ai_config = {
@@ -751,7 +766,7 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # CSS - SMALL POPUP, NO OVERLAY
+    # CSS STYLING
     # =========================
     st.markdown("""
     <style>
@@ -776,13 +791,13 @@ if tab_choice == "🔁 Rotor Tracker":
         z-index: 1000;
     }
     
-    /* Assistant popup - SMALL, RIGHT CORNER */
+    /* Assistant popup */
     .assistant-popup {
         position: fixed;
-        bottom: 9px;
+        bottom: 90px;
         right: 20px;
-        width: 3px;
-        height: 5px;
+        width: 380px;
+        height: 550px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -791,81 +806,50 @@ if tab_choice == "🔁 Rotor Tracker":
         flex-direction: column;
         overflow: hidden;
         border: 1px solid #e0e0e0;
+        padding: 15px;
     }
     
     /* Header */
     .popup-header {
-        background: #4CAF50;
-        color: white;
-        padding: 12px 15px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-weight: bold;
-    }
-    
-    .popup-header button {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 18px;
-        cursor: pointer;
-        padding: 0 5px;
-    }
-    
-    /* Content */
-    .popup-content {
-        flex: 1;
-        padding: 12px;
-        overflow-y: auto;
-        background: white;
-    }
-    
-    /* Status bar */
-    .status-bar {
-        background: #f0f2f6;
-        padding: 6px 10px;
-        border-radius: 20px;
-        font-size: 11px;
         margin-bottom: 10px;
-        text-align: center;
     }
     
-    /* Chat area - FIXED HEIGHT */
+    /* Chat messages */
     .chat-area {
-        height: 220px;
+        flex: 1;
         overflow-y: auto;
-        padding: 8px;
+        padding: 10px;
         background: #f9f9f9;
         border-radius: 8px;
         margin-bottom: 10px;
-        border: 1px solid #eee;
+        max-height: 300px;
     }
     
-    .user-msg {
+    .user-message {
         background: #4CAF50;
         color: white;
-        padding: 6px 10px;
+        padding: 8px 12px;
         border-radius: 15px 15px 0 15px;
-        margin: 4px 0;
+        margin: 5px 0;
         max-width: 85%;
         float: right;
         clear: both;
-        font-size: 12px;
-        word-wrap: break-word;
+        font-size: 13px;
     }
     
-    .ai-msg {
+    .ai-message {
         background: #e0e0e0;
         color: black;
-        padding: 6px 10px;
+        padding: 8px 12px;
         border-radius: 15px 15px 15px 0;
-        margin: 4px 0;
+        margin: 5px 0;
         max-width: 85%;
         float: left;
         clear: both;
-        font-size: 12px;
-        word-wrap: break-word;
+        font-size: 13px;
     }
     
     .clearfix::after {
@@ -878,7 +862,7 @@ if tab_choice == "🔁 Rotor Tracker":
     .quick-buttons {
         display: flex;
         gap: 5px;
-        margin-bottom: 10px;
+        margin: 10px 0;
     }
     
     .quick-buttons button {
@@ -890,26 +874,20 @@ if tab_choice == "🔁 Rotor Tracker":
         padding: 6px;
         font-size: 11px;
         cursor: pointer;
-        font-weight: bold;
-    }
-    
-    .quick-buttons button:hover {
-        background: #45a049;
     }
     
     /* Input area */
     .input-area {
-        margin-top: 5px;
+        margin-top: 10px;
     }
     
     .input-area input {
         width: 100%;
-        padding: 8px 12px;
+        padding: 10px;
         border: 2px solid #4CAF50;
         border-radius: 20px;
-        font-size: 12px;
+        font-size: 13px;
         margin-bottom: 8px;
-        outline: none;
     }
     
     .button-row {
@@ -919,10 +897,10 @@ if tab_choice == "🔁 Rotor Tracker":
     
     .button-row button {
         flex: 1;
-        padding: 6px;
+        padding: 8px;
         border: none;
         border-radius: 20px;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: bold;
         cursor: pointer;
     }
@@ -937,88 +915,63 @@ if tab_choice == "🔁 Rotor Tracker":
         color: white;
     }
     
-    /* Make sure main app content is not covered */
-    .main-content {
-        margin-right: 0;
-        transition: margin-right 0.3s;
+    /* Status indicator */
+    .status-indicator {
+        padding: 5px 10px;
+        background: #f0f2f6;
+        border-radius: 20px;
+        font-size: 11px;
+        text-align: center;
+        margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # =========================
-    # DATA FUNCTIONS
+    # INVENTORY DATA FUNCTIONS
     # =========================
-    # Add this function to get future incoming rotors
-    def get_future_incoming():
-        """Get future incoming rotors"""
+    
+    def get_complete_inventory_context():
+        """Get complete inventory context for AI"""
         if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
+            return {
+                'error': 'No inventory data loaded',
+                'stock_summary': [],
+                'pending_orders': {},
+                'future_incoming': [],
+                'buyers': [],
+                'total_transactions': 0,
+                'date_range': 'No data'
+            }
         
         df = st.session_state.data.copy()
-        
-        # Ensure Date is datetime
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
         
-        # Get future incoming (Type = Inward, Status = Future)
-        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+        # Stock summary
+        stock_summary = []
+        for size in sorted(df['Size (mm)'].unique()):
+            if pd.isna(size):
+                continue
+            size_df = df[df['Size (mm)'] == size]
+            total_in = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current = total_in - total_out
+            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
+            future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+            
+            if current > 0 or pending > 0 or future > 0:
+                stock_summary.append({
+                    'size': int(size),
+                    'current_stock': int(current),
+                    'pending_orders': int(pending),
+                    'future_incoming': int(future)
+                })
         
-        if future_df.empty:
-            return []
-        
-        result = []
-        for _, row in future_df.iterrows():
-            date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Date TBD'
-            result.append({
-                'date': date_str,
-                'size': int(row['Size (mm)']),
-                'qty': int(row['Quantity'])
-                
-            })
-        
-        # Sort by date
-        result.sort(key=lambda x: x['date'] if x['date'] != 'Date TBD' else '9999-99-99')
-        
-        return result
-
-
-    def get_buyer_pending(buyer_name):
-        """Get pending orders for specific buyer"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return None
-        
-        df = st.session_state.data
+        # Pending orders by buyer
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
-        
-        if pending_df.empty:
-            return None
-        
-        # Case-insensitive search
-        buyer_match = pending_df[pending_df['Remarks'].str.lower().str.contains(buyer_name.lower(), na=False)]
-        
-        if buyer_match.empty:
-            return None
-        
-        result = []
-        for _, row in buyer_match.iterrows():
-            result.append({
-                'size': int(row['Size (mm)']),
-                'qty': int(row['Quantity'])
-            })
-        
-        return result
-    
-    def get_all_pending():
-        """Get all pending orders grouped by buyer"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return {}
-        
-        df = st.session_state.data
-        pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
-        
-        if pending_df.empty:
-            return {}
-        
-        result = {}
+        pending_orders = {}
         for buyer in pending_df['Remarks'].unique():
             if pd.isna(buyer):
                 continue
@@ -1027,217 +980,291 @@ if tab_choice == "🔁 Rotor Tracker":
             for _, row in buyer_df.iterrows():
                 orders.append({
                     'size': int(row['Size (mm)']),
-                    'qty': int(row['Quantity'])
+                    'quantity': int(row['Quantity']),
+                    'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
                 })
-            result[str(buyer)] = {
+            pending_orders[str(buyer)] = {
                 'total': int(buyer_df['Quantity'].sum()),
                 'orders': orders
             }
         
-        return result
-    
-    def get_stock_summary():
-        """Get stock summary"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
+        # Future incoming
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+        future_incoming = []
+        for _, row in future_df.iterrows():
+            future_incoming.append({
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'supplier': str(row['Remarks']),
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Date TBD'
+            })
         
-        df = st.session_state.data
-        result = []
+        # Buyers list
+        buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
         
-        for size in sorted(df['Size (mm)'].unique()):
-            if pd.isna(size):
-                continue
-            size_df = df[df['Size (mm)'] == size]
-            
-            total_in = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
-            total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
-            current = total_in - total_out
-            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
-            
-            if current > 0 or pending > 0:
-                result.append({
-                    'size': int(size),
-                    'stock': int(current),
-                    'pending': int(pending)
-                })
-        
-        return result
+        return {
+            'stock_summary': stock_summary,
+            'pending_orders': pending_orders,
+            'future_incoming': future_incoming,
+            'buyers': [str(b) for b in buyers],
+            'total_transactions': len(df),
+            'total_quantity': int(df['Quantity'].sum()),
+            'date_range': {
+                'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown',
+                'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown'
+            }
+        }
     
     # =========================
-    # AI RESPONSE FUNCTION (WITH REAL AI)
+    # AI RESPONSE WITH FULL MEMORY
     # =========================
-    # =========================
-    # FIXED AI WITH CONVERSATION MEMORY
-    # =========================
-    
-    # Add to your session state initialization
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    
-    # Update the get_ai_response function with memory
     def get_ai_response(user_input):
-        """Process user input with conversation memory"""
+        """Get AI response with full conversation memory and inventory awareness"""
         
-        text = user_input.lower().strip()
+        # Get complete inventory context
+        inventory_context = get_complete_inventory_context()
         
-        # If AI is connected, use it with memory
+        # If AI is connected, use it with full memory
         if st.session_state.ai_config['initialized']:
             try:
                 config = st.session_state.ai_config
                 provider = AI_PROVIDERS[config['provider']]
                 
-                # Get current context
-                context = {
-                    'total_transactions': len(st.session_state.data) if 'data' in st.session_state else 0,
-                    'stock_summary': get_stock_summary(),
-                    'pending_orders': get_all_pending(),
-                    'future_incoming': get_future_incoming()
-                }
+                # Build system prompt with complete inventory context
+                system_prompt = f"""You are an AI inventory assistant with complete knowledge of the inventory system. 
+    
+    CURRENT INVENTORY DATA (AS OF {datetime.now().strftime('%Y-%m-%d %H:%M')}):
+    
+    STOCK SUMMARY:
+    {json.dumps(inventory_context['stock_summary'], indent=2)}
+    
+    PENDING ORDERS BY BUYER:
+    {json.dumps(inventory_context['pending_orders'], indent=2)}
+    
+    FUTURE INCOMING ROTORS:
+    {json.dumps(inventory_context['future_incoming'], indent=2)}
+    
+    ALL BUYERS: {inventory_context['buyers']}
+    TOTAL TRANSACTIONS: {inventory_context['total_transactions']}
+    TOTAL QUANTITY: {inventory_context['total_quantity']} units
+    DATE RANGE: {inventory_context['date_range']['from']} to {inventory_context['date_range']['to']}
+    
+    INSTRUCTIONS:
+    1. You have COMPLETE knowledge of all inventory data above
+    2. Remember EVERYTHING discussed in this conversation
+    3. Answer naturally and conversationally like a human assistant
+    4. Be concise but informative
+    5. If asked about something not in the data, say so politely
+    6. Use the conversation history to maintain context
+    7. When showing data, format it nicely with bullet points or numbered lists
+    8. For pending orders, always mention buyer name, size, and quantity
+    9. For future incoming, include dates when available
+    10. You can reference previous questions and answers in the conversation
+    
+    CONVERSATION HISTORY (last 10 exchanges):
+    {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
+    
+    Current user question: {user_input}
+    
+    Provide a helpful, natural response based on ALL the above information."""
                 
-                # Build conversation history
-                messages = []
-                
-                # System prompt with context
-                system_prompt = f"""You are an inventory assistant. You have access to this data:
-    
-    CURRENT STOCK:
-    {json.dumps(context['stock_summary'], indent=2)}
-    
-    PENDING ORDERS:
-    {json.dumps(context['pending_orders'], indent=2)}
-    
-    FUTURE INCOMING:
-    {json.dumps(context['future_incoming'], indent=2)}
-    
-    Instructions:
-    1. Be helpful and conversational
-    2. Remember what was discussed earlier in the conversation
-    3. When showing future incoming rotors, group them by size
-    4. Answer naturally and concisely
-    5. If asked about something not in the data, say you don't have that information"""
-    
-                # Add system message based on provider
-                if "gemini" in config['provider'].lower():
-                    # For Gemini, we'll combine history in a different way
-                    conversation_text = system_prompt + "\n\n"
-                    for msg in st.session_state.conversation_history[-10:]:  # Last 10 messages
-                        role = "User" if msg["role"] == "user" else "Assistant"
-                        conversation_text += f"{role}: {msg['content']}\n"
-                    conversation_text += f"User: {user_input}"
-                    
+                if provider.get('api_key_in_url', False):
                     url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
                     headers = provider['headers'](config['api_key'])
+                    
+                    # For Gemini
                     data = {
-                        "contents": [{"parts": [{"text": conversation_text}]}],
-                        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500}
+                        "contents": [{"parts": [{"text": system_prompt}]}],
+                        "generationConfig": {
+                            "temperature": 0.2,
+                            "maxOutputTokens": 800,
+                            "topP": 0.8,
+                            "topK": 40
+                        }
                     }
                 else:
                     # For OpenAI-compatible APIs
+                    url = provider['base_url']
+                    headers = provider['headers'](config['api_key'])
+                    
+                    # Build messages with history
                     messages = [{"role": "system", "content": system_prompt}]
                     
                     # Add conversation history
                     for msg in st.session_state.conversation_history[-10:]:
                         messages.append({"role": msg["role"], "content": msg["content"]})
                     
-                    # Add current user message
                     messages.append({"role": "user", "content": user_input})
                     
-                    url = provider['base_url']
-                    headers = provider['headers'](config['api_key'])
                     data = {
                         "model": config['model'],
                         "messages": messages,
-                        "temperature": 0.1,
-                        "max_tokens": 500
+                        "temperature": 0.2,
+                        "max_tokens": 800,
+                        "top_p": 0.8
                     }
                 
-                response = requests.post(url, headers=headers, json=data, timeout=10)
+                # Make API request
+                response = requests.post(url, headers=headers, json=data, timeout=15)
                 
                 if response.status_code == 200:
                     result = response.json()
+                    
+                    # Parse response based on provider
                     if "gemini" in config['provider'].lower():
                         ai_response = result['candidates'][0]['content']['parts'][0]['text']
                     else:
                         ai_response = result['choices'][0]['message']['content']
                     
-                    # Save to conversation history
+                    # Update conversation history
                     st.session_state.conversation_history.append({"role": "user", "content": user_input})
                     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
                     
+                    # Keep history manageable (last 50 exchanges)
+                    if len(st.session_state.conversation_history) > 100:
+                        st.session_state.conversation_history = st.session_state.conversation_history[-100:]
+                    
                     return ai_response
                 else:
-                    return fallback_response(user_input)
+                    return f"⚠️ AI Error: {response.status_code}. Using fallback mode."
+                    
             except Exception as e:
-                return fallback_response(user_input)
+                return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
         
-        # If AI not connected, use rule-based but still maintain some "memory" via context
-        return fallback_response(user_input)
+        # Fallback response if AI not connected
+        return get_fallback_response(user_input, inventory_context)
     
-    # Update handle_action to use the new function
+    # =========================
+    # FALLBACK RESPONSE (WHEN AI NOT CONNECTED)
+    # =========================
+    def get_fallback_response(user_input, context):
+        """Rule-based fallback when AI is not connected"""
+        text = user_input.lower().strip()
+        
+        # Stock query
+        if 'stock' in text:
+            if context['stock_summary']:
+                response = "📦 **Current Stock Levels:**\n\n"
+                total = 0
+                for item in context['stock_summary']:
+                    response += f"• {item['size']}mm: {item['current_stock']} units"
+                    if item['pending_orders'] > 0:
+                        response += f" (⏳ {item['pending_orders']} pending)"
+                    response += "\n"
+                    total += item['current_stock']
+                response += f"\n**Total Stock:** {total} units"
+                return response
+        
+        # Pending orders
+        elif 'pending' in text:
+            # Check for specific buyer
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    if buyer in context['pending_orders']:
+                        data = context['pending_orders'][buyer]
+                        response = f"⏳ **Pending for {buyer}:**\n"
+                        for order in data['orders']:
+                            response += f"• {order['size']}mm: {order['quantity']} units\n"
+                        response += f"\n**Total:** {data['total']} units"
+                        return response
+            
+            # All pending
+            if context['pending_orders']:
+                response = "⏳ **All Pending Orders:**\n\n"
+                total_all = 0
+                for buyer, data in context['pending_orders'].items():
+                    response += f"**{buyer}**\n"
+                    for order in data['orders']:
+                        response += f"  • {order['size']}mm: {order['quantity']} units\n"
+                    response += f"  Total: {data['total']} units\n\n"
+                    total_all += data['total']
+                response += f"**Overall Total:** {total_all} units"
+                return response
+        
+        # Future incoming
+        elif any(word in text for word in ['coming', 'future', 'incoming']):
+            if context['future_incoming']:
+                # Group by size
+                size_groups = {}
+                for item in context['future_incoming']:
+                    size = item['size']
+                    if size not in size_groups:
+                        size_groups[size] = {'total': 0, 'items': []}
+                    size_groups[size]['total'] += item['quantity']
+                    size_groups[size]['items'].append(item)
+                
+                response = "📅 **Future Incoming Rotors:**\n\n"
+                grand_total = 0
+                for size in sorted(size_groups.keys()):
+                    response += f"**{size}mm** - Total: {size_groups[size]['total']} units\n"
+                    for item in size_groups[size]['items']:
+                        response += f"  • {item['date']}: {item['quantity']} units from {item['supplier']}\n"
+                    response += "\n"
+                    grand_total += size_groups[size]['total']
+                response += f"**Grand Total:** {grand_total} units"
+                return response
+        
+        # Help
+        elif 'help' in text:
+            return """🤖 **Available Commands:**
+    • `stock` - Show current stock levels
+    • `pending` - Show all pending orders
+    • `[buyer] pending` - Show pending for specific buyer
+    • `coming` - Show future incoming rotors
+    • Ask me anything about your inventory!
+    
+    To use AI features, connect an AI provider above."""
+        
+        # Default response
+        return "I can help you with stock levels, pending orders, and future incoming rotors. Try asking: 'stock', 'pending', 'ajji pending', or 'coming'"
+    
+    # =========================
+    # HANDLE ACTIONS
+    # =========================
     def handle_action(query):
         """Handle button clicks"""
         response = get_ai_response(query)
-        st.rerun()
-    
-    # Also update your form submission handler
-    with st.form(key="assistant_chat_form", clear_on_submit=True):
-        user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors, stock")
-        col1, col2 = st.columns(2)
-        with col1:
-            send = st.form_submit_button("📤 Send", use_container_width=True)
-        with col2:
-            clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
-    
-    if send and user_input:
-        # The get_ai_response function now handles history internally
-        response = get_ai_response(user_input)
-        st.rerun()
-    
-    if clear:
-        # Clear both chat display AND conversation history
-        st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Chat cleared. Ask me about inventory!"}
-        ]
-        st.session_state.conversation_history = []  # Clear AI memory too
+        # Update chat display
+        st.session_state.chat_messages.append({"role": "user", "content": query})
+        st.session_state.chat_messages.append({"role": "assistant", "content": response})
         st.rerun()
     
     # =========================
     # FLOATING BUTTON
     # =========================
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col3:
-        if st.button("🤖 AI Assistant", key="open_ai"):
-            st.session_state.show_assistant = not st.session_state.show_assistant
-            st.rerun()
+    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
+    if st.button("🤖 AI Assistant", key="open_assistant"):
+        st.session_state.show_assistant = not st.session_state.show_assistant
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # =========================
-    # ASSISTANT POPUP (SMALL, RIGHT CORNER)
+    # ASSISTANT POPUP
     # =========================
-    # =========================
-    # FIXED ASSISTANT POPUP WITH UNIQUE FORM KEY
-    # =========================
-    
     if st.session_state.show_assistant:
         st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
         
         # Header
         col1, col2 = st.columns([6, 1])
         with col1:
-            st.markdown("### 🤖 Assistant")
+            st.markdown("### 🤖 AI Assistant")
         with col2:
-            if st.button("✖️", key="close_assistant_unique"):
+            if st.button("✖️", key="close_assistant"):
                 st.session_state.show_assistant = False
                 st.rerun()
         
-        # Connection status
+        # Status indicator
         if st.session_state.ai_config['initialized']:
-            st.success(f"✅ Connected", icon="✅")
+            st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
         else:
-            with st.expander("🔌 Connect AI"):
-                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="assistant_provider")
-                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="assistant_model")
-                api_key = st.text_input("API Key", type="password", key="assistant_key")
-                if st.button("Connect", key="assistant_connect_btn"):
+            st.markdown('<div class="status-indicator">⚠️ Not connected - Using basic mode</div>', unsafe_allow_html=True)
+            
+            # Connection expander
+            with st.expander("🔌 Connect AI for smarter responses"):
+                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
+                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
+                api_key = st.text_input("API Key", type="password", key="popup_key")
+                if st.button("Connect", key="popup_connect"):
                     if api_key:
                         st.session_state.ai_config.update({
                             'provider': provider,
@@ -1247,49 +1274,55 @@ if tab_choice == "🔁 Rotor Tracker":
                         })
                         st.rerun()
         
-        # Chat messages
-        for msg in st.session_state.chat_messages[-5:]:
+        # Chat area
+        st.markdown('<div class="chat-area">', unsafe_allow_html=True)
+        for msg in st.session_state.chat_messages[-8:]:
             if msg["role"] == "user":
-                st.markdown(f"**You:** {msg['content']}")
+                st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f"**AI:** {msg['content']}")
-        
-        st.divider()
+                st.markdown(f'<div class="ai-message">{msg["content"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Quick buttons
+        st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("📦 Stock", key="assistant_stock_btn", use_container_width=True):
-                handle_action("Show stock")
+            if st.button("📦 Stock", key="btn_stock"):
+                handle_action("Show me current stock levels")
         with col2:
-            if st.button("⏳ Pending", key="assistant_pending_btn", use_container_width=True):
-                handle_action("Show pending")
+            if st.button("⏳ Pending", key="btn_pending"):
+                handle_action("Show all pending orders")
         with col3:
-            if st.button("📅 Coming", key="assistant_coming_btn", use_container_width=True):
-                handle_action("Show coming rotors")
+            if st.button("📅 Coming", key="btn_coming"):
+                handle_action("What rotors are coming in the future?")
         with col4:
-            if st.button("❓ Help", key="assistant_help_btn", use_container_width=True):
-                handle_action("Help")
+            if st.button("❓ Help", key="btn_help"):
+                handle_action("What can you help me with?")
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # CHAT FORM WITH UNIQUE KEY
-        with st.form(key="assistant_cha_form", clear_on_submit=True):  # CHANGED: unique key
-            user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors")
+        # Input form
+        with st.form(key="assistant_chat_form", clear_on_submit=True):
+            user_input = st.text_input("Ask me anything about your inventory...", 
+                                       placeholder="e.g., Show pending for Ajji, What's coming next week?")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
             with col2:
-                clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
+                clear = st.form_submit_button("🗑️ Clear Chat", use_container_width=True)
         
         # Handle form submissions
         if send and user_input:
             response = get_ai_response(user_input)
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
             st.rerun()
         
         if clear:
             st.session_state.chat_messages = [
-                {"role": "assistant", "content": "👋 Chat cleared. Ask me about inventory!"}
+                {"role": "assistant", "content": "👋 Chat cleared. I still remember everything about your inventory. Ask me anything!"}
             ]
-            st.session_state.conversation_history = []  # Clear AI memory
+            # Keep conversation history but reset display
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
