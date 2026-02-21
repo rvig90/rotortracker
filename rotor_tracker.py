@@ -948,6 +948,39 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     # DATA FUNCTIONS
     # =========================
+    # Add this function to get future incoming rotors
+    def get_future_incoming():
+        """Get future incoming rotors"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        
+        # Ensure Date is datetime
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Get future incoming (Type = Inward, Status = Future)
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
+        
+        if future_df.empty:
+            return []
+        
+        result = []
+        for _, row in future_df.iterrows():
+            date_str = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Date TBD'
+            result.append({
+                'date': date_str,
+                'size': int(row['Size (mm)']),
+                'qty': int(row['Quantity']),
+                'supplier': str(row['Remarks'])
+            })
+        
+        # Sort by date
+        result.sort(key=lambda x: x['date'] if x['date'] != 'Date TBD' else '9999-99-99')
+        
+        return result
+
+
     def get_buyer_pending(buyer_name):
         """Get pending orders for specific buyer"""
         if 'data' not in st.session_state or st.session_state.data.empty:
@@ -1049,8 +1082,26 @@ if tab_choice == "🔁 Rotor Tracker":
                     'total_transactions': len(st.session_state.data) if 'data' in st.session_state else 0,
                     'stock_summary': get_stock_summary(),
                     'pending_orders': get_all_pending()
+                    'future_incoming': get_future_incoming()
                 }
+
+                # Update the get_ai_response function to handle future incoming queries
+           
+                if 'future' in text or 'coming' in text or 'incoming' in text:
+                    future = get_future_incoming()
+                    if future:
+                        response = "📅 **Future Incoming Rotors:**\n\n"
+                        total = 0
+                        for item in future:
+                            response += f"• {item['date']}: Size {item['size']}mm, {item['qty']} units from {item['supplier']}\n"
+                            total += item['qty']
+                        response += f"\n**Total Coming:** {total} units"
+                        return response
+                    else:
+                        return "No future incoming rotors found"
                 
+                # Rest of your existing code...
+                # [Keep all your other handlers here]
                 if provider.get('api_key_in_url', False):
                     url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
                 else:
