@@ -1272,7 +1272,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 handle_action("Help")
         
         # CHAT FORM WITH UNIQUE KEY
-        with st.form(key="assistant_chat_form", clear_on_submit=True):  # CHANGED: unique key
+        with st.form(key="assistant_cha_form", clear_on_submit=True):  # CHANGED: unique key
             user_input = st.text_input("Ask me...", placeholder="e.g., ajji pending, coming rotors")
             col1, col2 = st.columns(2)
             with col1:
