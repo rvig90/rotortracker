@@ -700,6 +700,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE AI ASSISTANT WITH LATEST TRANSACTIONS
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH RECONNECT BUTTON & FIXED SIZE FILTER
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -758,6 +762,9 @@ if tab_choice == "🔁 Rotor Tracker":
             'initialized': False
         }
     
+    if 'connection_error_count' not in st.session_state:
+        st.session_state.connection_error_count = 0
+    
     # =========================
     # CSS STYLING
     # =========================
@@ -790,7 +797,7 @@ if tab_choice == "🔁 Rotor Tracker":
         bottom: 9px;
         right: 2px;
         width: 3px;
-        height: 5px;
+        height: 6px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -861,7 +868,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     .quick-buttons button {
         flex: 1;
-        min-width: 70px;
+        min-width: 60px;
         background: #4CAF50;
         color: white;
         border: none;
@@ -910,6 +917,17 @@ if tab_choice == "🔁 Rotor Tracker":
         color: white;
     }
     
+    .reconnect-btn {
+        background: #ff9800;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 5px 10px;
+        font-size: 11px;
+        cursor: pointer;
+        margin-left: 5px;
+    }
+    
     /* Status indicator */
     .status-indicator {
         padding: 5px 10px;
@@ -918,16 +936,19 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 11px;
         text-align: center;
         margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # =========================
-    # LATEST TRANSACTIONS FUNCTIONS (NEW)
+    # LATEST TRANSACTIONS FUNCTIONS
     # =========================
     
-    def get_latest_incoming(limit=10, buyer=None, size=None):
-        """Get latest incoming transactions"""
+    def get_latest_incoming(limit=10, supplier=None, size=None):
+        """Get latest incoming transactions with size filter"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return []
         
@@ -940,10 +961,12 @@ if tab_choice == "🔁 Rotor Tracker":
         if incoming_df.empty:
             return []
         
-        # Apply filters
-        if buyer:
-            incoming_df = incoming_df[incoming_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
-        if size:
+        # Apply filters - FIXED SIZE FILTER
+        if supplier:
+            incoming_df = incoming_df[incoming_df['Remarks'].str.lower().str.contains(supplier.lower(), na=False)]
+        
+        if size is not None:
+            # FIX: Ensure size comparison works correctly
             incoming_df = incoming_df[incoming_df['Size (mm)'] == size]
         
         # Sort by date (newest first)
@@ -963,7 +986,7 @@ if tab_choice == "🔁 Rotor Tracker":
         return results
     
     def get_latest_outgoing(limit=10, buyer=None, size=None):
-        """Get latest outgoing transactions"""
+        """Get latest outgoing transactions with size filter"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return []
         
@@ -976,10 +999,12 @@ if tab_choice == "🔁 Rotor Tracker":
         if outgoing_df.empty:
             return []
         
-        # Apply filters
+        # Apply filters - FIXED SIZE FILTER
         if buyer:
             outgoing_df = outgoing_df[outgoing_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
-        if size:
+        
+        if size is not None:
+            # FIX: Ensure size comparison works correctly
             outgoing_df = outgoing_df[outgoing_df['Size (mm)'] == size]
         
         # Sort by date (newest first)
@@ -1045,6 +1070,10 @@ if tab_choice == "🔁 Rotor Tracker":
             for t in transactions:
                 response += f"• {t['date']}: **{t['size']}mm**, {t['quantity']} units from {t['supplier']}\n"
         
+        # Add count if limited
+        if len(transactions) == 10:
+            response += f"\n*Showing last 10 transactions*"
+        
         return response
     
     # =========================
@@ -1109,7 +1138,7 @@ if tab_choice == "🔁 Rotor Tracker":
             }
         
         # Future incoming
-        future_incoming = get_future_incoming(50)  # Use the new function
+        future_incoming = get_future_incoming(50)
         
         # Buyers list
         buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
@@ -1134,6 +1163,58 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
+    # TEST CONNECTION FUNCTION
+    # =========================
+    def test_ai_connection():
+        """Test if AI connection is working"""
+        if not st.session_state.ai_config['initialized'] or not st.session_state.ai_config['api_key']:
+            return False
+        
+        try:
+            config = st.session_state.ai_config
+            provider = AI_PROVIDERS[config['provider']]
+            
+            if provider.get('api_key_in_url', False):
+                # Test Gemini
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={config['api_key']}"
+                response = requests.get(url, timeout=5)
+                return response.status_code == 200
+            else:
+                # Test other providers with a simple ping
+                url = provider['base_url']
+                headers = provider['headers'](config['api_key'])
+                
+                # For OpenRouter
+                if "openrouter" in url:
+                    test_url = "https://openrouter.ai/api/v1/auth/key"
+                    response = requests.get(test_url, headers=headers, timeout=5)
+                    return response.status_code == 200
+                
+                # For Sarvam
+                elif "sarvam" in url:
+                    test_url = "https://api.sarvam.ai/v1/models"
+                    response = requests.get(test_url, headers=headers, timeout=5)
+                    return response.status_code == 200
+                
+                return True
+        except:
+            return False
+    
+    # =========================
+    # RECONNECT FUNCTION
+    # =========================
+    def reconnect_ai():
+        """Attempt to reconnect AI"""
+        st.session_state.connection_error_count = 0
+        # Keep the same config, just test connection
+        if test_ai_connection():
+            st.session_state.ai_config['initialized'] = True
+            return True
+        else:
+            st.session_state.ai_config['initialized'] = False
+            return False
+    
+    # =========================
     # AI RESPONSE WITH FULL MEMORY
     # =========================
     def get_ai_response(user_input):
@@ -1141,6 +1222,14 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # Get complete inventory context
         inventory_context = get_complete_inventory_context()
+        
+        # Check connection if AI is initialized
+        if st.session_state.ai_config['initialized']:
+            if not test_ai_connection():
+                st.session_state.connection_error_count += 1
+                if st.session_state.connection_error_count > 2:
+                    st.session_state.ai_config['initialized'] = False
+                    return "⚠️ Connection lost. Please use the reconnect button to try again."
         
         # If AI is connected, use it with full memory
         if st.session_state.ai_config['initialized']:
@@ -1171,7 +1260,6 @@ if tab_choice == "🔁 Rotor Tracker":
     ALL BUYERS: {inventory_context['buyers']}
     TOTAL TRANSACTIONS: {inventory_context['total_transactions']}
     TOTAL QUANTITY: {inventory_context['total_quantity']} units
-    DATE RANGE: {inventory_context['date_range']['from']} to {inventory_context['date_range']['to']}
     
     INSTRUCTIONS:
     1. You have COMPLETE knowledge of all inventory data above
@@ -1184,7 +1272,6 @@ if tab_choice == "🔁 Rotor Tracker":
     8. For pending orders, always mention buyer name, size, and quantity
     9. For future incoming, include dates when available
     10. For latest transactions, show date, buyer/supplier, size, and quantity
-    11. You can reference previous questions and answers in the conversation
     
     CONVERSATION HISTORY (last 10 exchanges):
     {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
@@ -1197,7 +1284,6 @@ if tab_choice == "🔁 Rotor Tracker":
                     url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
                     headers = provider['headers'](config['api_key'])
                     
-                    # For Gemini
                     data = {
                         "contents": [{"parts": [{"text": system_prompt}]}],
                         "generationConfig": {
@@ -1208,14 +1294,11 @@ if tab_choice == "🔁 Rotor Tracker":
                         }
                     }
                 else:
-                    # For OpenAI-compatible APIs
                     url = provider['base_url']
                     headers = provider['headers'](config['api_key'])
                     
-                    # Build messages with history
                     messages = [{"role": "system", "content": system_prompt}]
                     
-                    # Add conversation history
                     for msg in st.session_state.conversation_history[-10:]:
                         messages.append({"role": msg["role"], "content": msg["content"]})
                     
@@ -1225,36 +1308,31 @@ if tab_choice == "🔁 Rotor Tracker":
                         "model": config['model'],
                         "messages": messages,
                         "temperature": 0.2,
-                        "max_tokens": 800,
-                        "top_p": 0.8
+                        "max_tokens": 800
                     }
                 
-                # Make API request
                 response = requests.post(url, headers=headers, json=data, timeout=15)
                 
                 if response.status_code == 200:
                     result = response.json()
                     
-                    # Parse response based on provider
                     if "gemini" in config['provider'].lower():
                         ai_response = result['candidates'][0]['content']['parts'][0]['text']
                     else:
                         ai_response = result['choices'][0]['message']['content']
                     
-                    # Update conversation history
                     st.session_state.conversation_history.append({"role": "user", "content": user_input})
                     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
-                    
-                    # Keep history manageable (last 50 exchanges)
-                    if len(st.session_state.conversation_history) > 100:
-                        st.session_state.conversation_history = st.session_state.conversation_history[-100:]
+                    st.session_state.connection_error_count = 0
                     
                     return ai_response
                 else:
+                    st.session_state.connection_error_count += 1
                     return f"⚠️ AI Error: {response.status_code}. Using fallback mode."
                     
             except Exception as e:
-                return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
+                st.session_state.connection_error_count += 1
+                return f"⚠️ Connection Error. Using fallback mode."
         
         # Fallback response if AI not connected
         return get_fallback_response(user_input, inventory_context)
@@ -1268,15 +1346,15 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # ===== LATEST TRANSACTIONS QUERIES =====
         
-        # Latest incoming
+        # Latest incoming - FIXED SIZE FILTER
         if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['incoming', 'inward', 'received']):
-            # Check for specific buyer/supplier
+            # Check for specific supplier
             for buyer in context['buyers']:
                 if buyer.lower() in text:
-                    transactions = get_latest_incoming(limit=10, buyer=buyer)
+                    transactions = get_latest_incoming(limit=10, supplier=buyer)
                     return format_latest_transactions(transactions, f"Latest Incoming from {buyer}", "incoming")
             
-            # Check for specific size
+            # Check for specific size - FIXED
             size_match = re.search(r'(\d+)', text)
             if size_match:
                 size = int(size_match.group(1))
@@ -1287,7 +1365,7 @@ if tab_choice == "🔁 Rotor Tracker":
             transactions = get_latest_incoming(limit=10)
             return format_latest_transactions(transactions, "Latest Incoming Transactions", "incoming")
         
-        # Latest outgoing
+        # Latest outgoing - FIXED SIZE FILTER
         if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward', 'sold']):
             # Check for specific buyer
             for buyer in context['buyers']:
@@ -1295,7 +1373,7 @@ if tab_choice == "🔁 Rotor Tracker":
                     transactions = get_latest_outgoing(limit=10, buyer=buyer)
                     return format_latest_transactions(transactions, f"Latest Outgoing for {buyer}", "outgoing")
             
-            # Check for specific size
+            # Check for specific size - FIXED
             size_match = re.search(r'(\d+)', text)
             if size_match:
                 size = int(size_match.group(1))
@@ -1308,11 +1386,10 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # Future incoming
         if any(word in text for word in ['coming', 'future', 'incoming', 'expected']):
-            if 'future' in text or 'coming' in text:
-                transactions = get_future_incoming(limit=20)
-                return format_latest_transactions(transactions, "Future Incoming Rotors", "future")
+            transactions = get_future_incoming(limit=20)
+            return format_latest_transactions(transactions, "Future Incoming Rotors", "future")
         
-        # Combined latest (both types)
+        # Combined latest
         if any(word in text for word in ['latest', 'recent', 'last']) and not any(word in text for word in ['incoming', 'outgoing']):
             incoming = get_latest_incoming(limit=5)
             outgoing = get_latest_outgoing(limit=5)
@@ -1387,13 +1464,14 @@ if tab_choice == "🔁 Rotor Tracker":
     • `coming` - Show future incoming rotors
     • `latest incoming` - Show recent incoming transactions
     • `latest outgoing` - Show recent outgoing transactions
+    • `latest incoming 130mm` - Show recent incoming for size 130mm
+    • `latest outgoing 1803mm` - Show recent outgoing for size 1803mm
     • `latest for [buyer]` - Show recent transactions for specific buyer
-    • `latest [size]mm` - Show recent transactions for specific size
     
     Ask me anything about your inventory!"""
         
         # Default response
-        return "I can help you with stock levels, pending orders, future incoming, and latest transactions. Try asking: 'stock', 'pending', 'coming', 'latest incoming', or 'latest outgoing'"
+        return "I can help you with stock levels, pending orders, future incoming, and latest transactions. Try asking: 'stock', 'pending', 'coming', 'latest incoming 130mm', or 'latest outgoing'"
     
     # =========================
     # HANDLE ACTIONS
@@ -1401,7 +1479,6 @@ if tab_choice == "🔁 Rotor Tracker":
     def handle_action(query):
         """Handle button clicks"""
         response = get_ai_response(query)
-        # Update chat display
         st.session_state.chat_messages.append({"role": "user", "content": query})
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
         st.rerun()
@@ -1430,14 +1507,28 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.session_state.show_assistant = False
                 st.rerun()
         
-        # Status indicator
-        if st.session_state.ai_config['initialized']:
-            st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="status-indicator">⚠️ Not connected - Using basic mode</div>', unsafe_allow_html=True)
-            
-            # Connection expander
-            with st.expander("🔌 Connect AI for smarter responses"):
+        # Status indicator with reconnect button
+        status_col1, status_col2 = st.columns([3, 1])
+        with status_col1:
+            if st.session_state.ai_config['initialized']:
+                if test_ai_connection():
+                    st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="status-indicator">⚠️ Connection lost</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="status-indicator">🔌 Not connected</div>', unsafe_allow_html=True)
+        
+        with status_col2:
+            if st.button("🔄 Reconnect", key="reconnect_btn", help="Reconnect to AI"):
+                if reconnect_ai():
+                    st.success("✅ Reconnected!")
+                    st.rerun()
+                else:
+                    st.error("❌ Reconnection failed")
+        
+        # Connection expander (only show when not connected)
+        if not st.session_state.ai_config['initialized']:
+            with st.expander("🔌 Connect AI", expanded=True):
                 provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
                 model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
                 api_key = st.text_input("API Key", type="password", key="popup_key")
@@ -1449,7 +1540,12 @@ if tab_choice == "🔁 Rotor Tracker":
                             'api_key': api_key,
                             'initialized': True
                         })
-                        st.rerun()
+                        if test_ai_connection():
+                            st.success("✅ Connected!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Connection failed. Check your API key.")
+                            st.session_state.ai_config['initialized'] = False
         
         # Chat area
         st.markdown('<div class="chat-area">', unsafe_allow_html=True)
@@ -1461,7 +1557,7 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick buttons - UPDATED with more options
+        # Quick buttons
         st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
         col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
@@ -1486,13 +1582,13 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # Input form
         with st.form(key="assistant_chat_form", clear_on_submit=True):
-            user_input = st.text_input("Ask me anything about your inventory...", 
-                                       placeholder="e.g., Show latest incoming, pending for Ajji, stock")
+            user_input = st.text_input("Ask me anything...", 
+                                       placeholder="e.g., latest incoming 130mm, pending for Ajji")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
             with col2:
-                clear = st.form_submit_button("🗑️ Clear Chat", use_container_width=True)
+                clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
         
         # Handle form submissions
         if send and user_input:
@@ -1503,12 +1599,12 @@ if tab_choice == "🔁 Rotor Tracker":
         
         if clear:
             st.session_state.chat_messages = [
-                {"role": "assistant", "content": "👋 Chat cleared. I still remember everything about your inventory. Ask me anything!"}
+                {"role": "assistant", "content": "👋 Chat cleared. Ask me anything about your inventory!"}
             ]
-            # Keep conversation history but reset display
+            st.session_state.conversation_history = []
             st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True))
     # === TAB 3: Rotor Trend ===
 
         
