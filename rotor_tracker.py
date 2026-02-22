@@ -781,10 +781,10 @@ if tab_choice == "🔁 Rotor Tracker":
     }
     .assistant-popup {
         position: fixed;
-        bottom: 90px;
-        right: 20px;
-        width: 400px;
-        height: 600px;
+        bottom: 9px;
+        right: 2px;
+        width: 4px;
+        height: 6px;
         background: white;
         border-radius: 15px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
