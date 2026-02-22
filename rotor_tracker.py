@@ -711,6 +711,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE UPGRADED AI ASSISTANT WITH LATEST TRANSACTIONS
     # =========================
     
+    # =========================
+    # REAL CONVERSATIONAL AI WITH ACCURATE DATA
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -763,7 +767,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I can track stock, pending orders, future incoming, AND latest transactions! Ask me anything!"}
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I can help you track stock, pending orders, future incoming, and latest transactions. What would you like to know?"}
         ]
     
     if 'conversation_history' not in st.session_state:
@@ -778,18 +782,17 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # CSS STYLING
+    # CSS STYLING (keep your existing CSS)
     # =========================
     st.markdown("""
     <style>
-    /* Floating button */
+    /* Your existing CSS here */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
         right: 20px;
         z-index: 1000;
     }
-    
     .floating-btn {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -803,13 +806,10 @@ if tab_choice == "🔁 Rotor Tracker":
         z-index: 1000;
         transition: all 0.3s;
     }
-    
     .floating-btn:hover {
         transform: scale(1.05);
         box-shadow: 0 6px 16px rgba(0,0,0,0.3);
     }
-    
-    /* Assistant popup */
     .assistant-popup {
         position: fixed;
         bottom: 9px;
@@ -826,8 +826,6 @@ if tab_choice == "🔁 Rotor Tracker":
         border: 1px solid #e0e0e0;
         padding: 15px;
     }
-    
-    /* Header */
     .popup-header {
         display: flex;
         justify-content: space-between;
@@ -836,13 +834,10 @@ if tab_choice == "🔁 Rotor Tracker":
         padding-bottom: 10px;
         border-bottom: 2px solid #4CAF50;
     }
-    
     .popup-header h3 {
         margin: 0;
         color: #4CAF50;
     }
-    
-    /* Status indicator */
     .status-indicator {
         padding: 5px 10px;
         background: #f0f2f6;
@@ -851,8 +846,6 @@ if tab_choice == "🔁 Rotor Tracker":
         text-align: center;
         margin-bottom: 10px;
     }
-    
-    /* Chat area */
     .chat-area {
         flex: 1;
         overflow-y: auto;
@@ -862,7 +855,6 @@ if tab_choice == "🔁 Rotor Tracker":
         margin-bottom: 10px;
         max-height: 300px;
     }
-    
     .user-message {
         background: #4CAF50;
         color: white;
@@ -875,7 +867,6 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 13px;
         word-wrap: break-word;
     }
-    
     .ai-message {
         background: #e0e0e0;
         color: black;
@@ -888,21 +879,17 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 13px;
         word-wrap: break-word;
     }
-    
     .clearfix::after {
         content: "";
         clear: both;
         display: table;
     }
-    
-    /* Quick buttons grid */
     .quick-buttons {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 5px;
         margin: 10px 0;
     }
-    
     .quick-buttons button {
         background: #4CAF50;
         color: white;
@@ -914,17 +901,13 @@ if tab_choice == "🔁 Rotor Tracker":
         cursor: pointer;
         transition: all 0.3s;
     }
-    
     .quick-buttons button:hover {
         background: #45a049;
         transform: translateY(-2px);
     }
-    
-    /* Input area */
     .input-area {
         margin-top: 10px;
     }
-    
     .input-area input {
         width: 100%;
         padding: 12px;
@@ -934,17 +917,14 @@ if tab_choice == "🔁 Rotor Tracker":
         margin-bottom: 8px;
         outline: none;
     }
-    
     .input-area input:focus {
         border-color: #45a049;
         box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
     }
-    
     .button-row {
         display: flex;
         gap: 8px;
     }
-    
     .button-row button {
         flex: 1;
         padding: 8px;
@@ -955,154 +935,40 @@ if tab_choice == "🔁 Rotor Tracker":
         cursor: pointer;
         transition: all 0.3s;
     }
-    
     .send-btn {
         background: #4CAF50;
         color: white;
     }
-    
     .send-btn:hover {
         background: #45a049;
     }
-    
     .clear-btn {
         background: #f44336;
         color: white;
     }
-    
     .clear-btn:hover {
         background: #d32f2f;
-    }
-    
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        font-size: 13px;
-        background: #f0f2f6;
-        border-radius: 8px;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # =========================
-    # LATEST TRANSACTIONS FUNCTIONS
+    # DATA COLLECTION FUNCTIONS (ACCURATE DATA FOR AI)
     # =========================
     
-    def get_latest_outgoing(limit=10, buyer=None, size=None):
-        """Get latest outgoing transactions"""
+    def get_complete_inventory_data():
+        """Collect ALL inventory data for AI to use naturally"""
         if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
+            return {
+                'has_data': False,
+                'message': 'No inventory data loaded yet.'
+            }
         
         df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         
-        # Filter for outgoing transactions only
-        outgoing_df = df[df['Type'] == 'Outgoing'].copy()
-        
-        if outgoing_df.empty:
-            return []
-        
-        # Apply filters
-        if buyer:
-            outgoing_df = outgoing_df[outgoing_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
-        if size:
-            outgoing_df = outgoing_df[outgoing_df['Size (mm)'] == size]
-        
-        # Sort by date (newest first)
-        outgoing_df['Date'] = pd.to_datetime(outgoing_df['Date'], errors='coerce')
-        outgoing_df = outgoing_df.sort_values('Date', ascending=False)
-        
-        # Format results
-        results = []
-        for _, row in outgoing_df.head(limit).iterrows():
-            results.append({
-                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
-                'buyer': str(row['Remarks']),
-                'size': int(row['Size (mm)']),
-                'quantity': int(row['Quantity']),
-                'status': str(row['Status']),
-                'pending': bool(row['Pending'])
-            })
-        
-        return results
-    
-    def get_latest_incoming(limit=10, supplier=None, size=None):
-        """Get latest incoming transactions"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
-        
-        df = st.session_state.data.copy()
-        
-        # Filter for incoming transactions only
-        incoming_df = df[df['Type'] == 'Inward'].copy()
-        
-        if incoming_df.empty:
-            return []
-        
-        # Apply filters
-        if supplier:
-            incoming_df = incoming_df[incoming_df['Remarks'].str.lower().str.contains(supplier.lower(), na=False)]
-        if size:
-            incoming_df = incoming_df[incoming_df['Size (mm)'] == size]
-        
-        # Sort by date (newest first)
-        incoming_df['Date'] = pd.to_datetime(incoming_df['Date'], errors='coerce')
-        incoming_df = incoming_df.sort_values('Date', ascending=False)
-        
-        # Format results
-        results = []
-        for _, row in incoming_df.head(limit).iterrows():
-            results.append({
-                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
-                'supplier': str(row['Remarks']),
-                'size': int(row['Size (mm)']),
-                'quantity': int(row['Quantity']),
-                'status': str(row['Status'])
-            })
-        
-        return results
-    
-    def format_latest_outgoing(transactions, title="Latest Outgoing Transactions"):
-        """Format outgoing transactions for display"""
-        if not transactions:
-            return "No outgoing transactions found."
-        
-        response = f"**📤 {title}:**\n\n"
-        total_units = 0
-        
-        for t in transactions:
-            pending_mark = " ⏳" if t['pending'] else ""
-            response += f"• **{t['date']}**: {t['buyer']} - {t['size']}mm, {t['quantity']} units{pending_mark}\n"
-            total_units += t['quantity']
-        
-        response += f"\n**Total:** {total_units} units across {len(transactions)} transactions"
-        return response
-    
-    def format_latest_incoming(transactions, title="Latest Incoming Transactions"):
-        """Format incoming transactions for display"""
-        if not transactions:
-            return "No incoming transactions found."
-        
-        response = f"**📥 {title}:**\n\n"
-        total_units = 0
-        
-        for t in transactions:
-            response += f"• **{t['date']}**: {t['supplier']} - {t['size']}mm, {t['quantity']} units\n"
-            total_units += t['quantity']
-        
-        response += f"\n**Total:** {total_units} units across {len(transactions)} transactions"
-        return response
-    
-    # =========================
-    # INVENTORY DATA FUNCTIONS
-    # =========================
-    
-    def get_stock_summary():
-        """Get current stock levels"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
-        
-        df = st.session_state.data
-        result = []
-        
+        # ===== STOCK SUMMARY =====
+        stock = []
         for size in sorted(df['Size (mm)'].unique()):
             if pd.isna(size):
                 continue
@@ -1110,57 +976,21 @@ if tab_choice == "🔁 Rotor Tracker":
             
             total_in = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
             total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
-            current = total_in - total_out
-            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
-            future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+            current = int(total_in - total_out)
+            pending = int(size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum())
+            future = int(size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum())
             
             if current > 0 or pending > 0 or future > 0:
-                result.append({
-                    'size': int(size),
-                    'stock': int(current),
-                    'pending': int(pending),
-                    'future': int(future)
+                stock.append({
+                    'size': size,
+                    'current': current,
+                    'pending': pending,
+                    'future': future
                 })
         
-        return result
-    
-    def get_buyer_pending(buyer_name):
-        """Get pending orders for specific buyer"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return None
-        
-        df = st.session_state.data
+        # ===== PENDING ORDERS BY BUYER =====
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
-        
-        if pending_df.empty:
-            return None
-        
-        buyer_df = pending_df[pending_df['Remarks'].str.lower() == buyer_name.lower()]
-        
-        if buyer_df.empty:
-            return None
-        
-        result = []
-        for _, row in buyer_df.iterrows():
-            result.append({
-                'size': int(row['Size (mm)']),
-                'qty': int(row['Quantity'])
-            })
-        
-        return result
-    
-    def get_all_pending():
-        """Get all pending orders grouped by buyer"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return {}
-        
-        df = st.session_state.data
-        pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
-        
-        if pending_df.empty:
-            return {}
-        
-        result = {}
+        pending_by_buyer = {}
         for buyer in pending_df['Remarks'].unique():
             if pd.isna(buyer):
                 continue
@@ -1169,266 +999,245 @@ if tab_choice == "🔁 Rotor Tracker":
             for _, row in buyer_df.iterrows():
                 orders.append({
                     'size': int(row['Size (mm)']),
-                    'qty': int(row['Quantity'])
+                    'qty': int(row['Quantity']),
+                    'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'unknown'
                 })
-            result[str(buyer)] = {
+            pending_by_buyer[str(buyer)] = {
                 'total': int(buyer_df['Quantity'].sum()),
                 'orders': orders
             }
         
-        return result
-    
-    def get_future_incoming():
-        """Get future incoming rotors"""
-        if 'data' not in st.session_state or st.session_state.data.empty:
-            return []
-        
-        df = st.session_state.data
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        
+        # ===== FUTURE INCOMING =====
         future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
-        
-        if future_df.empty:
-            return []
-        
-        # Group by size
-        size_groups = {}
+        future_incoming = []
         for _, row in future_df.iterrows():
-            size = int(row['Size (mm)'])
-            qty = int(row['Quantity'])
-            supplier = str(row['Remarks'])
-            date = row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'TBD'
-            
-            if size not in size_groups:
-                size_groups[size] = {'total': 0, 'deliveries': []}
-            
-            size_groups[size]['deliveries'].append({
-                'date': date,
-                'qty': qty,
-                'supplier': supplier
-            })
-            size_groups[size]['total'] += qty
-        
-        # Convert to list and sort
-        result = []
-        for size in sorted(size_groups.keys()):
-            result.append({
-                'size': size,
-                'total': size_groups[size]['total'],
-                'deliveries': sorted(size_groups[size]['deliveries'], key=lambda x: x['date'])
+            future_incoming.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'TBD',
+                'size': int(row['Size (mm)']),
+                'qty': int(row['Quantity']),
+                'supplier': str(row['Remarks'])
             })
         
-        return result
+        # ===== LATEST TRANSACTIONS =====
+        latest_outgoing = []
+        outgoing_df = df[df['Type'] == 'Outgoing'].sort_values('Date', ascending=False).head(20)
+        for _, row in outgoing_df.iterrows():
+            latest_outgoing.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'unknown',
+                'buyer': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'qty': int(row['Quantity']),
+                'pending': bool(row['Pending'])
+            })
+        
+        latest_incoming = []
+        incoming_df = df[df['Type'] == 'Inward'].sort_values('Date', ascending=False).head(20)
+        for _, row in incoming_df.iterrows():
+            latest_incoming.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'unknown',
+                'supplier': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'qty': int(row['Quantity'])
+            })
+        
+        # ===== SUMMARY STATS =====
+        total_stock = sum(s['current'] for s in stock)
+        total_pending = sum(s['pending'] for s in stock)
+        total_future = sum(s['future'] for s in stock)
+        unique_buyers = df[df['Type'] == 'Outgoing']['Remarks'].nunique()
+        unique_suppliers = df[df['Type'] == 'Inward']['Remarks'].nunique()
+        
+        return {
+            'has_data': True,
+            'stock': stock,
+            'pending_by_buyer': pending_by_buyer,
+            'future_incoming': future_incoming,
+            'latest_outgoing': latest_outgoing,
+            'latest_incoming': latest_incoming,
+            'summary': {
+                'total_stock': total_stock,
+                'total_pending': total_pending,
+                'total_future': total_future,
+                'unique_buyers': unique_buyers,
+                'unique_suppliers': unique_suppliers,
+                'total_transactions': len(df),
+                'date_range': {
+                    'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A',
+                    'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A'
+                }
+            }
+        }
     
     # =========================
-    # AI RESPONSE FUNCTION
+    # REAL AI RESPONSE WITH NATURAL CONVERSATION
     # =========================
     
     def get_ai_response(user_input):
-        """Process user input and return response"""
+        """Let the REAL AI handle everything naturally"""
+        
+        # Get complete inventory data
+        inventory = get_complete_inventory_data()
+        
+        # If AI is connected, let it handle everything naturally
+        if st.session_state.ai_config['initialized']:
+            try:
+                config = st.session_state.ai_config
+                provider = AI_PROVIDERS[config['provider']]
+                
+                # Build conversation context
+                system_prompt = f"""You are an AI inventory assistant for a rotor manufacturing company. You have complete access to their inventory data.
+    
+    CURRENT INVENTORY DATA (as of {datetime.now().strftime('%Y-%m-%d %H:%M')}):
+    
+    STOCK SUMMARY:
+    {json.dumps(inventory['stock'], indent=2)}
+    
+    PENDING ORDERS BY BUYER:
+    {json.dumps(inventory['pending_by_buyer'], indent=2)}
+    
+    FUTURE INCOMING ROTORS:
+    {json.dumps(inventory['future_incoming'], indent=2)}
+    
+    LATEST OUTGOING TRANSACTIONS (last 20):
+    {json.dumps(inventory['latest_outgoing'], indent=2)}
+    
+    LATEST INCOMING TRANSACTIONS (last 20):
+    {json.dumps(inventory['latest_incoming'], indent=2)}
+    
+    OVERALL SUMMARY:
+    {json.dumps(inventory['summary'], indent=2)}
+    
+    CONVERSATION HISTORY:
+    {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
+    
+    INSTRUCTIONS:
+    1. Be a friendly, helpful assistant - have a natural conversation
+    2. Use the data above to answer questions accurately
+    3. Remember everything discussed in this conversation
+    4. If asked about something not in the data, say so politely
+    5. Be concise but informative
+    6. When showing numbers, format them clearly
+    7. You can ask follow-up questions if needed
+    8. Reference previous parts of the conversation naturally
+    
+    Current user question: {user_input}
+    
+    Respond naturally as a helpful inventory assistant:"""
+    
+                # API call based on provider
+                if provider.get('api_key_in_url', False):
+                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
+                    headers = provider['headers'](config['api_key'])
+                    data = {
+                        "contents": [{"parts": [{"text": system_prompt}]}],
+                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}
+                    }
+                else:
+                    url = provider['base_url']
+                    headers = provider['headers'](config['api_key'])
+                    
+                    # Build messages with history
+                    messages = [{"role": "system", "content": system_prompt}]
+                    for msg in st.session_state.conversation_history[-10:]:
+                        messages.append({"role": msg["role"], "content": msg["content"]})
+                    messages.append({"role": "user", "content": user_input})
+                    
+                    data = {
+                        "model": config['model'],
+                        "messages": messages,
+                        "temperature": 0.3,
+                        "max_tokens": 800
+                    }
+                
+                response = requests.post(url, headers=headers, json=data, timeout=15)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if "gemini" in config['provider'].lower():
+                        ai_response = result['candidates'][0]['content']['parts'][0]['text']
+                    else:
+                        ai_response = result['choices'][0]['message']['content']
+                    
+                    # Save to conversation history
+                    st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                    st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+                    
+                    return ai_response
+                else:
+                    return f"⚠️ AI temporarily unavailable. Using basic mode.\n\n{fallback_response(user_input, inventory)}"
+            
+            except Exception as e:
+                return f"⚠️ Connection issue. Using basic mode.\n\n{fallback_response(user_input, inventory)}"
+        
+        # If AI not connected, use fallback
+        return fallback_response(user_input, inventory)
+    
+    # =========================
+    # FALLBACK RESPONSE (WHEN AI NOT CONNECTED)
+    # =========================
+    
+    def fallback_response(user_input, inventory):
+        """Basic rule-based responses when AI is offline"""
         
         text = user_input.lower().strip()
         
-        # ===== LATEST OUTGOING QUERIES =====
-        if any(word in text for word in ['latest', 'recent', 'last']) and ('outgoing' in text or 'outward' in text):
-            # Check for specific buyer
-            buyers = ['ajji', 'enova', 'anil', 'tri', 'avs', 'kkm', 'aggarwal', 'alpha', 'beta', 'gamma']
-            mentioned_buyer = None
-            for buyer in buyers:
-                if buyer in text:
-                    mentioned_buyer = buyer
-                    break
-            
-            # Check for specific size
-            size_match = re.search(r'(\d+)', text)
-            size = int(size_match.group(1)) if size_match else None
-            
-            # Get limit from text
-            limit_match = re.search(r'last\s+(\d+)', text)
-            limit = int(limit_match.group(1)) if limit_match else 10
-            
-            if mentioned_buyer and size:
-                transactions = get_latest_outgoing(limit=limit, buyer=mentioned_buyer, size=size)
-                title = f"Last {limit} Outgoing for {mentioned_buyer.title()} - Size {size}mm"
-                return format_latest_outgoing(transactions, title)
-            
-            elif mentioned_buyer:
-                transactions = get_latest_outgoing(limit=limit, buyer=mentioned_buyer)
-                title = f"Last {limit} Outgoing for {mentioned_buyer.title()}"
-                return format_latest_outgoing(transactions, title)
-            
-            elif size:
-                transactions = get_latest_outgoing(limit=limit, size=size)
-                title = f"Last {limit} Outgoing for Size {size}mm"
-                return format_latest_outgoing(transactions, title)
-            
-            else:
-                transactions = get_latest_outgoing(limit=limit)
-                title = f"Last {limit} Outgoing Transactions"
-                return format_latest_outgoing(transactions, title)
+        if not inventory['has_data']:
+            return "No inventory data loaded yet. Please add some transactions first."
         
-        # ===== LATEST INCOMING QUERIES =====
-        if any(word in text for word in ['latest', 'recent', 'last']) and ('incoming' in text or 'inward' in text):
-            # Check for specific supplier
-            suppliers = ['ajji', 'enova', 'anil', 'tri', 'avs', 'kkm', 'aggarwal', 'alpha', 'beta', 'gamma']
-            mentioned_supplier = None
-            for supplier in suppliers:
-                if supplier in text:
-                    mentioned_supplier = supplier
-                    break
-            
-            size_match = re.search(r'(\d+)', text)
-            size = int(size_match.group(1)) if size_match else None
-            limit_match = re.search(r'last\s+(\d+)', text)
-            limit = int(limit_match.group(1)) if limit_match else 10
-            
-            if mentioned_supplier and size:
-                transactions = get_latest_incoming(limit=limit, supplier=mentioned_supplier, size=size)
-                title = f"Last {limit} Incoming from {mentioned_supplier.title()} - Size {size}mm"
-                return format_latest_incoming(transactions, title)
-            
-            elif mentioned_supplier:
-                transactions = get_latest_incoming(limit=limit, supplier=mentioned_supplier)
-                title = f"Last {limit} Incoming from {mentioned_supplier.title()}"
-                return format_latest_incoming(transactions, title)
-            
-            elif size:
-                transactions = get_latest_incoming(limit=limit, size=size)
-                title = f"Last {limit} Incoming for Size {size}mm"
-                return format_latest_incoming(transactions, title)
-            
-            else:
-                transactions = get_latest_incoming(limit=limit)
-                title = f"Last {limit} Incoming Transactions"
-                return format_latest_incoming(transactions, title)
+        # Check for latest outgoing
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward', 'sold']):
+            if inventory['latest_outgoing']:
+                response = "**Here are the most recent outgoing transactions:**\n\n"
+                for t in inventory['latest_outgoing'][:5]:
+                    pending = " (pending)" if t['pending'] else ""
+                    response += f"• {t['date']}: {t['buyer']} - {t['size']}mm, {t['qty']} units{pending}\n"
+                return response
         
-        # ===== JUST "LATEST" (BOTH TYPES) =====
-        if any(word in text for word in ['latest', 'recent', 'last']):
-            limit_match = re.search(r'last\s+(\d+)', text)
-            limit = int(limit_match.group(1)) if limit_match else 5
-            
-            outgoing = get_latest_outgoing(limit=limit)
-            incoming = get_latest_incoming(limit=limit)
-            
-            response = f"**📊 Last {limit} Transactions:**\n\n"
-            
-            if incoming:
-                response += "**📥 Incoming:**\n"
-                for t in incoming:
-                    response += f"• {t['date']}: {t['supplier']} - {t['size']}mm, {t['quantity']} units\n"
+        # Check for latest incoming
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['incoming', 'inward', 'received']):
+            if inventory['latest_incoming']:
+                response = "**Here are the most recent incoming transactions:**\n\n"
+                for t in inventory['latest_incoming'][:5]:
+                    response += f"• {t['date']}: {t['supplier']} - {t['size']}mm, {t['qty']} units\n"
+                return response
+        
+        # Check for stock
+        if 'stock' in text:
+            response = "**Current stock levels:**\n\n"
+            for item in inventory['stock']:
+                response += f"• {item['size']}mm: {item['current']} units"
+                if item['pending'] > 0:
+                    response += f" ({item['pending']} pending)"
                 response += "\n"
-            
-            if outgoing:
-                response += "**📤 Outgoing:**\n"
-                for t in outgoing:
-                    pending = " ⏳" if t['pending'] else ""
-                    response += f"• {t['date']}: {t['buyer']} - {t['size']}mm, {t['quantity']} units{pending}\n"
-            
-            if not incoming and not outgoing:
-                return "No recent transactions found."
-            
+            response += f"\n**Total:** {inventory['summary']['total_stock']} units"
             return response
         
-        # ===== PENDING QUERIES =====
+        # Check for pending
         if 'pending' in text:
-            # Check for specific buyer
-            buyers = ['ajji', 'enova', 'anil', 'tri', 'avs', 'kkm', 'aggarwal', 'alpha', 'beta', 'gamma']
-            mentioned_buyer = None
-            for buyer in buyers:
-                if buyer in text:
-                    mentioned_buyer = buyer
-                    break
-            
-            if mentioned_buyer:
-                pending = get_buyer_pending(mentioned_buyer)
-                if pending:
-                    response = f"**⏳ Pending for {mentioned_buyer.title()}:**\n\n"
-                    total = 0
-                    for p in pending:
-                        response += f"• {p['size']}mm: {p['qty']} units\n"
-                        total += p['qty']
-                    response += f"\n**Total:** {total} units"
-                    return response
-                else:
-                    return f"No pending orders for {mentioned_buyer.title()}"
-            else:
-                pending = get_all_pending()
-                if pending:
-                    response = "**⏳ All Pending Orders:**\n\n"
-                    total_all = 0
-                    for buyer, data in pending.items():
-                        response += f"**{buyer}** ({data['total']} units)\n"
-                        for order in data['orders'][:3]:
-                            response += f"  • {order['size']}mm: {order['qty']} units\n"
-                        if len(data['orders']) > 3:
-                            response += f"  • ... and {len(data['orders'])-3} more\n"
-                        total_all += data['total']
-                    response += f"\n**Overall Total:** {total_all} units"
-                    return response
-                return "No pending orders found"
-        
-        # ===== STOCK QUERIES =====
-        if 'stock' in text:
-            stock = get_stock_summary()
-            if stock:
-                response = "**📦 Current Stock Levels:**\n\n"
-                total = 0
-                for item in stock:
-                    response += f"• {item['size']}mm: {item['stock']} units"
-                    if item['pending'] > 0:
-                        response += f" (⏳ {item['pending']} pending)"
-                    if item['future'] > 0:
-                        response += f" (📅 {item['future']} coming)"
-                    response += "\n"
-                    total += item['stock']
-                response += f"\n**Total Stock:** {total} units"
+            if inventory['pending_by_buyer']:
+                response = "**Pending orders by buyer:**\n\n"
+                for buyer, data in inventory['pending_by_buyer'].items():
+                    response += f"• {buyer}: {data['total']} units\n"
                 return response
-            return "No stock data found"
+            return "No pending orders found."
         
-        # ===== COMING/FUTURE QUERIES =====
+        # Check for future/coming
         if any(word in text for word in ['coming', 'future', 'incoming']):
-            future = get_future_incoming()
-            if future:
-                response = "**📅 Future Incoming Rotors:**\n\n"
-                grand_total = 0
-                for item in future:
-                    response += f"**{item['size']}mm** - Total: {item['total']} units\n"
-                    for delivery in item['deliveries']:
-                        response += f"  • {delivery['date']}: {delivery['qty']} units from {delivery['supplier']}\n"
-                    grand_total += item['total']
-                    response += "\n"
-                response += f"**Grand Total:** {grand_total} units coming"
+            if inventory['future_incoming']:
+                response = "**Future incoming rotors:**\n\n"
+                for item in inventory['future_incoming']:
+                    response += f"• {item['date']}: {item['size']}mm, {item['qty']} units from {item['supplier']}\n"
                 return response
-            return "No future incoming rotors found"
+            return "No future incoming rotors scheduled."
         
-        # ===== HELP =====
-        if 'help' in text:
-            return """**🤖 Available Commands:**
-    
-    **Latest Transactions:**
-    • `latest outgoing` - Last 10 outgoing
-    • `last 5 outgoing for ajji` - Specific buyer
-    • `recent outgoing 130mm` - Specific size
-    • `latest incoming` - Last 10 incoming
-    • `last 3 transactions` - Both types
-    
-    **Other Commands:**
-    • `stock` - Current stock levels
-    • `pending` - All pending orders
-    • `ajji pending` - Specific buyer pending
-    • `coming` - Future incoming rotors
+        # Help
+        return """I can help you with:
+    • Stock levels - Try "What's in stock?"
+    • Pending orders - Try "Show pending orders"
+    • Latest transactions - Try "What's the latest outgoing?"
+    • Future incoming - Try "What rotors are coming?"
     
     What would you like to know?"""
-        
-        # ===== DEFAULT =====
-        return """I can help you track:
-    • 📤 Latest outgoing transactions
-    • 📥 Latest incoming transactions
-    • 📦 Current stock levels
-    • ⏳ Pending orders
-    • 📅 Future incoming rotors
-    
-    Try: 'latest outgoing', 'stock', 'pending', or 'coming'"""
     
     # =========================
     # HANDLE ACTION
@@ -1495,32 +1304,30 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick buttons - NOW WITH 6 BUTTONS INCLUDING OUTGOING & INCOMING
+        # Quick buttons
         st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
-        
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("📦 Stock", key="btn_stock", use_container_width=True):
-                handle_action("Show stock")
+                handle_action("What's the current stock?")
             if st.button("📤 Outgoing", key="btn_outgoing", use_container_width=True):
-                handle_action("Show latest outgoing")
+                handle_action("Show me the latest outgoing transactions")
         with col2:
             if st.button("⏳ Pending", key="btn_pending", use_container_width=True):
-                handle_action("Show pending")
+                handle_action("What orders are pending?")
             if st.button("📥 Incoming", key="btn_incoming", use_container_width=True):
-                handle_action("Show latest incoming")
+                handle_action("Show me the latest incoming transactions")
         with col3:
             if st.button("📅 Coming", key="btn_coming", use_container_width=True):
-                handle_action("Show coming rotors")
+                handle_action("What rotors are coming in the future?")
             if st.button("❓ Help", key="btn_help", use_container_width=True):
-                handle_action("Help")
-        
+                handle_action("What can you help me with?")
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Input form
         with st.form(key="assistant_chat_form", clear_on_submit=True):
             user_input = st.text_input("Ask me anything...", 
-                                       placeholder="e.g., latest outgoing, ajji pending, stock, coming")
+                                       placeholder="e.g., What's the latest? Any pending for Ajji?")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
@@ -1536,8 +1343,9 @@ if tab_choice == "🔁 Rotor Tracker":
         
         if clear:
             st.session_state.chat_messages = [
-                {"role": "assistant", "content": "👋 Chat cleared. Ask me about inventory! Try 'latest outgoing'"}
+                {"role": "assistant", "content": "👋 Chat cleared. Ask me anything about your inventory!"}
             ]
+            st.session_state.conversation_history = []
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
