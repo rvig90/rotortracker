@@ -684,6 +684,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE FIXED AI ASSISTANT WITH WORKING CONNECTION
     # =========================
     
+    # =========================
+    # COMPLETELY FIXED AI ASSISTANT WITH WORKING CONNECTION
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -701,7 +705,6 @@ if tab_choice == "🔁 Rotor Tracker":
             "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
             "models": ["gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"],
             "default_model": "gemini-2.0-flash-exp",
-            "headers": lambda api_key: {"Content-Type": "application/json"},
             "description": "Google's fastest model with 1M context",
             "api_key_in_url": True
         },
@@ -709,21 +712,7 @@ if tab_choice == "🔁 Rotor Tracker":
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
             "models": ["deepseek/deepseek-r1:free", "deepseek/deepseek-v3:free"],
             "default_model": "deepseek/deepseek-r1:free",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rotortracker.app",
-                "X-Title": "Rotor Tracker"
-            },
             "description": "Completely free DeepSeek models, 160k context",
-            "api_key_in_url": False
-        },
-        "Sarvam AI": {
-            "base_url": "https://api.sarvam.ai/v1/chat/completions",
-            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
-            "default_model": "sarvam-m",
-            "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
-            "description": "Indian language focused models",
             "api_key_in_url": False
         }
     }
@@ -755,7 +744,6 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     st.markdown("""
     <style>
-    /* Floating button */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
@@ -1031,7 +1019,81 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # AI RESPONSE FUNCTION WITH WORKING CONNECTION
+    # FIXED API CALL FUNCTIONS
+    # =========================
+    
+    def call_gemini_api(api_key, model, prompt):
+        """Call Google Gemini API"""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 800,
+                "topP": 0.8,
+                "topK": 40
+            }
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=15)
+            print(f"Gemini API response status: {response.status_code}")  # Debug
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'candidates' in result and len(result['candidates']) > 0:
+                    return result['candidates'][0]['content']['parts'][0]['text']
+                else:
+                    return None
+            else:
+                print(f"Gemini API error: {response.text}")  # Debug
+                return None
+        except Exception as e:
+            print(f"Gemini API exception: {str(e)}")  # Debug
+            return None
+    
+    def call_openrouter_api(api_key, model, messages):
+        """Call OpenRouter API"""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://rotortracker.app",
+            "X-Title": "Rotor Tracker"
+        }
+        
+        data = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 800
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=15)
+            print(f"OpenRouter API response status: {response.status_code}")  # Debug
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result and len(result['choices']) > 0:
+                    return result['choices'][0]['message']['content']
+                else:
+                    return None
+            else:
+                print(f"OpenRouter API error: {response.text}")  # Debug
+                return None
+        except Exception as e:
+            print(f"OpenRouter API exception: {str(e)}")  # Debug
+            return None
+    
+    # =========================
+    # FIXED AI RESPONSE FUNCTION
     # =========================
     
     def get_ai_response(user_input):
@@ -1040,14 +1102,21 @@ if tab_choice == "🔁 Rotor Tracker":
         # Get complete inventory data
         inventory = get_complete_inventory_data()
         
-        # If AI is connected, use it
+        # Check if AI is connected and has API key
         if st.session_state.ai_config['initialized'] and st.session_state.ai_config['api_key']:
-            try:
-                config = st.session_state.ai_config
-                provider = AI_PROVIDERS[config['provider']]
-                
-                # Prepare the conversation context
-                system_prompt = f"""You are an AI inventory assistant. You have access to this inventory data:
+            
+            config = st.session_state.ai_config
+            provider_name = config['provider']
+            model = config['model']
+            api_key = config['api_key']
+            
+            # Build conversation history for context
+            history_text = ""
+            for msg in st.session_state.conversation_history[-6:]:  # Last 3 exchanges
+                history_text += f"{msg['role']}: {msg['content']}\n"
+            
+            # Create prompt with inventory data
+            prompt = f"""You are an AI inventory assistant. You have access to this inventory data:
     
     STOCK LEVELS:
     {json.dumps(inventory['stock'], indent=2)}
@@ -1064,70 +1133,36 @@ if tab_choice == "🔁 Rotor Tracker":
     LATEST INCOMING TRANSACTIONS:
     {json.dumps(inventory['latest_incoming'][:5], indent=2)}
     
-    Be helpful, conversational, and use the data above to answer questions accurately.
-    Current date: {datetime.now().strftime('%Y-%m-%d')}
-    
     Conversation history:
-    {json.dumps(st.session_state.conversation_history[-10:], indent=2)}
+    {history_text}
     
-    User: {user_input}
-    Assistant:"""
+    Current question: {user_input}
     
-                # Handle different API formats
-                if provider.get('api_key_in_url', False):
-                    # For Gemini
-                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
-                    headers = {"Content-Type": "application/json"}
-                    
-                    data = {
-                        "contents": [{"parts": [{"text": system_prompt}]}],
-                        "generationConfig": {
-                            "temperature": 0.3,
-                            "maxOutputTokens": 800
-                        }
-                    }
-                else:
-                    # For OpenAI-compatible APIs
-                    url = provider['base_url']
-                    headers = provider['headers'](config['api_key'])
-                    
-                    # Build messages with history
-                    messages = [{"role": "system", "content": system_prompt}]
-                    for msg in st.session_state.conversation_history[-10:]:
-                        messages.append({"role": msg["role"], "content": msg["content"]})
-                    messages.append({"role": "user", "content": user_input})
-                    
-                    data = {
-                        "model": config['model'],
-                        "messages": messages,
-                        "temperature": 0.3,
-                        "max_tokens": 800
-                    }
-                
-                # Make the API call
-                response = requests.post(url, headers=headers, json=data, timeout=15)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    
-                    # Parse based on provider
-                    if "gemini" in config['provider'].lower():
-                        ai_response = result['candidates'][0]['content']['parts'][0]['text']
-                    else:
-                        ai_response = result['choices'][0]['message']['content']
-                    
-                    # Save to conversation history
-                    st.session_state.conversation_history.append({"role": "user", "content": user_input})
-                    st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
-                    
-                    return ai_response
-                else:
-                    # API error - show friendly message
-                    return f"I'm having trouble connecting right now. Here's what I know:\n\n{fallback_response(user_input, inventory)}"
+    Answer helpfully and conversationally using the data above. Be concise but informative."""
+    
+            # Call appropriate API based on provider
+            ai_response = None
             
-            except Exception as e:
-                # Connection error
-                return f"I'm having trouble connecting right now. Here's what I know:\n\n{fallback_response(user_input, inventory)}"
+            if "Gemini" in provider_name:
+                ai_response = call_gemini_api(api_key, model, prompt)
+            elif "OpenRouter" in provider_name or "DeepSeek" in provider_name:
+                # Build messages for OpenRouter
+                messages = [{"role": "system", "content": "You are a helpful inventory assistant."}]
+                for msg in st.session_state.conversation_history[-6:]:
+                    messages.append(msg)
+                messages.append({"role": "user", "content": user_input})
+                
+                ai_response = call_openrouter_api(api_key, model, messages)
+            
+            # If API call succeeded, save and return
+            if ai_response:
+                st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+                return ai_response
+            else:
+                # API call failed, use fallback
+                print("API call failed, using fallback")  # Debug
+                return fallback_response(user_input, inventory)
         
         # If AI not connected, use fallback
         return fallback_response(user_input, inventory)
@@ -1187,6 +1222,16 @@ if tab_choice == "🔁 Rotor Tracker":
                 return response
             return "No future incoming rotors scheduled."
         
+        # Check for specific buyer
+        for buyer in inventory['pending_by_buyer'].keys():
+            if buyer.lower() in text:
+                data = inventory['pending_by_buyer'][buyer]
+                response = f"**📋 Pending for {buyer}:**\n\n"
+                for order in data['orders']:
+                    response += f"• {order['size']}mm: {order['qty']} units\n"
+                response += f"\n**Total:** {data['total']} units"
+                return response
+        
         # Help message
         return """**🤖 I can help you with:**
     
@@ -1207,6 +1252,24 @@ if tab_choice == "🔁 Rotor Tracker":
         st.session_state.chat_messages.append({"role": "user", "content": query})
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
         st.rerun()
+    
+    # =========================
+    # TEST CONNECTION FUNCTION
+    # =========================
+    def test_api_connection(provider, api_key, model):
+        """Test if API key works"""
+        try:
+            if "Gemini" in provider:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+                response = requests.get(url, timeout=5)
+                return response.status_code == 200
+            elif "OpenRouter" in provider or "DeepSeek" in provider:
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=5)
+                return response.status_code == 200
+            return False
+        except:
+            return False
     
     # =========================
     # FLOATING BUTTON
@@ -1239,21 +1302,35 @@ if tab_choice == "🔁 Rotor Tracker":
             st.markdown('<div class="status-indicator">🔌 Not connected - Using basic mode</div>', unsafe_allow_html=True)
             
             # Connection expander
-            with st.expander("🔌 Connect AI for smarter responses", expanded=True):
+            with st.expander("🔌 Connect AI", expanded=True):
                 provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
                 model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
                 api_key = st.text_input("API Key", type="password", key="popup_key", placeholder="Enter your API key...")
                 
-                if st.button("Connect", key="popup_connect", use_container_width=True):
-                    if api_key:
-                        st.session_state.ai_config.update({
-                            'provider': provider,
-                            'model': model,
-                            'api_key': api_key,
-                            'initialized': True
-                        })
-                        st.success("✅ Connected! Try asking something.")
-                        st.rerun()
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Test Connection", key="test_connection", use_container_width=True):
+                        if api_key:
+                            with st.spinner("Testing..."):
+                                if test_api_connection(provider, api_key, model):
+                                    st.success("✅ API key works!")
+                                else:
+                                    st.error("❌ Connection failed. Check your key.")
+                
+                with col2:
+                    if st.button("Connect", key="popup_connect", use_container_width=True):
+                        if api_key:
+                            if test_api_connection(provider, api_key, model):
+                                st.session_state.ai_config.update({
+                                    'provider': provider,
+                                    'model': model,
+                                    'api_key': api_key,
+                                    'initialized': True
+                                })
+                                st.success("✅ Connected!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Invalid API key or connection failed")
         
         # Chat area
         st.markdown('<div class="chat-area">', unsafe_allow_html=True)
