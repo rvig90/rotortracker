@@ -708,6 +708,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE AI ASSISTANT WITH LATEST TRANSACTIONS + RECONNECT BUTTON
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH LATEST TRANSACTIONS
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -766,11 +770,8 @@ if tab_choice == "🔁 Rotor Tracker":
             'initialized': False
         }
     
-    if 'connection_error_count' not in st.session_state:
-        st.session_state.connection_error_count = 0
-    
     # =========================
-    # CSS STYLING (UPDATED WITH RECONNECT BUTTON STYLES)
+    # CSS STYLING
     # =========================
     st.markdown("""
     <style>
@@ -798,10 +799,10 @@ if tab_choice == "🔁 Rotor Tracker":
     /* Assistant popup */
     .assistant-popup {
         position: fixed;
-        bottom: 9px;
-        right: 2px;
-        width: 3px;
-        height: 6px;
+        bottom: 90px;
+        right: 20px;
+        width: 380px;
+        height: 550px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -872,7 +873,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
     .quick-buttons button {
         flex: 1;
-        min-width: 60px;
+        min-width: 70px;
         background: #4CAF50;
         color: white;
         border: none;
@@ -921,17 +922,6 @@ if tab_choice == "🔁 Rotor Tracker":
         color: white;
     }
     
-    .reconnect-btn {
-        background: #ff9800;
-        color: white;
-        border: none;
-        border-radius: 20px;
-        padding: 5px 10px;
-        font-size: 11px;
-        cursor: pointer;
-        margin-left: 5px;
-    }
-    
     /* Status indicator */
     .status-indicator {
         padding: 5px 10px;
@@ -940,15 +930,12 @@ if tab_choice == "🔁 Rotor Tracker":
         font-size: 11px;
         text-align: center;
         margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # =========================
-    # LATEST TRANSACTIONS FUNCTIONS
+    # LATEST TRANSACTIONS FUNCTIONS (NEW)
     # =========================
     
     def get_latest_incoming(limit=10, buyer=None, size=None):
@@ -1134,7 +1121,7 @@ if tab_choice == "🔁 Rotor Tracker":
             }
         
         # Future incoming
-        future_incoming = get_future_incoming(50)
+        future_incoming = get_future_incoming(50)  # Use the new function
         
         # Buyers list
         buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
@@ -1159,57 +1146,6 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # TEST CONNECTION FUNCTION
-    # =========================
-    def test_ai_connection():
-        """Test if AI connection is working"""
-        if not st.session_state.ai_config['initialized'] or not st.session_state.ai_config['api_key']:
-            return False
-        
-        try:
-            config = st.session_state.ai_config
-            provider = AI_PROVIDERS[config['provider']]
-            
-            if provider.get('api_key_in_url', False):
-                # Test Gemini
-                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={config['api_key']}"
-                response = requests.get(url, timeout=5)
-                return response.status_code == 200
-            else:
-                # Test other providers with a simple ping
-                url = provider['base_url']
-                headers = provider['headers'](config['api_key'])
-                
-                # For OpenRouter
-                if "openrouter" in url:
-                    test_url = "https://openrouter.ai/api/v1/auth/key"
-                    response = requests.get(test_url, headers=headers, timeout=5)
-                    return response.status_code == 200
-                
-                # For Sarvam
-                elif "sarvam" in url:
-                    test_url = "https://api.sarvam.ai/v1/models"
-                    response = requests.get(test_url, headers=headers, timeout=5)
-                    return response.status_code == 200
-                
-                return True
-        except:
-            return False
-    
-    # =========================
-    # RECONNECT FUNCTION
-    # =========================
-    def reconnect_ai():
-        """Attempt to reconnect AI"""
-        st.session_state.connection_error_count = 0
-        if test_ai_connection():
-            st.session_state.ai_config['initialized'] = True
-            return True
-        else:
-            st.session_state.ai_config['initialized'] = False
-            return False
-    
-    # =========================
     # AI RESPONSE WITH FULL MEMORY
     # =========================
     def get_ai_response(user_input):
@@ -1217,14 +1153,6 @@ if tab_choice == "🔁 Rotor Tracker":
         
         # Get complete inventory context
         inventory_context = get_complete_inventory_context()
-        
-        # Check connection if AI is initialized
-        if st.session_state.ai_config['initialized']:
-            if not test_ai_connection():
-                st.session_state.connection_error_count += 1
-                if st.session_state.connection_error_count > 2:
-                    st.session_state.ai_config['initialized'] = False
-                    return "⚠️ Connection lost. Please use the reconnect button to try again."
         
         # If AI is connected, use it with full memory
         if st.session_state.ai_config['initialized']:
@@ -1328,7 +1256,6 @@ if tab_choice == "🔁 Rotor Tracker":
                     # Update conversation history
                     st.session_state.conversation_history.append({"role": "user", "content": user_input})
                     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
-                    st.session_state.connection_error_count = 0
                     
                     # Keep history manageable (last 50 exchanges)
                     if len(st.session_state.conversation_history) > 100:
@@ -1336,11 +1263,9 @@ if tab_choice == "🔁 Rotor Tracker":
                     
                     return ai_response
                 else:
-                    st.session_state.connection_error_count += 1
                     return f"⚠️ AI Error: {response.status_code}. Using fallback mode."
                     
             except Exception as e:
-                st.session_state.connection_error_count += 1
                 return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
         
         # Fallback response if AI not connected
@@ -1517,28 +1442,14 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.session_state.show_assistant = False
                 st.rerun()
         
-        # Status indicator with reconnect button
-        status_col1, status_col2 = st.columns([3, 1])
-        with status_col1:
-            if st.session_state.ai_config['initialized']:
-                if test_ai_connection():
-                    st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="status-indicator">⚠️ Connection lost</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="status-indicator">🔌 Not connected</div>', unsafe_allow_html=True)
-        
-        with status_col2:
-            if st.button("🔄 Reconnect", key="reconnect_btn", help="Reconnect to AI"):
-                if reconnect_ai():
-                    st.success("✅ Reconnected!")
-                    st.rerun()
-                else:
-                    st.error("❌ Reconnection failed")
-        
-        # Connection expander (only show when not connected)
-        if not st.session_state.ai_config['initialized']:
-            with st.expander("🔌 Connect AI", expanded=True):
+        # Status indicator
+        if st.session_state.ai_config['initialized']:
+            st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="status-indicator">⚠️ Not connected - Using basic mode</div>', unsafe_allow_html=True)
+            
+            # Connection expander
+            with st.expander("🔌 Connect AI for smarter responses"):
                 provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
                 model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
                 api_key = st.text_input("API Key", type="password", key="popup_key")
@@ -1550,12 +1461,7 @@ if tab_choice == "🔁 Rotor Tracker":
                             'api_key': api_key,
                             'initialized': True
                         })
-                        if test_ai_connection():
-                            st.success("✅ Connected!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Connection failed. Check your API key.")
-                            st.session_state.ai_config['initialized'] = False
+                        st.rerun()
         
         # Chat area
         st.markdown('<div class="chat-area">', unsafe_allow_html=True)
@@ -1567,7 +1473,7 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick buttons
+        # Quick buttons - UPDATED with more options
         st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
         col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
@@ -1611,7 +1517,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.session_state.chat_messages = [
                 {"role": "assistant", "content": "👋 Chat cleared. I still remember everything about your inventory. Ask me anything!"}
             ]
-            st.session_state.conversation_history = []
+            # Keep conversation history but reset display
             st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
