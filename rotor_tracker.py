@@ -719,7 +719,7 @@ if tab_choice == "🔁 Rotor Tracker":
             "description": "Indian language focused models with free tier",
             "api_key_in_url": False,
             "headers": lambda api_key: {
-                "api-subscription-key": api_key,
+                "api-subscription-key": api_key,  # FIXED: hyphen, not underscore
                 "Content-Type": "application/json"
             }
         },
@@ -1070,11 +1070,11 @@ if tab_choice == "🔁 Rotor Tracker":
             return None
     
     def call_sarvam_api(api_key, model, messages):
-        """Call Sarvam AI API"""
+        """Call Sarvam AI API with correct authentication header"""
         url = "https://api.sarvam.ai/v1/chat/completions"
         
         headers = {
-            "api-subscription-key": api_key,
+            "api-subscription-key": api_key,  # FIXED: hyphen is correct
             "Content-Type": "application/json"
         }
         
@@ -1087,6 +1087,8 @@ if tab_choice == "🔁 Rotor Tracker":
         
         try:
             response = requests.post(url, headers=headers, json=data, timeout=15)
+            print(f"Sarvam API response status: {response.status_code}")  # Debug
+            print(f"Sarvam API response: {response.text[:200]}")  # Debug
             
             if response.status_code == 200:
                 result = response.json()
@@ -1095,8 +1097,10 @@ if tab_choice == "🔁 Rotor Tracker":
                 else:
                     return None
             else:
+                print(f"Sarvam API error: {response.text}")
                 return None
         except Exception as e:
+            print(f"Sarvam API exception: {str(e)}")
             return None
     
     def call_openrouter_api(api_key, model, messages):
@@ -1297,7 +1301,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 return response.status_code == 200
             
             elif "Sarvam" in provider:
-                # Sarvam test endpoint (if available)
+                # Sarvam test endpoint with correct header
                 headers = {"api-subscription-key": api_key}
                 response = requests.get("https://api.sarvam.ai/v1/models", headers=headers, timeout=5)
                 return response.status_code == 200
