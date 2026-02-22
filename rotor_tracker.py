@@ -1443,17 +1443,52 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.rerun()
         
         # Status indicator
-        if st.session_state.ai_config['initialized']:
-            st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
+        # =========================
+        # AI CONNECTION PANEL
+        # =========================
+        
+        connected = st.session_state.ai_config['initialized']
+        
+        if connected:
+            st.markdown(
+                f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]} ({st.session_state.ai_config["model"]})</div>',
+                unsafe_allow_html=True
+            )
         else:
-            st.markdown('<div class="status-indicator">⚠️ Not connected - Using basic mode</div>', unsafe_allow_html=True)
-            
-            # Connection expander
-            with st.expander("🔌 Connect AI for smarter responses"):
-                provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
-                model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
-                api_key = st.text_input("API Key", type="password", key="popup_key")
-                if st.button("Connect", key="popup_connect"):
+            st.markdown(
+                '<div class="status-indicator">⚠️ Not connected - Using basic mode</div>',
+                unsafe_allow_html=True
+            )
+        
+        with st.expander("🔌 AI Connection Settings", expanded=not connected):
+        
+            provider = st.selectbox(
+                "Provider",
+                options=list(AI_PROVIDERS.keys()),
+                index=list(AI_PROVIDERS.keys()).index(st.session_state.ai_config['provider'])
+                if st.session_state.ai_config['provider'] in AI_PROVIDERS else 0,
+                key="popup_provider"
+            )
+        
+            model = st.selectbox(
+                "Model",
+                options=AI_PROVIDERS[provider]['models'],
+                index=AI_PROVIDERS[provider]['models'].index(st.session_state.ai_config['model'])
+                if st.session_state.ai_config['model'] in AI_PROVIDERS[provider]['models'] else 0,
+                key="popup_model"
+            )
+        
+            api_key = st.text_input(
+                "API Key",
+                type="password",
+                value=st.session_state.ai_config.get("api_key", ""),
+                key="popup_key"
+            )
+        
+            colA, colB = st.columns(2)
+        
+            with colA:
+                if st.button("🔄 Reconnect / Update", use_container_width=True):
                     if api_key:
                         st.session_state.ai_config.update({
                             'provider': provider,
@@ -1461,7 +1496,14 @@ if tab_choice == "🔁 Rotor Tracker":
                             'api_key': api_key,
                             'initialized': True
                         })
+                        st.success("✅ AI Connected")
                         st.rerun()
+        
+            with colB:
+                if st.button("❌ Disconnect", use_container_width=True):
+                    st.session_state.ai_config['initialized'] = False
+                    st.success("Disconnected")
+                    st.rerun()
         
         # Chat area
         st.markdown('<div class="chat-area">', unsafe_allow_html=True)
