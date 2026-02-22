@@ -1604,7 +1604,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.session_state.conversation_history = []
             st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True))
+        st.markdown('</div>', unsafe_allow_html=True)
     # === TAB 3: Rotor Trend ===
 
         
