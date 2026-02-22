@@ -680,39 +680,8 @@ if tab_choice == "🔁 Rotor Tracker":
                             st.session_state.editing = None
                             st.rerun()
     
-    # =========================
-    # AI ASSISTANT (FLOATING WIDGET)
-    # =========================
-    # =========================
-    # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
-    # =========================
     
-    # =========================
-    # COMPLETE AI ASSISTANT WITH CHARTS & PREDICTIONS
-    # =========================
-    
-    # =========================
-    # COMPLETE AI ASSISTANT WITH WORKING CHAT
-    # =========================
-    
-    # =========================
-    # CLEAN AI ASSISTANT - NO WHITE OVERLAY
-    # =========================
-    
-    # =========================
-    # FIXED AI ASSISTANT - SMALL POPUP, WORKING AI
-    # =========================
-    
-    # =========================
-    # COMPLETE AI ASSISTANT WITH FULL MEMORY & INVENTORY AWARENESS
-    # =========================
-    
-    # =========================
-    # COMPLETE UPGRADED AI ASSISTANT WITH LATEST TRANSACTIONS
-    # =========================
-    
-    # =========================
-    # REAL CONVERSATIONAL AI WITH ACCURATE DATA
+    # COMPLETE FIXED AI ASSISTANT WITH WORKING CONNECTION
     # =========================
     
     import streamlit as st
@@ -782,11 +751,11 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # CSS STYLING (keep your existing CSS)
+    # CSS STYLING
     # =========================
     st.markdown("""
     <style>
-    /* Your existing CSS here */
+    /* Floating button */
     .floating-btn-container {
         position: fixed;
         bottom: 20px;
@@ -812,10 +781,10 @@ if tab_choice == "🔁 Rotor Tracker":
     }
     .assistant-popup {
         position: fixed;
-        bottom: 9px;
-        right: 2px;
-        width: 4px;
-        height: 6px;
+        bottom: 90px;
+        right: 20px;
+        width: 400px;
+        height: 600px;
         background: white;
         border-radius: 15px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -953,11 +922,11 @@ if tab_choice == "🔁 Rotor Tracker":
     """, unsafe_allow_html=True)
     
     # =========================
-    # DATA COLLECTION FUNCTIONS (ACCURATE DATA FOR AI)
+    # DATA COLLECTION FUNCTIONS
     # =========================
     
     def get_complete_inventory_data():
-        """Collect ALL inventory data for AI to use naturally"""
+        """Collect ALL inventory data for AI to use"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return {
                 'has_data': False,
@@ -967,7 +936,7 @@ if tab_choice == "🔁 Rotor Tracker":
         df = st.session_state.data.copy()
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         
-        # ===== STOCK SUMMARY =====
+        # Stock summary
         stock = []
         for size in sorted(df['Size (mm)'].unique()):
             if pd.isna(size):
@@ -988,7 +957,7 @@ if tab_choice == "🔁 Rotor Tracker":
                     'future': future
                 })
         
-        # ===== PENDING ORDERS BY BUYER =====
+        # Pending orders by buyer
         pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
         pending_by_buyer = {}
         for buyer in pending_df['Remarks'].unique():
@@ -1007,7 +976,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 'orders': orders
             }
         
-        # ===== FUTURE INCOMING =====
+        # Future incoming
         future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
         future_incoming = []
         for _, row in future_df.iterrows():
@@ -1018,7 +987,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 'supplier': str(row['Remarks'])
             })
         
-        # ===== LATEST TRANSACTIONS =====
+        # Latest outgoing
         latest_outgoing = []
         outgoing_df = df[df['Type'] == 'Outgoing'].sort_values('Date', ascending=False).head(20)
         for _, row in outgoing_df.iterrows():
@@ -1030,6 +999,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 'pending': bool(row['Pending'])
             })
         
+        # Latest incoming
         latest_incoming = []
         incoming_df = df[df['Type'] == 'Inward'].sort_values('Date', ascending=False).head(20)
         for _, row in incoming_df.iterrows():
@@ -1040,12 +1010,10 @@ if tab_choice == "🔁 Rotor Tracker":
                 'qty': int(row['Quantity'])
             })
         
-        # ===== SUMMARY STATS =====
+        # Summary stats
         total_stock = sum(s['current'] for s in stock)
         total_pending = sum(s['pending'] for s in stock)
         total_future = sum(s['future'] for s in stock)
-        unique_buyers = df[df['Type'] == 'Outgoing']['Remarks'].nunique()
-        unique_suppliers = df[df['Type'] == 'Inward']['Remarks'].nunique()
         
         return {
             'has_data': True,
@@ -1058,38 +1026,30 @@ if tab_choice == "🔁 Rotor Tracker":
                 'total_stock': total_stock,
                 'total_pending': total_pending,
                 'total_future': total_future,
-                'unique_buyers': unique_buyers,
-                'unique_suppliers': unique_suppliers,
-                'total_transactions': len(df),
-                'date_range': {
-                    'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A',
-                    'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'N/A'
-                }
+                'total_transactions': len(df)
             }
         }
     
     # =========================
-    # REAL AI RESPONSE WITH NATURAL CONVERSATION
+    # AI RESPONSE FUNCTION WITH WORKING CONNECTION
     # =========================
     
     def get_ai_response(user_input):
-        """Let the REAL AI handle everything naturally"""
+        """Process user input with working AI connection"""
         
         # Get complete inventory data
         inventory = get_complete_inventory_data()
         
-        # If AI is connected, let it handle everything naturally
-        if st.session_state.ai_config['initialized']:
+        # If AI is connected, use it
+        if st.session_state.ai_config['initialized'] and st.session_state.ai_config['api_key']:
             try:
                 config = st.session_state.ai_config
                 provider = AI_PROVIDERS[config['provider']]
                 
-                # Build conversation context
-                system_prompt = f"""You are an AI inventory assistant for a rotor manufacturing company. You have complete access to their inventory data.
+                # Prepare the conversation context
+                system_prompt = f"""You are an AI inventory assistant. You have access to this inventory data:
     
-    CURRENT INVENTORY DATA (as of {datetime.now().strftime('%Y-%m-%d %H:%M')}):
-    
-    STOCK SUMMARY:
+    STOCK LEVELS:
     {json.dumps(inventory['stock'], indent=2)}
     
     PENDING ORDERS BY BUYER:
@@ -1098,41 +1058,36 @@ if tab_choice == "🔁 Rotor Tracker":
     FUTURE INCOMING ROTORS:
     {json.dumps(inventory['future_incoming'], indent=2)}
     
-    LATEST OUTGOING TRANSACTIONS (last 20):
-    {json.dumps(inventory['latest_outgoing'], indent=2)}
+    LATEST OUTGOING TRANSACTIONS:
+    {json.dumps(inventory['latest_outgoing'][:5], indent=2)}
     
-    LATEST INCOMING TRANSACTIONS (last 20):
-    {json.dumps(inventory['latest_incoming'], indent=2)}
+    LATEST INCOMING TRANSACTIONS:
+    {json.dumps(inventory['latest_incoming'][:5], indent=2)}
     
-    OVERALL SUMMARY:
-    {json.dumps(inventory['summary'], indent=2)}
+    Be helpful, conversational, and use the data above to answer questions accurately.
+    Current date: {datetime.now().strftime('%Y-%m-%d')}
     
-    CONVERSATION HISTORY:
-    {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
+    Conversation history:
+    {json.dumps(st.session_state.conversation_history[-10:], indent=2)}
     
-    INSTRUCTIONS:
-    1. Be a friendly, helpful assistant - have a natural conversation
-    2. Use the data above to answer questions accurately
-    3. Remember everything discussed in this conversation
-    4. If asked about something not in the data, say so politely
-    5. Be concise but informative
-    6. When showing numbers, format them clearly
-    7. You can ask follow-up questions if needed
-    8. Reference previous parts of the conversation naturally
+    User: {user_input}
+    Assistant:"""
     
-    Current user question: {user_input}
-    
-    Respond naturally as a helpful inventory assistant:"""
-    
-                # API call based on provider
+                # Handle different API formats
                 if provider.get('api_key_in_url', False):
+                    # For Gemini
                     url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
-                    headers = provider['headers'](config['api_key'])
+                    headers = {"Content-Type": "application/json"}
+                    
                     data = {
                         "contents": [{"parts": [{"text": system_prompt}]}],
-                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}
+                        "generationConfig": {
+                            "temperature": 0.3,
+                            "maxOutputTokens": 800
+                        }
                     }
                 else:
+                    # For OpenAI-compatible APIs
                     url = provider['base_url']
                     headers = provider['headers'](config['api_key'])
                     
@@ -1149,10 +1104,13 @@ if tab_choice == "🔁 Rotor Tracker":
                         "max_tokens": 800
                     }
                 
+                # Make the API call
                 response = requests.post(url, headers=headers, json=data, timeout=15)
                 
                 if response.status_code == 200:
                     result = response.json()
+                    
+                    # Parse based on provider
                     if "gemini" in config['provider'].lower():
                         ai_response = result['candidates'][0]['content']['parts'][0]['text']
                     else:
@@ -1164,78 +1122,79 @@ if tab_choice == "🔁 Rotor Tracker":
                     
                     return ai_response
                 else:
-                    return f"⚠️ AI temporarily unavailable. Using basic mode.\n\n{fallback_response(user_input, inventory)}"
+                    # API error - show friendly message
+                    return f"I'm having trouble connecting right now. Here's what I know:\n\n{fallback_response(user_input, inventory)}"
             
             except Exception as e:
-                return f"⚠️ Connection issue. Using basic mode.\n\n{fallback_response(user_input, inventory)}"
+                # Connection error
+                return f"I'm having trouble connecting right now. Here's what I know:\n\n{fallback_response(user_input, inventory)}"
         
         # If AI not connected, use fallback
         return fallback_response(user_input, inventory)
     
     # =========================
-    # FALLBACK RESPONSE (WHEN AI NOT CONNECTED)
+    # FALLBACK RESPONSE
     # =========================
     
     def fallback_response(user_input, inventory):
-        """Basic rule-based responses when AI is offline"""
+        """Basic responses when AI is unavailable"""
         
         text = user_input.lower().strip()
         
         if not inventory['has_data']:
             return "No inventory data loaded yet. Please add some transactions first."
         
-        # Check for latest outgoing
-        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward', 'sold']):
-            if inventory['latest_outgoing']:
-                response = "**Here are the most recent outgoing transactions:**\n\n"
-                for t in inventory['latest_outgoing'][:5]:
-                    pending = " (pending)" if t['pending'] else ""
-                    response += f"• {t['date']}: {t['buyer']} - {t['size']}mm, {t['qty']} units{pending}\n"
-                return response
-        
-        # Check for latest incoming
-        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['incoming', 'inward', 'received']):
-            if inventory['latest_incoming']:
-                response = "**Here are the most recent incoming transactions:**\n\n"
-                for t in inventory['latest_incoming'][:5]:
-                    response += f"• {t['date']}: {t['supplier']} - {t['size']}mm, {t['qty']} units\n"
-                return response
-        
-        # Check for stock
-        if 'stock' in text:
-            response = "**Current stock levels:**\n\n"
-            for item in inventory['stock']:
-                response += f"• {item['size']}mm: {item['current']} units"
-                if item['pending'] > 0:
-                    response += f" ({item['pending']} pending)"
-                response += "\n"
-            response += f"\n**Total:** {inventory['summary']['total_stock']} units"
-            return response
-        
-        # Check for pending
+        # Check for pending orders
         if 'pending' in text:
             if inventory['pending_by_buyer']:
-                response = "**Pending orders by buyer:**\n\n"
+                response = "**📋 Pending Orders by Buyer:**\n\n"
+                total = 0
                 for buyer, data in inventory['pending_by_buyer'].items():
-                    response += f"• {buyer}: {data['total']} units\n"
+                    response += f"• **{buyer}**: {data['total']} units\n"
+                    total += data['total']
+                response += f"\n**Total Pending:** {total} units"
                 return response
             return "No pending orders found."
         
-        # Check for future/coming
+        # Check for stock
+        if 'stock' in text:
+            response = "**📦 Current Stock Levels:**\n\n"
+            total = 0
+            for item in inventory['stock']:
+                response += f"• **{item['size']}mm**: {item['current']} units"
+                if item['pending'] > 0:
+                    response += f" (⏳ {item['pending']} pending)"
+                response += "\n"
+                total += item['current']
+            response += f"\n**Total Stock:** {total} units"
+            return response
+        
+        # Check for latest outgoing
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward']):
+            if inventory['latest_outgoing']:
+                response = "**📤 Recent Outgoing Transactions:**\n\n"
+                for t in inventory['latest_outgoing'][:5]:
+                    pending = " (pending)" if t['pending'] else ""
+                    response += f"• {t['date']}: **{t['buyer']}** - {t['size']}mm, {t['qty']} units{pending}\n"
+                return response
+        
+        # Check for coming rotors
         if any(word in text for word in ['coming', 'future', 'incoming']):
             if inventory['future_incoming']:
-                response = "**Future incoming rotors:**\n\n"
+                response = "**📅 Future Incoming Rotors:**\n\n"
                 for item in inventory['future_incoming']:
-                    response += f"• {item['date']}: {item['size']}mm, {item['qty']} units from {item['supplier']}\n"
+                    response += f"• {item['date']}: **{item['size']}mm**, {item['qty']} units from {item['supplier']}\n"
                 return response
             return "No future incoming rotors scheduled."
         
-        # Help
-        return """I can help you with:
-    • Stock levels - Try "What's in stock?"
-    • Pending orders - Try "Show pending orders"
-    • Latest transactions - Try "What's the latest outgoing?"
-    • Future incoming - Try "What rotors are coming?"
+        # Help message
+        return """**🤖 I can help you with:**
+    
+    • **Stock levels** - Try "What's in stock?"
+    • **Pending orders** - Try "Show pending orders"
+    • **Latest transactions** - Try "Show latest outgoing"
+    • **Future incoming** - Try "What's coming?"
+    • **Specific buyers** - Try "Pending for Ajji"
     
     What would you like to know?"""
     
@@ -1274,17 +1233,18 @@ if tab_choice == "🔁 Rotor Tracker":
                 st.rerun()
         
         # Status indicator
-        if st.session_state.ai_config['initialized']:
+        if st.session_state.ai_config['initialized'] and st.session_state.ai_config['api_key']:
             st.markdown(f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]}</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="status-indicator">⚠️ Not connected - Using basic mode</div>', unsafe_allow_html=True)
+            st.markdown('<div class="status-indicator">🔌 Not connected - Using basic mode</div>', unsafe_allow_html=True)
             
             # Connection expander
-            with st.expander("🔌 Connect AI for smarter responses"):
+            with st.expander("🔌 Connect AI for smarter responses", expanded=True):
                 provider = st.selectbox("Provider", options=list(AI_PROVIDERS.keys()), key="popup_provider")
                 model = st.selectbox("Model", options=AI_PROVIDERS[provider]['models'], key="popup_model")
-                api_key = st.text_input("API Key", type="password", key="popup_key")
-                if st.button("Connect", key="popup_connect"):
+                api_key = st.text_input("API Key", type="password", key="popup_key", placeholder="Enter your API key...")
+                
+                if st.button("Connect", key="popup_connect", use_container_width=True):
                     if api_key:
                         st.session_state.ai_config.update({
                             'provider': provider,
@@ -1292,6 +1252,7 @@ if tab_choice == "🔁 Rotor Tracker":
                             'api_key': api_key,
                             'initialized': True
                         })
+                        st.success("✅ Connected! Try asking something.")
                         st.rerun()
         
         # Chat area
@@ -1327,7 +1288,7 @@ if tab_choice == "🔁 Rotor Tracker":
         # Input form
         with st.form(key="assistant_chat_form", clear_on_submit=True):
             user_input = st.text_input("Ask me anything...", 
-                                       placeholder="e.g., What's the latest? Any pending for Ajji?")
+                                       placeholder="e.g., What's pending? Show latest outgoing")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
