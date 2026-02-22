@@ -696,6 +696,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETE AI ASSISTANT WITH FULL MEMORY & INVENTORY AWARENESS
     # =========================
     
+    # =========================
+    # COMPLETE AI ASSISTANT WITH LATEST TRANSACTIONS
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -852,15 +856,17 @@ if tab_choice == "🔁 Rotor Tracker":
         display: flex;
         gap: 5px;
         margin: 10px 0;
+        flex-wrap: wrap;
     }
     
     .quick-buttons button {
         flex: 1;
+        min-width: 70px;
         background: #4CAF50;
         color: white;
         border: none;
         border-radius: 20px;
-        padding: 6px;
+        padding: 8px 5px;
         font-size: 11px;
         cursor: pointer;
     }
@@ -915,6 +921,131 @@ if tab_choice == "🔁 Rotor Tracker":
     }
     </style>
     """, unsafe_allow_html=True)
+    
+    # =========================
+    # LATEST TRANSACTIONS FUNCTIONS (NEW)
+    # =========================
+    
+    def get_latest_incoming(limit=10, buyer=None, size=None):
+        """Get latest incoming transactions"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for incoming
+        incoming_df = df[df['Type'] == 'Inward'].copy()
+        
+        if incoming_df.empty:
+            return []
+        
+        # Apply filters
+        if buyer:
+            incoming_df = incoming_df[incoming_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
+        if size:
+            incoming_df = incoming_df[incoming_df['Size (mm)'] == size]
+        
+        # Sort by date (newest first)
+        incoming_df = incoming_df.sort_values('Date', ascending=False)
+        
+        # Format results
+        results = []
+        for _, row in incoming_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+                'supplier': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'status': str(row['Status'])
+            })
+        
+        return results
+    
+    def get_latest_outgoing(limit=10, buyer=None, size=None):
+        """Get latest outgoing transactions"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for outgoing
+        outgoing_df = df[df['Type'] == 'Outgoing'].copy()
+        
+        if outgoing_df.empty:
+            return []
+        
+        # Apply filters
+        if buyer:
+            outgoing_df = outgoing_df[outgoing_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
+        if size:
+            outgoing_df = outgoing_df[outgoing_df['Size (mm)'] == size]
+        
+        # Sort by date (newest first)
+        outgoing_df = outgoing_df.sort_values('Date', ascending=False)
+        
+        # Format results
+        results = []
+        for _, row in outgoing_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+                'buyer': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'pending': bool(row['Pending'])
+            })
+        
+        return results
+    
+    def get_future_incoming(limit=20):
+        """Get future incoming rotors"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for future incoming
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')].copy()
+        
+        if future_df.empty:
+            return []
+        
+        # Sort by date (soonest first)
+        future_df = future_df.sort_values('Date', ascending=True)
+        
+        # Format results
+        results = []
+        for _, row in future_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'TBD',
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'supplier': str(row['Remarks'])
+            })
+        
+        return results
+    
+    def format_latest_transactions(transactions, title, transaction_type="incoming"):
+        """Format transactions for display"""
+        if not transactions:
+            return f"No {transaction_type} transactions found."
+        
+        response = f"**{title}:**\n\n"
+        
+        if transaction_type == "incoming":
+            for t in transactions:
+                response += f"• {t['date']}: **{t['supplier']}** - {t['size']}mm, {t['quantity']} units\n"
+        elif transaction_type == "outgoing":
+            for t in transactions:
+                pending = " ⏳" if t['pending'] else ""
+                response += f"• {t['date']}: **{t['buyer']}** - {t['size']}mm, {t['quantity']} units{pending}\n"
+        elif transaction_type == "future":
+            for t in transactions:
+                response += f"• {t['date']}: **{t['size']}mm**, {t['quantity']} units from {t['supplier']}\n"
+        
+        return response
     
     # =========================
     # INVENTORY DATA FUNCTIONS
@@ -978,18 +1109,14 @@ if tab_choice == "🔁 Rotor Tracker":
             }
         
         # Future incoming
-        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')]
-        future_incoming = []
-        for _, row in future_df.iterrows():
-            future_incoming.append({
-                'size': int(row['Size (mm)']),
-                'quantity': int(row['Quantity']),
-                'supplier': str(row['Remarks']),
-                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Date TBD'
-            })
+        future_incoming = get_future_incoming(50)  # Use the new function
         
         # Buyers list
         buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
+        
+        # Latest transactions for context
+        latest_incoming = get_latest_incoming(5)
+        latest_outgoing = get_latest_outgoing(5)
         
         return {
             'stock_summary': stock_summary,
@@ -998,6 +1125,8 @@ if tab_choice == "🔁 Rotor Tracker":
             'buyers': [str(b) for b in buyers],
             'total_transactions': len(df),
             'total_quantity': int(df['Quantity'].sum()),
+            'latest_incoming': latest_incoming,
+            'latest_outgoing': latest_outgoing,
             'date_range': {
                 'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown',
                 'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown'
@@ -1033,6 +1162,12 @@ if tab_choice == "🔁 Rotor Tracker":
     FUTURE INCOMING ROTORS:
     {json.dumps(inventory_context['future_incoming'], indent=2)}
     
+    LATEST INCOMING (Last 5):
+    {json.dumps(inventory_context['latest_incoming'], indent=2)}
+    
+    LATEST OUTGOING (Last 5):
+    {json.dumps(inventory_context['latest_outgoing'], indent=2)}
+    
     ALL BUYERS: {inventory_context['buyers']}
     TOTAL TRANSACTIONS: {inventory_context['total_transactions']}
     TOTAL QUANTITY: {inventory_context['total_quantity']} units
@@ -1048,7 +1183,8 @@ if tab_choice == "🔁 Rotor Tracker":
     7. When showing data, format it nicely with bullet points or numbered lists
     8. For pending orders, always mention buyer name, size, and quantity
     9. For future incoming, include dates when available
-    10. You can reference previous questions and answers in the conversation
+    10. For latest transactions, show date, buyer/supplier, size, and quantity
+    11. You can reference previous questions and answers in the conversation
     
     CONVERSATION HISTORY (last 10 exchanges):
     {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
@@ -1130,6 +1266,78 @@ if tab_choice == "🔁 Rotor Tracker":
         """Rule-based fallback when AI is not connected"""
         text = user_input.lower().strip()
         
+        # ===== LATEST TRANSACTIONS QUERIES =====
+        
+        # Latest incoming
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['incoming', 'inward', 'received']):
+            # Check for specific buyer/supplier
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    transactions = get_latest_incoming(limit=10, buyer=buyer)
+                    return format_latest_transactions(transactions, f"Latest Incoming from {buyer}", "incoming")
+            
+            # Check for specific size
+            size_match = re.search(r'(\d+)', text)
+            if size_match:
+                size = int(size_match.group(1))
+                transactions = get_latest_incoming(limit=10, size=size)
+                return format_latest_transactions(transactions, f"Latest Incoming for Size {size}mm", "incoming")
+            
+            # Default latest incoming
+            transactions = get_latest_incoming(limit=10)
+            return format_latest_transactions(transactions, "Latest Incoming Transactions", "incoming")
+        
+        # Latest outgoing
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward', 'sold']):
+            # Check for specific buyer
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    transactions = get_latest_outgoing(limit=10, buyer=buyer)
+                    return format_latest_transactions(transactions, f"Latest Outgoing for {buyer}", "outgoing")
+            
+            # Check for specific size
+            size_match = re.search(r'(\d+)', text)
+            if size_match:
+                size = int(size_match.group(1))
+                transactions = get_latest_outgoing(limit=10, size=size)
+                return format_latest_transactions(transactions, f"Latest Outgoing for Size {size}mm", "outgoing")
+            
+            # Default latest outgoing
+            transactions = get_latest_outgoing(limit=10)
+            return format_latest_transactions(transactions, "Latest Outgoing Transactions", "outgoing")
+        
+        # Future incoming
+        if any(word in text for word in ['coming', 'future', 'incoming', 'expected']):
+            if 'future' in text or 'coming' in text:
+                transactions = get_future_incoming(limit=20)
+                return format_latest_transactions(transactions, "Future Incoming Rotors", "future")
+        
+        # Combined latest (both types)
+        if any(word in text for word in ['latest', 'recent', 'last']) and not any(word in text for word in ['incoming', 'outgoing']):
+            incoming = get_latest_incoming(limit=5)
+            outgoing = get_latest_outgoing(limit=5)
+            
+            response = "**📊 Recent Transactions:**\n\n"
+            
+            if incoming:
+                response += "**📥 Incoming:**\n"
+                for t in incoming:
+                    response += f"• {t['date']}: {t['supplier']} - {t['size']}mm, {t['quantity']} units\n"
+                response += "\n"
+            
+            if outgoing:
+                response += "**📤 Outgoing:**\n"
+                for t in outgoing:
+                    pending = " ⏳" if t['pending'] else ""
+                    response += f"• {t['date']}: {t['buyer']} - {t['size']}mm, {t['quantity']} units{pending}\n"
+            
+            if not incoming and not outgoing:
+                return "No recent transactions found."
+            
+            return response
+        
+        # ===== ORIGINAL FALLBACK QUERIES =====
+        
         # Stock query
         if 'stock' in text:
             if context['stock_summary']:
@@ -1170,29 +1378,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 response += f"**Overall Total:** {total_all} units"
                 return response
         
-        # Future incoming
-        elif any(word in text for word in ['coming', 'future', 'incoming']):
-            if context['future_incoming']:
-                # Group by size
-                size_groups = {}
-                for item in context['future_incoming']:
-                    size = item['size']
-                    if size not in size_groups:
-                        size_groups[size] = {'total': 0, 'items': []}
-                    size_groups[size]['total'] += item['quantity']
-                    size_groups[size]['items'].append(item)
-                
-                response = "📅 **Future Incoming Rotors:**\n\n"
-                grand_total = 0
-                for size in sorted(size_groups.keys()):
-                    response += f"**{size}mm** - Total: {size_groups[size]['total']} units\n"
-                    for item in size_groups[size]['items']:
-                        response += f"  • {item['date']}: {item['quantity']} units from {item['supplier']}\n"
-                    response += "\n"
-                    grand_total += size_groups[size]['total']
-                response += f"**Grand Total:** {grand_total} units"
-                return response
-        
         # Help
         elif 'help' in text:
             return """🤖 **Available Commands:**
@@ -1200,12 +1385,15 @@ if tab_choice == "🔁 Rotor Tracker":
     • `pending` - Show all pending orders
     • `[buyer] pending` - Show pending for specific buyer
     • `coming` - Show future incoming rotors
-    • Ask me anything about your inventory!
+    • `latest incoming` - Show recent incoming transactions
+    • `latest outgoing` - Show recent outgoing transactions
+    • `latest for [buyer]` - Show recent transactions for specific buyer
+    • `latest [size]mm` - Show recent transactions for specific size
     
-    To use AI features, connect an AI provider above."""
+    Ask me anything about your inventory!"""
         
         # Default response
-        return "I can help you with stock levels, pending orders, and future incoming rotors. Try asking: 'stock', 'pending', 'ajji pending', or 'coming'"
+        return "I can help you with stock levels, pending orders, future incoming, and latest transactions. Try asking: 'stock', 'pending', 'coming', 'latest incoming', or 'latest outgoing'"
     
     # =========================
     # HANDLE ACTIONS
@@ -1273,9 +1461,9 @@ if tab_choice == "🔁 Rotor Tracker":
         st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Quick buttons
+        # Quick buttons - UPDATED with more options
         st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
             if st.button("📦 Stock", key="btn_stock"):
                 handle_action("Show me current stock levels")
@@ -1283,9 +1471,15 @@ if tab_choice == "🔁 Rotor Tracker":
             if st.button("⏳ Pending", key="btn_pending"):
                 handle_action("Show all pending orders")
         with col3:
+            if st.button("📥 Incoming", key="btn_incoming"):
+                handle_action("Show latest incoming transactions")
+        with col4:
+            if st.button("📤 Outgoing", key="btn_outgoing"):
+                handle_action("Show latest outgoing transactions")
+        with col5:
             if st.button("📅 Coming", key="btn_coming"):
                 handle_action("What rotors are coming in the future?")
-        with col4:
+        with col6:
             if st.button("❓ Help", key="btn_help"):
                 handle_action("What can you help me with?")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1293,7 +1487,7 @@ if tab_choice == "🔁 Rotor Tracker":
         # Input form
         with st.form(key="assistant_chat_form", clear_on_submit=True):
             user_input = st.text_input("Ask me anything about your inventory...", 
-                                       placeholder="e.g., Show pending for Ajji, What's coming next week?")
+                                       placeholder="e.g., Show latest incoming, pending for Ajji, stock")
             col1, col2 = st.columns(2)
             with col1:
                 send = st.form_submit_button("📤 Send", use_container_width=True)
