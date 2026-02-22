@@ -688,6 +688,10 @@ if tab_choice == "🔁 Rotor Tracker":
     # COMPLETELY FIXED AI ASSISTANT WITH WORKING CONNECTION
     # =========================
     
+    # =========================
+    # COMPLETELY FIXED AI ASSISTANT WITH ALL PROVIDERS
+    # =========================
+    
     import streamlit as st
     import pandas as pd
     import numpy as np
@@ -698,7 +702,7 @@ if tab_choice == "🔁 Rotor Tracker":
     import time
     
     # =========================
-    # AVAILABLE AI PROVIDERS
+    # AVAILABLE AI PROVIDERS (WITH SARVAM ADDED BACK)
     # =========================
     AI_PROVIDERS = {
         "Google Gemini": {
@@ -707,6 +711,17 @@ if tab_choice == "🔁 Rotor Tracker":
             "default_model": "gemini-2.0-flash-exp",
             "description": "Google's fastest model with 1M context",
             "api_key_in_url": True
+        },
+        "Sarvam AI": {
+            "base_url": "https://api.sarvam.ai/v1/chat/completions",
+            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
+            "default_model": "sarvam-m",
+            "description": "Indian language focused models with free tier",
+            "api_key_in_url": False,
+            "headers": lambda api_key: {
+                "api-subscription-key": api_key,
+                "Content-Type": "application/json"
+            }
         },
         "DeepSeek (Free via OpenRouter)": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
@@ -772,7 +787,7 @@ if tab_choice == "🔁 Rotor Tracker":
         bottom: 9px;
         right: 2px;
         width: 4px;
-        height: 6px;
+        height: 600px;
         background: white;
         border-radius: 15px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -1019,7 +1034,7 @@ if tab_choice == "🔁 Rotor Tracker":
         }
     
     # =========================
-    # FIXED API CALL FUNCTIONS
+    # API CALL FUNCTIONS FOR EACH PROVIDER
     # =========================
     
     def call_gemini_api(api_key, model, prompt):
@@ -1042,7 +1057,6 @@ if tab_choice == "🔁 Rotor Tracker":
         
         try:
             response = requests.post(url, headers=headers, json=data, timeout=15)
-            print(f"Gemini API response status: {response.status_code}")  # Debug
             
             if response.status_code == 200:
                 result = response.json()
@@ -1051,10 +1065,38 @@ if tab_choice == "🔁 Rotor Tracker":
                 else:
                     return None
             else:
-                print(f"Gemini API error: {response.text}")  # Debug
                 return None
         except Exception as e:
-            print(f"Gemini API exception: {str(e)}")  # Debug
+            return None
+    
+    def call_sarvam_api(api_key, model, messages):
+        """Call Sarvam AI API"""
+        url = "https://api.sarvam.ai/v1/chat/completions"
+        
+        headers = {
+            "api-subscription-key": api_key,
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 800
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=15)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result and len(result['choices']) > 0:
+                    return result['choices'][0]['message']['content']
+                else:
+                    return None
+            else:
+                return None
+        except Exception as e:
             return None
     
     def call_openrouter_api(api_key, model, messages):
@@ -1077,7 +1119,6 @@ if tab_choice == "🔁 Rotor Tracker":
         
         try:
             response = requests.post(url, headers=headers, json=data, timeout=15)
-            print(f"OpenRouter API response status: {response.status_code}")  # Debug
             
             if response.status_code == 200:
                 result = response.json()
@@ -1086,10 +1127,8 @@ if tab_choice == "🔁 Rotor Tracker":
                 else:
                     return None
             else:
-                print(f"OpenRouter API error: {response.text}")  # Debug
                 return None
         except Exception as e:
-            print(f"OpenRouter API exception: {str(e)}")  # Debug
             return None
     
     # =========================
@@ -1111,47 +1150,41 @@ if tab_choice == "🔁 Rotor Tracker":
             api_key = config['api_key']
             
             # Build conversation history for context
-            history_text = ""
-            for msg in st.session_state.conversation_history[-6:]:  # Last 3 exchanges
-                history_text += f"{msg['role']}: {msg['content']}\n"
+            messages = [{"role": "system", "content": "You are a helpful inventory assistant."}]
             
-            # Create prompt with inventory data
-            prompt = f"""You are an AI inventory assistant. You have access to this inventory data:
+            # Add conversation history
+            for msg in st.session_state.conversation_history[-6:]:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            
+            # Add current user message
+            messages.append({"role": "user", "content": user_input})
+            
+            # Add inventory data as context
+            inventory_context = f"""
+    Current Inventory Data:
+    - Stock: {json.dumps(inventory['stock'])}
+    - Pending Orders: {json.dumps(inventory['pending_by_buyer'])}
+    - Future Incoming: {json.dumps(inventory['future_incoming'])}
+    - Latest Outgoing: {json.dumps(inventory['latest_outgoing'][:5])}
+    """
     
-    STOCK LEVELS:
-    {json.dumps(inventory['stock'], indent=2)}
-    
-    PENDING ORDERS BY BUYER:
-    {json.dumps(inventory['pending_by_buyer'], indent=2)}
-    
-    FUTURE INCOMING ROTORS:
-    {json.dumps(inventory['future_incoming'], indent=2)}
-    
-    LATEST OUTGOING TRANSACTIONS:
-    {json.dumps(inventory['latest_outgoing'][:5], indent=2)}
-    
-    LATEST INCOMING TRANSACTIONS:
-    {json.dumps(inventory['latest_incoming'][:5], indent=2)}
-    
-    Conversation history:
-    {history_text}
-    
-    Current question: {user_input}
-    
-    Answer helpfully and conversationally using the data above. Be concise but informative."""
-    
+            # Insert inventory context into system message or as a separate message
+            messages.insert(1, {"role": "system", "content": inventory_context})
+            
             # Call appropriate API based on provider
             ai_response = None
             
             if "Gemini" in provider_name:
-                ai_response = call_gemini_api(api_key, model, prompt)
+                # For Gemini, we need to flatten messages into a prompt
+                full_prompt = ""
+                for msg in messages:
+                    full_prompt += f"{msg['role']}: {msg['content']}\n"
+                ai_response = call_gemini_api(api_key, model, full_prompt)
+            
+            elif "Sarvam" in provider_name:
+                ai_response = call_sarvam_api(api_key, model, messages)
+            
             elif "OpenRouter" in provider_name or "DeepSeek" in provider_name:
-                # Build messages for OpenRouter
-                messages = [{"role": "system", "content": "You are a helpful inventory assistant."}]
-                for msg in st.session_state.conversation_history[-6:]:
-                    messages.append(msg)
-                messages.append({"role": "user", "content": user_input})
-                
                 ai_response = call_openrouter_api(api_key, model, messages)
             
             # If API call succeeded, save and return
@@ -1161,7 +1194,6 @@ if tab_choice == "🔁 Rotor Tracker":
                 return ai_response
             else:
                 # API call failed, use fallback
-                print("API call failed, using fallback")  # Debug
                 return fallback_response(user_input, inventory)
         
         # If AI not connected, use fallback
@@ -1263,10 +1295,18 @@ if tab_choice == "🔁 Rotor Tracker":
                 url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
                 response = requests.get(url, timeout=5)
                 return response.status_code == 200
+            
+            elif "Sarvam" in provider:
+                # Sarvam test endpoint (if available)
+                headers = {"api-subscription-key": api_key}
+                response = requests.get("https://api.sarvam.ai/v1/models", headers=headers, timeout=5)
+                return response.status_code == 200
+            
             elif "OpenRouter" in provider or "DeepSeek" in provider:
                 headers = {"Authorization": f"Bearer {api_key}"}
                 response = requests.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=5)
                 return response.status_code == 200
+            
             return False
         except:
             return False
