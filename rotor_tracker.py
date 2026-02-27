@@ -1174,10 +1174,10 @@ if tab_choice == "🔁 Rotor Tracker":
     FUTURE INCOMING ROTORS:
     {json.dumps(inventory_context['future_incoming'], indent=2)}
     
-    LATEST INCOMING (Last 5):
+    LATEST INCOMING (Last 10):
     {json.dumps(inventory_context['latest_incoming'], indent=2)}
     
-    LATEST OUTGOING (Last 5):
+    LATEST OUTGOING (Last 10):
     {json.dumps(inventory_context['latest_outgoing'], indent=2)}
     
     ALL BUYERS: {inventory_context['buyers']}
