@@ -938,7 +938,7 @@ if tab_choice == "🔁 Rotor Tracker":
     # LATEST TRANSACTIONS FUNCTIONS (NEW)
     # =========================
     
-    def get_latest_incoming(limit=10, buyer=None, size=None):
+    def get_latest_incoming(limit=20, buyer=None, size=None):
         """Get latest incoming transactions"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return []
@@ -974,7 +974,7 @@ if tab_choice == "🔁 Rotor Tracker":
         
         return results
     
-    def get_latest_outgoing(limit=10, buyer=None, size=None):
+    def get_latest_outgoing(limit=20, buyer=None, size=None):
         """Get latest outgoing transactions"""
         if 'data' not in st.session_state or st.session_state.data.empty:
             return []
