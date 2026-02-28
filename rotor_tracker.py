@@ -1483,7 +1483,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 "API Key",
                 type="password",
                 value=st.session_state.ai_config.get("api_key", ""),
-                key="popup_key"
+                key=""
             )
         
             colA, colB = st.columns(2)
