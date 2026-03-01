@@ -772,22 +772,7 @@ if tab_choice == "🔁 Rotor Tracker":
     import json
     import re
     import time
-    def load_api_key_from_secrets():
-        providers_map = {
-            "Google Gemini": "GOOGLE_GEMINI_API_KEY",
-            "Sarvam AI": "SARVAM_AI_API_KEY",
-            "OpenRouter": "OPENROUTER_API_KEY"
-        }
     
-        provider = st.session_state.ai_config.get("provider", "Sarvam AI")
-        key_name = providers_map.get(provider)
-    
-        if key_name in st.secrets:
-            st.session_state.ai_config["api_key"] = st.secrets[key_name]
-            st.session_state.ai_config["initialized"] = True
-    
-    # call once
-    load_api_key_from_secrets()
    
     
     AI_PROVIDERS = {
