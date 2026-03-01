@@ -804,7 +804,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
         providers_map = {
             "Google Gemini": "GOOGLE_GEMINI_API_KEY",
-            "Sarvam AI": "SARVAM_AI_API_KEY",
+            "Sarvam AI": "SARVAM_API_KEY",
             "OpenRouter": "OPENROUTER_API_KEY"
         }
     
