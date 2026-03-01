@@ -199,23 +199,23 @@ def auto_save_to_gsheet():
     except Exception as e:
         st.error(f"Auto-save failed: {e}")
 
-    st.sidebar.subheader("🔑 AI API Key Setup")
-    
-    provider = st.sidebar.selectbox(
-        "Select AI Provider",
-        ["Google Gemini", "Sarvam AI", "OpenRouter"]
-    )
-    
-    api_key_input = st.sidebar.text_input(
-        "Enter API Key",
-        type="password"
-    )
-    
-    if st.sidebar.button("Save API Key"):
-        if api_key_input:
-            save_api_key(provider, api_key_input)
-        else:
-            st.sidebar.error("Please enter API key")
+st.sidebar.subheader("🔑 AI API Key Setup")
+
+provider = st.sidebar.selectbox(
+    "Select AI Provider",
+    ["Google Gemini", "Sarvam AI", "OpenRouter"]
+)
+
+api_key_input = st.sidebar.text_input(
+    "Enter API Key",
+    type="password"
+)
+
+if st.sidebar.button("Save API Key"):
+    if api_key_input:
+        save_api_key(provider, api_key_input)
+    else:
+        st.sidebar.error("Please enter API key")
 
 
 
