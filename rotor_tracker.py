@@ -19,6 +19,39 @@ import os
 import os
 import toml
 import streamlit as st
+import streamlit as st
+import pandas as pd
+import requests
+# etc…
+
+# =========================
+# LOAD API KEY FUNCTION
+# =========================
+def load_api_key_from_secrets():
+    providers_map = {
+        "Google Gemini": "GOOGLE_GEMINI_API_KEY",
+        "Sarvam AI": "SARVAM_AI_API_KEY",
+        "OpenRouter": "OPENROUTER_API_KEY"
+    }
+
+    if "ai_config" not in st.session_state:
+        st.session_state.ai_config = {
+            "provider": "Sarvam AI",
+            "model": "sarvam-m",
+            "api_key": None,
+            "initialized": False
+        }
+
+    provider = st.session_state.ai_config.get("provider", "Sarvam AI")
+    key_name = providers_map.get(provider)
+
+    api_key = st.secrets.get(key_name, None)
+
+    if api_key:
+        st.session_state.ai_config["api_key"] = api_key
+        st.session_state.ai_config["initialized"] = True
+    else:
+        st.session_state.ai_config["initialized"] = False
 
 SECRETS_PATH = ".streamlit/secrets.toml"
 
@@ -823,8 +856,10 @@ if tab_choice == "🔁 Rotor Tracker":
             'provider': 'Sarvam AI',
             'model': 'sarvam-m',
             'api_key': sarvam_key,
-            'initialized': bool(sarvam_key)
+            'initialized': False
         }
+
+    load_api_key_from_secrets()
     
     # =========================
     # CSS STYLING
