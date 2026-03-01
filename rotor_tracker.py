@@ -53,7 +53,7 @@ def load_api_key_from_secrets():
     else:
         st.session_state.ai_config["initialized"] = False
 
-SECRETS_PATH = ".streamlit/secrets.toml"
+SECRETS_PATH = "rotor_tracker.py.streamlit/secrets.toml"
 
 def save_api_key(provider, api_key):
     """Save API key into Streamlit secrets.toml"""
