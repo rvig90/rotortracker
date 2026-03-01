@@ -766,8 +766,8 @@ if tab_choice == "🔁 Rotor Tracker":
         sarvam_key = None
         try:
             sarvam_key = st.secrets["SARVAM_API_KEY"]
-            except:
-                pass
+        except:
+            pass
         st.session_state.ai_config = {
             'provider': 'Sarvam AI',
             'model': 'saevam-m',
