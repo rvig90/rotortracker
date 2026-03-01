@@ -816,7 +816,7 @@ if tab_choice == "🔁 Rotor Tracker":
             st.session_state.ai_config["initialized"] = True
     
     # call once
-    load_api_key_from_secrets()
+        load_api_key_from_secrets()
 
     
     
