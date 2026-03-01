@@ -22,6 +22,40 @@ import streamlit as st
 import streamlit as st
 import pandas as pd
 import requests
+
+import os
+import toml
+import streamlit as st
+
+SECRETS_PATH = "rvig90/rotortracker/rotor_tracker.py.streamlit/secrets.toml"
+
+def save_api_key(provider, api_key):
+    """Save API key into Streamlit secrets.toml"""
+    
+    # Ensure folder exists
+    os.makedirs(".streamlit", exist_ok=True)
+
+    secrets_data = {}
+    
+    # Load existing secrets if file exists
+    if os.path.exists(SECRETS_PATH):
+        with open(SECRETS_PATH, "r") as f:
+            secrets_data = toml.load(f)
+
+    # Save key
+    key_name = f"{provider.upper().replace(' ', '_')}_API_KEY"
+    secrets_data[key_name] = api_key
+
+    # Write back
+    with open(SECRETS_PATH, "w") as f:
+        toml.dump(secrets_data, f)
+
+    # Update session
+    st.session_state.ai_config["api_key"] = api_key
+    st.session_state.ai_config["provider"] = provider
+    st.session_state.ai_config["initialized"] = True
+
+    st.success(f"✅ {provider} API key saved securely!")
 # etc…
 
 # =========================
@@ -782,14 +816,23 @@ if tab_choice == "🔁 Rotor Tracker":
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = []
     
-    if 'ai_config' not in st.session_state:
-        
-        st.session_state.ai_config = {
-            'provider': 'Sarvam AI',
-            'model': 'sarvam-m',
-            'api_key': None,
-            'initialized': False
+    def load_api_key_from_secrets():
+    
+        providers_map = {
+            "Google Gemini": "GOOGLE_GEMINI_API_KEY",
+            "Sarvam AI": "SARVAM_AI_API_KEY",
+            "OpenRouter": "OPENROUTER_API_KEY"
         }
+    
+        provider = st.session_state.ai_config.get("provider", "Sarvam AI")
+        key_name = providers_map.get(provider)
+    
+        if key_name in st.secrets:
+            st.session_state.ai_config["api_key"] = st.secrets[key_name]
+            st.session_state.ai_config["initialized"] = True
+    
+    # call once
+    load_api_key_from_secrets()
 
     
     
