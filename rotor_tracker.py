@@ -769,7 +769,7 @@ if tab_choice == "🔁 Rotor Tracker":
             pass
         st.session_state.ai_config = {
             'provider': 'Sarvam AI',
-            'model': 'saevam-m',
+            'model': 'sarvam-m',
             'api_key': sarvam_key,
             'initialized': bool(sarvam_key)
         }
