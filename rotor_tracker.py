@@ -721,30 +721,100 @@ if tab_choice == "🔁 Rotor Tracker":
     import re
     import time
     
+   
+    
+    class SecretsManager:
+        """Manages API keys in Streamlit secrets"""
+        
+        @staticmethod
+        def get_secrets_path():
+            """Get the path to .streamlit/secrets.toml"""
+            return Path(".streamlit/secrets.toml")
+        
+        @staticmethod
+        def load_secrets():
+            """Load existing secrets"""
+            secrets_path = SecretsManager.get_secrets_path()
+            if secrets_path.exists():
+                with open(secrets_path, 'r') as f:
+                    return toml.load(f)
+            return {}
+        
+        @staticmethod
+        def save_api_key(provider, api_key):
+            """Save API key to secrets.toml"""
+            secrets_path = SecretsManager.get_secrets_path()
+            
+            # Create .streamlit folder if it doesn't exist
+            secrets_path.parent.mkdir(exist_ok=True)
+            
+            # Load existing secrets
+            secrets = SecretsManager.load_secrets()
+            
+            # Update with new API key
+            if provider == "Sarvam AI":
+                secrets["SARVAM_API_KEY"] = api_key
+            elif provider == "Google Gemini":
+                secrets["GEMINI_API_KEY"] = api_key
+            elif provider == "OpenRouter":
+                secrets["OPENROUTER_API_KEY"] = api_key
+            
+            # Write back to file
+            with open(secrets_path, 'w') as f:
+                toml.dump(secrets, f)
+            
+            # Clear cache to reload secrets
+            st.cache_data.clear()
+            
+            return True
+        
+        @staticmethod
+        def get_api_key(provider):
+            """Get API key from secrets"""
+            try:
+                if provider == "Sarvam AI":
+                    return st.secrets.get("SARVAM_API_KEY")
+                elif provider == "Google Gemini":
+                    return st.secrets.get("GEMINI_API_KEY")
+                elif provider == "OpenRouter":
+                    return st.secrets.get("OPENROUTER_API_KEY")
+            except:
+                return None
+            return None
+    
     # =========================
     # AVAILABLE AI PROVIDERS
     # =========================
     AI_PROVIDERS = {
-        "Google Gemini": {
-            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
-            "models": ["gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash"],
-            "default_model": "gemini-pro",
-            "headers": lambda api_key: {"Content-Type": "application/json"},
-            "api_key_in_url": True
-        },
         "Sarvam AI": {
             "base_url": "https://api.sarvam.ai/v1/chat/completions",
             "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
             "default_model": "sarvam-m",
             "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
-            "api_key_in_url": False
+            "api_key_in_url": False,
+            "description": "Indian language focused models",
+            "secret_key": "SARVAM_API_KEY"
+        },
+        "Google Gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
+            "models": ["gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"],
+            "default_model": "gemini-2.0-flash-exp",
+            "headers": lambda api_key: {"Content-Type": "application/json"},
+            "api_key_in_url": True,
+            "description": "Google's Gemini models",
+            "secret_key": "GEMINI_API_KEY"
         },
         "OpenRouter": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
             "models": ["deepseek/deepseek-chat:free", "google/gemini-2.0-flash-exp:free"],
             "default_model": "deepseek/deepseek-chat:free",
-            "headers": lambda api_key: {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            "api_key_in_url": False
+            "headers": lambda api_key: {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            "api_key_in_url": False,
+            "description": "Access to multiple free models",
+            "secret_key": "OPENROUTER_API_KEY"
         }
     }
     
@@ -756,24 +826,56 @@ if tab_choice == "🔁 Rotor Tracker":
     
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I know everything about your inventory. Ask me anything!"}
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. Ask me about transactions, stock, or pending orders!"}
         ]
     
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    
     if 'ai_config' not in st.session_state:
-        sarvam_key = None
+        # Try to load API keys from secrets
+        sarvam_key = SecretsManager.get_api_key("Sarvam AI")
+        gemini_key = SecretsManager.get_api_key("Google Gemini")
+        openrouter_key = SecretsManager.get_api_key("OpenRouter")
+        
+        # Default to Sarvam if available
+        if sarvam_key:
+            st.session_state.ai_config = {
+                'provider': 'Sarvam AI',
+                'model': 'sarvam-m',
+                'api_key': sarvam_key,
+                'initialized': True
+            }
+        else:
+            st.session_state.ai_config = {
+                'provider': 'Sarvam AI',
+                'model': 'sarvam-m',
+                'api_key': None,
+                'initialized': False
+            }
+    
+    if 'show_api_settings' not in st.session_state:
+        st.session_state.show_api_settings = False
+    
+    # =========================
+    # TEST CONNECTION FUNCTION
+    # =========================
+    def test_api_connection(provider, api_key):
+        """Test if API key works"""
         try:
-            sarvam_key = st.secrets["SARVAM_API_KEY"]
+            if "Sarvam" in provider:
+                url = "https://api.sarvam.ai/v1/models"
+                headers = {"api-subscription-key": api_key}
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+            elif "Gemini" in provider:
+                url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + api_key
+                response = requests.get(url, timeout=5)
+                return response.status_code == 200
+            elif "OpenRouter" in provider:
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=5)
+                return response.status_code == 200
         except:
-            pass
-        st.session_state.ai_config = {
-            'provider': 'Sarvam AI',
-            'model': 'saevam-m',
-            'api_key': sarvam_key,
-            'initialized': bool(sarvam_key)
-        }
+            return False
+        return False
     
     # =========================
     # CSS STYLING
