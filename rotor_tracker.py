@@ -27,31 +27,7 @@ import requests
 # =========================
 # LOAD API KEY FUNCTION
 # =========================
-def load_api_key_from_secrets():
-    providers_map = {
-        "Google Gemini": "GOOGLE_GEMINI_API_KEY",
-        "Sarvam AI": "SARVAM_AI_API_KEY",
-        "OpenRouter": "OPENROUTER_API_KEY"
-    }
 
-    if "ai_config" not in st.session_state:
-        st.session_state.ai_config = {
-            "provider": "Sarvam AI",
-            "model": "sarvam-m",
-            "api_key": None,
-            "initialized": False
-        }
-
-    provider = st.session_state.ai_config.get("provider", "Sarvam AI")
-    key_name = providers_map.get(provider)
-
-    api_key = st.secrets.get(key_name, None)
-
-    if api_key:
-        st.session_state.ai_config["api_key"] = api_key
-        st.session_state.ai_config["initialized"] = True
-    else:
-        st.session_state.ai_config["initialized"] = False
 
 SECRETS_PATH = "rotor_tracker.py.streamlit/secrets.toml"
 
@@ -82,6 +58,32 @@ def save_api_key(provider, api_key):
     st.session_state.ai_config["initialized"] = True
 
     st.success(f"✅ {provider} API key saved securely!")
+
+def load_api_key_from_secrets():
+    providers_map = {
+        "Google Gemini": "GOOGLE_GEMINI_API_KEY",
+        "Sarvam AI": "SARVAM_AI_API_KEY",
+        "OpenRouter": "OPENROUTER_API_KEY"
+    }
+
+    if "ai_config" not in st.session_state:
+        st.session_state.ai_config = {
+            "provider": "Sarvam AI",
+            "model": "sarvam-m",
+            "api_key": None,
+            "initialized": False
+        }
+
+    provider = st.session_state.ai_config.get("provider", "Sarvam AI")
+    key_name = providers_map.get(provider)
+
+    api_key = st.secrets.get(key_name, None)
+
+    if api_key:
+        st.session_state.ai_config["api_key"] = api_key
+        st.session_state.ai_config["initialized"] = True
+    else:
+        st.session_state.ai_config["initialized"] = False
 # Add this at the very top of your app
 
 # =========================
