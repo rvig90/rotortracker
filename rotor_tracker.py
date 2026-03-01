@@ -856,7 +856,7 @@ if tab_choice == "🔁 Rotor Tracker":
             'provider': 'Sarvam AI',
             'model': 'sarvam-m',
             'api_key': sarvam_key,
-            'initialized': False
+            'initialized': True
         }
 
     load_api_key_from_secrets()
