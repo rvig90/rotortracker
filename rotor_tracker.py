@@ -849,16 +849,12 @@ if tab_choice == "🔁 Rotor Tracker":
         st.session_state.conversation_history = []
     
     if 'ai_config' not in st.session_state:
-        sarvam_key = None
-        try:
-            sarvam_key = st.secrets["SARVAM_API_KEY"]
-        except:
-            pass
+        
         st.session_state.ai_config = {
             'provider': 'Sarvam AI',
             'model': 'sarvam-m',
             'api_key': sarvam_key,
-            'initialized': True
+            'initialized': False
         }
 
     load_api_key_from_secrets()
