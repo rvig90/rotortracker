@@ -938,6 +938,7 @@ if tab_choice == "🔁 Rotor Tracker":
     # LATEST TRANSACTIONS FUNCTIONS (NEW)
     # =========================
     
+    
     def get_latest_incoming(limit=20, buyer=None, size=None):
         """Get latest incoming transactions"""
         if 'data' not in st.session_state or st.session_state.data.empty:
@@ -1591,7 +1592,7 @@ if tab_choice == "🔁 Rotor Tracker":
           }
       
       if 'base_rate_per_mm' not in st.session_state:
-          st.session_state.base_rate_per_mm = 4.10
+          st.session_state.base_rate_per_mm = 4.15
       
       BASE_RATE_PER_MM = st.session_state.base_rate_per_mm
       
