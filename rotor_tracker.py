@@ -29,61 +29,7 @@ import requests
 # =========================
 
 
-SECRETS_PATH = "rotor_tracker.py.streamlit/secrets.toml"
 
-def save_api_key(provider, api_key):
-    """Save API key into Streamlit secrets.toml"""
-    
-    # Ensure folder exists
-    os.makedirs(".streamlit", exist_ok=True)
-
-    secrets_data = {}
-    
-    # Load existing secrets if file exists
-    if os.path.exists(SECRETS_PATH):
-        with open(SECRETS_PATH, "r") as f:
-            secrets_data = toml.load(f)
-
-    # Save key
-    key_name = f"{provider.upper().replace(' ', '_')}_API_KEY"
-    secrets_data[key_name] = api_key
-
-    # Write back
-    with open(SECRETS_PATH, "w") as f:
-        toml.dump(secrets_data, f)
-
-    # Update session
-    st.session_state.ai_config["api_key"] = api_key
-    st.session_state.ai_config["provider"] = provider
-    st.session_state.ai_config["initialized"] = True
-
-    st.success(f"✅ {provider} API key saved securely!")
-
-def load_api_key_from_secrets():
-    providers_map = {
-        "Google Gemini": "GOOGLE_GEMINI_API_KEY",
-        "Sarvam AI": "SARVAM_AI_API_KEY",
-        "OpenRouter": "OPENROUTER_API_KEY"
-    }
-
-    if "ai_config" not in st.session_state:
-        st.session_state.ai_config = {
-            "provider": "Sarvam AI",
-            "model": "sarvam-m",
-            "api_key": None,
-            "initialized": False
-        }
-
-    provider = st.session_state.ai_config.get("provider", "Sarvam AI")
-    key_name = providers_map.get(provider)
-
-    api_key = st.secrets.get(key_name, None)
-
-    if api_key:
-        st.session_state.ai_config["api_key"] = api_key
-        st.session_state.ai_config["initialized"] = True
-    else:
-        st.session_state.ai_config["initialized"] = False
 # Add this at the very top of your app
 
 # =========================
@@ -811,27 +757,15 @@ if tab_choice == "🔁 Rotor Tracker":
    
     
     AI_PROVIDERS = {
-        "Google Gemini": {
-            "base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
-            "models": ["gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash"],
-            "default_model": "gemini-pro",
-            "headers": lambda api_key: {"Content-Type": "application/json"},
-            "api_key_in_url": True
-        },
+        
         "Sarvam AI": {
             "base_url": "https://api.sarvam.ai/v1/chat/completions",
             "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
             "default_model": "sarvam-m",
             "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
             "api_key_in_url": False
-        },
-        "OpenRouter": {
-            "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": ["deepseek/deepseek-chat:free", "google/gemini-2.0-flash-exp:free"],
-            "default_model": "deepseek/deepseek-chat:free",
-            "headers": lambda api_key: {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            "api_key_in_url": False
         }
+        
     }
     
     # =========================
@@ -857,7 +791,7 @@ if tab_choice == "🔁 Rotor Tracker":
             'initialized': False
         }
 
-    load_api_key_from_secrets()
+    
     
     # =========================
     # CSS STYLING
