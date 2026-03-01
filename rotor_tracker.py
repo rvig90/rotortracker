@@ -48,7 +48,9 @@ def save_api_key(provider, api_key):
 
     # Write back
     with open(SECRETS_PATH, "w") as f:
+        
         toml.dump(secrets_data, f)
+        
 
     # Update session
     st.session_state.ai_config["api_key"] = api_key
@@ -56,25 +58,7 @@ def save_api_key(provider, api_key):
     st.session_state.ai_config["initialized"] = True
 
     st.success(f"✅ {provider} API key saved securely!")
-# etc…
 
-# =========================
-# LOAD API KEY FUNCTION
-# =========================
-
-
-
-# Add this at the very top of your app
-
-# =========================
-# PERSISTENT CHAT WIDGET
-# =========================
-
-
-
-# =========================
-# YOUR MAIN APP CONTENT
-# =========================
 
 
 # Stop here, don't show the rest of the app # Stop here, don't show the rest of the app
