@@ -736,9 +736,20 @@ if tab_choice == "🔁 Rotor Tracker":
             "default_model": "sarvam-m",
             "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
             "api_key_in_url": False
+        },
+
+        "Gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1/models/",
+            "models": ["gemini-2.5-flash"],
+            "default_model": "gemini-2.5-flash",
+            "headers": lambda api_key: {
+                "Content-Type": "application/json"
+            },
+            "api_key_in_url": True  # ✅ important
         }
-        
     }
+        
+    
     
     # =========================
     # SESSION STATE INITIALIZATION
