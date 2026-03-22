@@ -757,11 +757,7 @@ if tab_choice == "🔁 Rotor Tracker":
     
         "OpenRouter": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": [
-                "deepseek/deepseek-chat:free",
-                "mistralai/mistral-7b-instruct",
-                "qwen/qwen-2.5-coder"
-            ],
+            "models": "openrouter/free",
             "default_model": "deepseek/deepseek-chat",
             "headers": lambda api_key: {
                 "Authorization": f"Bearer {api_key}",
