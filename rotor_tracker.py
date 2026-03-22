@@ -1196,6 +1196,7 @@ if tab_choice == "🔁 Rotor Tracker":
     10. For latest transactions, show date, buyer/supplier, size, and quantity
     11. You can reference previous questions and answers in the conversation
     12. If asked about any transaction history show at least 10 transactions
+    13. The reasonings should be hidden and give the final answer
     
     CONVERSATION HISTORY (last 10 exchanges):
     {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
