@@ -744,7 +744,7 @@ if tab_choice == "🔁 Rotor Tracker":
             "models": [
                 "gemini-2.5-flash-lite",   # ✅ primary
                 "gemini-2.5-flash",
-                "gemini-3.1-flash-lite"
+                "gemini-2.5-flash-TTS"
             ],
             "default_model": "gemini-2.5-flash-lite",
             "headers": lambda api_key: {
