@@ -739,20 +739,38 @@ if tab_choice == "🔁 Rotor Tracker":
         },
 
         
+       
+
         "Gemini": {
             "base_url": "https://generativelanguage.googleapis.com/v1/models/",
             "models": [
-                "gemini-2.5-flash-lite",   # ✅ primary
+                "gemini-2.5-flash-lite",
                 "gemini-2.5-flash",
-                "gemini-2.5-Flash-Native-Audio-Dialog"
+                "gemini-3.1-flash-lite"
             ],
             "default_model": "gemini-2.5-flash-lite",
             "headers": lambda api_key: {
                 "Content-Type": "application/json"
             },
             "api_key_in_url": True
+        },
+    
+        "OpenRouter": {
+            "base_url": "https://openrouter.ai/api/v1/chat/completions",
+            "models": [
+                "deepseek/deepseek-chat",
+                "mistralai/mistral-7b-instruct",
+                "qwen/qwen-2.5-coder"
+            ],
+            "default_model": "deepseek/deepseek-chat",
+            "headers": lambda api_key: {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            "api_key_in_url": False
         }
     }
+    
         
     
     
