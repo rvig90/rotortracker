@@ -1202,10 +1202,10 @@ if tab_choice == "🔁 Rotor Tracker":
     FUTURE INCOMING ROTORS:
     {json.dumps(inventory_context['future_incoming'], indent=2)}
     
-    LATEST INCOMING (Last 10):
+    LATEST INCOMING (Last 50):
     {json.dumps(inventory_context['latest_incoming'], indent=2)}
     
-    LATEST OUTGOING (Last 10):
+    LATEST OUTGOING (Last 50):
     {json.dumps(inventory_context['latest_outgoing'], indent=2)}
     
     ALL BUYERS: {inventory_context['buyers']}
@@ -1225,7 +1225,7 @@ if tab_choice == "🔁 Rotor Tracker":
     9. For future incoming, include dates when available
     10. For latest transactions, show date, buyer/supplier, size, and quantity
     11. You can reference previous questions and answers in the conversation
-    12. If asked about any transaction history show at least 10 transactions
+    12. If asked about any transaction history show at least 30 transactions
     13. The reasonings should be hidden and give the final answer
     
     CONVERSATION HISTORY (last 10 exchanges):
