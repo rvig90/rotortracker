@@ -738,14 +738,18 @@ if tab_choice == "🔁 Rotor Tracker":
             "api_key_in_url": False
         },
 
+        
         "Gemini": {
             "base_url": "https://generativelanguage.googleapis.com/v1/models/",
-            "models": ["gemini-2.5-flash"],
-            "default_model": "gemini-2.5-flash",
+            "models": [
+                "gemini-2.5-flash-lite",   # ✅ primary
+                "gemini-2.5-flash"         # optional fallback
+            ],
+            "default_model": "gemini-2.5-flash-lite",
             "headers": lambda api_key: {
                 "Content-Type": "application/json"
             },
-            "api_key_in_url": True  # ✅ important
+            "api_key_in_url": True
         }
     }
         
