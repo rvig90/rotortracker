@@ -743,7 +743,8 @@ if tab_choice == "🔁 Rotor Tracker":
             "base_url": "https://generativelanguage.googleapis.com/v1/models/",
             "models": [
                 "gemini-2.5-flash-lite",   # ✅ primary
-                "gemini-2.5-flash"         # optional fallback
+                "gemini-2.5-flash",
+                "gemini-3.5-flash-lite"
             ],
             "default_model": "gemini-2.5-flash-lite",
             "headers": lambda api_key: {
