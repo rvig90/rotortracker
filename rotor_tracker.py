@@ -203,7 +203,7 @@ if st.button("🔄 Sync Now", help="Manually reload data from Google Sheets"):
 st.set_page_config(page_title="Rotor + Stator Tracker", layout="wide")
 
 # Sidebar tab switch
-tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators"])
+tab_choice = st.sidebar.radio("📊 Choose Tab", ["🔁 Rotor Tracker", "🧰 Clitting + Laminations + Stators", "Invoices"])
 
 if tab_choice == "🔁 Rotor Tracker":
     st.title("🔁 Rotor Tracker")
@@ -4186,6 +4186,134 @@ if is_watch or watch_mode or is_mobile:
             st.rerun()
     
     st.stop()
+
+if tab_choice == "Invoices":
+    # ================== TALLY INVOICES TAB ==================
+
+    import streamlit as st
+    import json
+    import pandas as pd
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    
+    # ---------- LOAD DATA ----------
+    @st.cache_data(ttl=60)
+    def load_tally_data():
+        try:
+            with open("tally_cache.json") as f:
+                raw = json.load(f)
+    
+            vouchers = raw["ENVELOPE"]["BODY"]["DATA"]["COLLECTION"]["VOUCHER"]
+    
+            if not isinstance(vouchers, list):
+                vouchers = [vouchers]
+    
+            data = []
+            for v in vouchers:
+                try:
+                    amount = float(v.get("AMOUNT", 0))
+                except:
+                    amount = 0
+    
+                data.append({
+                    "Date": v.get("DATE", ""),
+                    "Party": v.get("PARTYLEDGERNAME", ""),
+                    "Voucher No": v.get("VOUCHERNUMBER", ""),
+                    "Amount": amount
+                })
+    
+            df = pd.DataFrame(data)
+            return df
+    
+        except Exception as e:
+            st.error(f"Error loading Tally data: {e}")
+            return pd.DataFrame()
+    
+    
+    # ---------- PDF GENERATOR ----------
+    def create_pdf(inv):
+        file = "invoice.pdf"
+        doc = SimpleDocTemplate(file)
+    
+        elements = []
+        elements.append(Paragraph(f"Invoice No: {inv['Voucher No']}", None))
+        elements.append(Paragraph(f"Date: {inv['Date']}", None))
+        elements.append(Paragraph(f"Party: {inv['Party']}", None))
+        elements.append(Paragraph(f"Amount: ₹{inv['Amount']}", None))
+    
+        doc.build(elements)
+        return file
+    
+    
+    # ---------- UI ----------
+    st.title("📄 Tally Invoices")
+    
+    df = load_tally_data()
+    
+    if df.empty:
+        st.warning("No invoice data found. Make sure tally_cache.json is updating.")
+    else:
+        # ---------- FILTERS ----------
+        col1, col2, col3 = st.columns(3)
+    
+        with col1:
+            party_filter = st.text_input("🔍 Search Party")
+    
+        with col2:
+            min_amt = st.number_input("Min Amount", value=0)
+    
+        with col3:
+            max_amt = st.number_input("Max Amount", value=10000000)
+    
+        filtered = df[
+            df["Party"].str.contains(party_filter, case=False, na=False) &
+            (df["Amount"] >= min_amt) &
+            (df["Amount"] <= max_amt)
+        ]
+    
+        st.markdown("### 📊 Invoice List")
+        st.dataframe(filtered, use_container_width=True)
+    
+        # ---------- SELECT INVOICE ----------
+        if not filtered.empty:
+            selected = st.selectbox("Select Invoice", filtered["Voucher No"])
+            invoice = filtered[filtered["Voucher No"] == selected].iloc[0]
+    
+            st.markdown("### 🧾 Invoice Details")
+            st.write(invoice)
+    
+            # ---------- ACTIONS ----------
+            msg = f"Invoice {invoice['Voucher No']} | {invoice['Party']} | ₹{invoice['Amount']}"
+    
+            col1, col2, col3 = st.columns(3)
+    
+            with col1:
+                st.link_button("📲 WhatsApp", f"https://wa.me/?text={msg}")
+    
+            with col2:
+                st.link_button("📧 Email", f"mailto:?subject=Invoice&body={msg}")
+    
+            with col3:
+                if st.button("📥 PDF"):
+                    pdf = create_pdf(invoice)
+                    with open(pdf, "rb") as f:
+                        st.download_button("Download PDF", f, file_name="invoice.pdf")
+    
+            # ---------- PRINT ----------
+            st.markdown("### 🖨️ Print")
+            st.markdown(
+                """
+                <script>
+                function printInvoice() {
+                    window.print();
+                }
+                </script>
+                <button onclick="printInvoice()">Print Invoice</button>
+                """,
+                unsafe_allow_html=True
+            )
+   
+
+      
    
 
 # ----- Inventory Summary -----
