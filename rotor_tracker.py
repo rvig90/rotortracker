@@ -4188,16 +4188,6 @@ if is_watch or watch_mode or is_mobile:
     st.stop()
 
 if tab_choice == "Invoices":
-
-    from tally_sync import fetch_tally_data
-
-    if st.button("🔄 Sync Tally Data"):
-        result = fetch_tally_data()
-    
-        if result == True:
-            st.success("✅ Data synced successfully")
-        else:
-            st.error(result)
     # ================== TALLY INVOICES TAB ==================
 
     import streamlit as st
@@ -4205,6 +4195,84 @@ if tab_choice == "Invoices":
     import json
     import os
     
+    from tally_sync import data
+
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+   
+
+    if st.button("📄 Generate PDF"):
+        file_path = generate_pdf(inv)
+    
+        with open(file_path, "rb") as f:
+            st.download_button(
+                label="⬇️ Download Invoice PDF",
+                data=f,
+                file_name=file_path,
+                mime="application/pdf"
+            )
+    
+    def generate_pdf(inv):
+        file_name = f"Invoice_{inv['Voucher No']}.pdf"
+    
+        doc = SimpleDocTemplate(file_name)
+        elements = []
+        styles = getSampleStyleSheet()
+    
+        # HEADER
+        elements.append(Paragraph("TAX INVOICE", styles['Title']))
+        elements.append(Spacer(1, 10))
+    
+        elements.append(Paragraph(f"Invoice No: {inv['Voucher No']}", styles['Normal']))
+        elements.append(Paragraph(f"Party: {inv['Party']}", styles['Normal']))
+        elements.append(Paragraph(f"Date: {inv['Date']}", styles['Normal']))
+        elements.append(Spacer(1, 10))
+    
+        # TABLE DATA
+        data = [["Item", "Description", "Qty", "Rate", "Amount"]]
+    
+        for i in inv["Items"]:
+            data.append([
+                i.get("Item", ""),
+                i.get("Description", ""),
+                i.get("Qty", ""),
+                i.get("Rate", ""),
+                str(i.get("Amount", ""))
+            ])
+    
+        table = Table(data)
+    
+        table.setStyle(TableStyle([
+            ("GRID", (0,0), (-1,-1), 1, colors.black),
+            ("BACKGROUND", (0,0), (-1,0), colors.grey)
+        ]))
+    
+        elements.append(table)
+        elements.append(Spacer(1, 10))
+    
+        # TOTALS
+        subtotal = inv["Total"]
+        cgst = subtotal * 0.09
+        sgst = subtotal * 0.09
+        grand_total = subtotal + cgst + sgst
+    
+        elements.append(Paragraph(f"Subtotal: ₹{subtotal:.2f}", styles['Normal']))
+        elements.append(Paragraph(f"CGST: ₹{cgst:.2f}", styles['Normal']))
+        elements.append(Paragraph(f"SGST: ₹{sgst:.2f}", styles['Normal']))
+        elements.append(Paragraph(f"Grand Total: ₹{grand_total:.2f}", styles['Heading2']))
+    
+        doc.build(elements)
+    
+        return file_name
+    if st.button("🔄 Sync Tally Data"):
+        result = data()
+
+        if result == True:
+            st.success("✅ Data synced successfully")
+        else:
+            st.error(result)
+
     st.title("🧾 GST Invoice (Tally Style)")
     
     # LOAD JSON DATA
