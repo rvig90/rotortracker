@@ -1,11 +1,11 @@
 import requests
-import time
 import xmltodict
 import json
+import re
 
-TALLY_URL = "http://172.16.14.128:9000"
+TALLY_URL = "http://<YOUR_VM_IP>:9000"
 
-XML_REQUEST = """
+XML_REQUEST = """ 
 <ENVELOPE>
  <HEADER>
   <TALLYREQUEST>Export Data</TALLYREQUEST>
@@ -24,18 +24,22 @@ XML_REQUEST = """
 </ENVELOPE>
 """
 
-def fetch():
-    try:
-        r = requests.post(TALLY_URL, data=XML_REQUEST)
-        data = xmltodict.parse(r.text)
+response = requests.post(TALLY_URL, data=XML_REQUEST)
 
-        with open("tally_cache.json", "w") as f:
-            json.dump(data, f)
+raw_xml = response.text
 
-        print("✅ Synced Tally")
-    except Exception as e:
-        print("❌ Error:", e)
+# 🔥 CLEAN INVALID CHARACTERS
+clean_xml = re.sub(r'&(?!amp;|lt;|gt;|apos;|quot;)', '&amp;', raw_xml)
 
-while True:
-    fetch()
-    time.sleep(120)  # every 2 mins
+# OPTIONAL: REMOVE NON-ASCII (extra safe)
+clean_xml = clean_xml.encode("utf-8", "ignore").decode("utf-8")
+
+# DEBUG (optional)
+print(clean_xml[:1000])
+
+data = xmltodict.parse(clean_xml)
+
+with open("tally_cache.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+print("✅ Data saved successfully")
