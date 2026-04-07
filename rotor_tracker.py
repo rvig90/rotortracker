@@ -4191,122 +4191,110 @@ if tab_choice == "Invoices":
     # ================== TALLY INVOICES TAB ==================
 
     import streamlit as st
-    import json
     import pandas as pd
+    import json
+    import os
     
-    
-    # ---------- LOAD DATA ----------
+    # LOAD DATA
     @st.cache_data(ttl=60)
-    def load_tally_data():
-        try:
-            with open("tally_cache.json") as f:
-                raw = json.load(f)
-    
-            vouchers = raw["ENVELOPE"]["BODY"]["DATA"]["COLLECTION"]["VOUCHER"]
-    
-            if not isinstance(vouchers, list):
-                vouchers = [vouchers]
-    
-            data = []
-            for v in vouchers:
-                try:
-                    amount = float(v.get("AMOUNT", 0))
-                except:
-                    amount = 0
-    
-                data.append({
-                    "Date": v.get("DATE", ""),
-                    "Party": v.get("PARTYLEDGERNAME", ""),
-                    "Voucher No": v.get("VOUCHERNUMBER", ""),
-                    "Amount": amount
-                })
-    
-            df = pd.DataFrame(data)
-            return df
-    
-        except Exception as e:
-            st.error(f"Error loading Tally data: {e}")
+    def load_data():
+        if not os.path.exists("tally_cache.json"):
             return pd.DataFrame()
+        with open("tally_cache.json") as f:
+            return pd.DataFrame(json.load(f))
     
     
-    # ---------- PDF GENERATOR ----------
-    def create_pdf(inv):
-        file = "invoice.pdf"
-        doc = SimpleDocTemplate(file)
+    st.title("🧾 GST Invoice (Tally Style)")
     
-        elements = []
-        elements.append(Paragraph(f"Invoice No: {inv['Voucher No']}", None))
-        elements.append(Paragraph(f"Date: {inv['Date']}", None))
-        elements.append(Paragraph(f"Party: {inv['Party']}", None))
-        elements.append(Paragraph(f"Amount: ₹{inv['Amount']}", None))
-    
-        doc.build(elements)
-        return file
-    
-    
-    # ---------- UI ----------
-    st.title("📄 Tally Invoices")
-    
-    df = load_tally_data()
+    df = load_data()
     
     if df.empty:
-        st.warning("No invoice data found. Make sure tally_cache.json is updating.")
+        st.warning("No invoices found")
     else:
-        # ---------- FILTERS ----------
-        col1, col2, col3 = st.columns(3)
+        selected = st.selectbox("Select Invoice", df["Voucher No"])
+        inv = df[df["Voucher No"] == selected].iloc[0]
     
-        with col1:
-            party_filter = st.text_input("🔍 Search Party")
+        # HEADER
+        st.markdown("## 🧾 TAX INVOICE")
     
-        with col2:
-            min_amt = st.number_input("Min Amount", value=0)
+        col1, col2 = st.columns(2)
+        col1.write(f"**Invoice No:** {inv['Voucher No']}")
+        col1.write(f"**Date:** {inv['Date']}")
+        col2.write(f"**Party Name:** {inv['Party']}")
     
-        with col3:
-            max_amt = st.number_input("Max Amount", value=10000000)
+        st.markdown("---")
     
-        filtered = df[
-            df["Party"].str.contains(party_filter, case=False, na=False) &
-            (df["Amount"] >= min_amt) &
-            (df["Amount"] <= max_amt)
-        ]
+        # ITEMS TABLE
+        st.markdown("### 📦 Item Details")
     
-        st.markdown("### 📊 Invoice List")
-        st.dataframe(filtered, use_container_width=True)
+        items_df = pd.DataFrame(inv["Items"])
     
-        # ---------- SELECT INVOICE ----------
-        if not filtered.empty:
-            selected = st.selectbox("Select Invoice", filtered["Voucher No"])
-            invoice = filtered[filtered["Voucher No"] == selected].iloc[0]
+        if not items_df.empty:
+            st.dataframe(items_df, use_container_width=True)
     
-            st.markdown("### 🧾 Invoice Details")
-            st.write(invoice)
+        # GST CALCULATION
+        subtotal = inv["Total"]
+        cgst = subtotal * 0.09
+        sgst = subtotal * 0.09
+        grand_total = subtotal + cgst + sgst
     
-            # ---------- ACTIONS ----------
-            msg = f"Invoice {invoice['Voucher No']} | {invoice['Party']} | ₹{invoice['Amount']}"
+        st.markdown("---")
     
-            col1, col2 = st.columns(2)
+        # TOTAL SECTION
+        col1, col2 = st.columns(2)
     
-            with col1:
-                st.link_button("📲 WhatsApp", f"https://wa.me/?text={msg}")
+        col2.write(f"**Subtotal:** ₹{subtotal:.2f}")
+        col2.write(f"**CGST (9%):** ₹{cgst:.2f}")
+        col2.write(f"**SGST (9%):** ₹{sgst:.2f}")
+        col2.write(f"### **Grand Total: ₹{grand_total:.2f}**")
     
-            with col2:
-                st.link_button("📧 Email", f"mailto:?subject=Invoice&body={msg}")
+        st.markdown("---")
     
-           
-            # ---------- PRINT ----------
-            st.markdown("### 🖨️ Print")
-            st.markdown(
-                """
-                <script>
-                function printInvoice() {
-                    window.print();
-                }
-                </script>
-                <button onclick="printInvoice()">Print Invoice</button>
-                """,
-                unsafe_allow_html=True
-            )
-   
+        # PRINTABLE HTML (TALLY STYLE)
+        html = f"""
+        <h2>TAX INVOICE</h2>
+        <p><b>Invoice No:</b> {inv['Voucher No']}</p>
+        <p><b>Party:</b> {inv['Party']}</p>
+        <p><b>Date:</b> {inv['Date']}</p>
+    
+        <table border="1" width="100%" cellpadding="5">
+        <tr>
+            <th>Item</th>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+        </tr>
+        """
+    
+        for i in inv["Items"]:
+            html += f"""
+            <tr>
+                <td>{i['Item']}</td>
+                <td>{i['Description']}</td>
+                <td>{i['Qty']}</td>
+                <td>{i['Rate']}</td>
+                <td>{i['Amount']}</td>
+            </tr>
+            """
+    
+        html += f"""
+        </table>
+    
+        <hr>
+        <p>Subtotal: ₹{subtotal:.2f}</p>
+        <p>CGST: ₹{cgst:.2f}</p>
+        <p>SGST: ₹{sgst:.2f}</p>
+        <h3>Grand Total: ₹{grand_total:.2f}</h3>
+        """
+    
+        st.markdown("### 🖨️ Print View")
+        st.components.v1.html(html, height=700)
+    
+        # SHARE
+        msg = f"Invoice {inv['Voucher No']} | ₹{grand_total:.2f}"
+        st.link_button("📲 WhatsApp", f"https://wa.me/?text={msg}")
+        st.link_button("📧 Email", f"mailto:?subject=Invoice&body={msg}")
 
       
    
