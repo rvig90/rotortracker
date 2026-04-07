@@ -4195,23 +4195,23 @@ if tab_choice == "Invoices":
     import json
     import os
     
-    # LOAD DATA
-    @st.cache_data(ttl=60)
+    st.title("🧾 GST Invoice (Tally Style)")
+    
+    # LOAD JSON DATA
     def load_data():
         if not os.path.exists("/users/ravivig/downloads/tally_cache.json"):
             return pd.DataFrame()
         with open("tally_cache.json") as f:
             return pd.DataFrame(json.load(f))
     
-    
-    st.title("🧾 GST Invoice (Tally Style)")
-    
     df = load_data()
     
     if df.empty:
-        st.warning("No invoices found")
+        st.warning("No invoices found. Click Sync first.")
     else:
+        # SELECT INVOICE
         selected = st.selectbox("Select Invoice", df["Voucher No"])
+    
         inv = df[df["Voucher No"] == selected].iloc[0]
     
         # HEADER
@@ -4224,15 +4224,13 @@ if tab_choice == "Invoices":
     
         st.markdown("---")
     
-        # ITEMS TABLE
+        # ITEMS
         st.markdown("### 📦 Item Details")
     
         items_df = pd.DataFrame(inv["Items"])
+        st.dataframe(items_df, use_container_width=True)
     
-        if not items_df.empty:
-            st.dataframe(items_df, use_container_width=True)
-    
-        # GST CALCULATION
+        # TOTALS
         subtotal = inv["Total"]
         cgst = subtotal * 0.09
         sgst = subtotal * 0.09
@@ -4240,7 +4238,6 @@ if tab_choice == "Invoices":
     
         st.markdown("---")
     
-        # TOTAL SECTION
         col1, col2 = st.columns(2)
     
         col2.write(f"**Subtotal:** ₹{subtotal:.2f}")
@@ -4250,14 +4247,15 @@ if tab_choice == "Invoices":
     
         st.markdown("---")
     
-        # PRINTABLE HTML (TALLY STYLE)
+        # PRINT VIEW
         html = f"""
-        <h2>TAX INVOICE</h2>
+        <h2 style="text-align:center;">TAX INVOICE</h2>
+    
         <p><b>Invoice No:</b> {inv['Voucher No']}</p>
         <p><b>Party:</b> {inv['Party']}</p>
         <p><b>Date:</b> {inv['Date']}</p>
     
-        <table border="1" width="100%" cellpadding="5">
+        <table border="1" width="100%" cellpadding="5" cellspacing="0">
         <tr>
             <th>Item</th>
             <th>Description</th>
@@ -4270,11 +4268,11 @@ if tab_choice == "Invoices":
         for i in inv["Items"]:
             html += f"""
             <tr>
-                <td>{i['Item']}</td>
-                <td>{i['Description']}</td>
-                <td>{i['Qty']}</td>
-                <td>{i['Rate']}</td>
-                <td>{i['Amount']}</td>
+                <td>{i.get('Item','')}</td>
+                <td>{i.get('Description','')}</td>
+                <td>{i.get('Qty','')}</td>
+                <td>{i.get('Rate','')}</td>
+                <td>{i.get('Amount','')}</td>
             </tr>
             """
     
@@ -4288,13 +4286,14 @@ if tab_choice == "Invoices":
         <h3>Grand Total: ₹{grand_total:.2f}</h3>
         """
     
-        st.markdown("### 🖨️ Print View")
+        st.markdown("### 🖨️ Print Preview")
         st.components.v1.html(html, height=700)
     
-        # SHARE
-        msg = f"Invoice {inv['Voucher No']} | ₹{grand_total:.2f}"
-        st.link_button("📲 WhatsApp", f"https://wa.me/?text={msg}")
-        st.link_button("📧 Email", f"mailto:?subject=Invoice&body={msg}")
+        # SHARE OPTIONS
+        msg = f"Invoice {inv['Voucher No']} | {inv['Party']} | ₹{grand_total:.2f}"
+    
+        st.link_button("📲 Share on WhatsApp", f"https://wa.me/?text={msg}")
+        st.link_button("📧 Send Email", f"mailto:?subject=Invoice&body={msg}")
 
       
    
