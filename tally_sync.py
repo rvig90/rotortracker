@@ -3,7 +3,7 @@ import time
 import xmltodict
 import json
 
-TALLY_URL = "http://127.0.0.1:9000"
+TALLY_URL = "http://172.16.14.128:9000"
 
 XML_REQUEST = """
 <ENVELOPE>
