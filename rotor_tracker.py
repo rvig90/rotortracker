@@ -4198,7 +4198,7 @@ if tab_choice == "Invoices":
     # LOAD DATA
     @st.cache_data(ttl=60)
     def load_data():
-        if not os.path.exists("tally_cache.json"):
+        if not os.path.exists("/users/ravivig/downloads/tally_cache.json"):
             return pd.DataFrame()
         with open("tally_cache.json") as f:
             return pd.DataFrame(json.load(f))
