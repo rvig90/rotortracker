@@ -4187,195 +4187,195 @@ if is_watch or watch_mode or is_mobile:
     
     st.stop()
 
-if tab_choice == "Invoices":
-
-    import streamlit as st
-    import pandas as pd
-    import json
-    import os
-
-    from tally_sync import fetch_tally_data
-
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet
-
-
-    # ================= PDF FUNCTION =================
-    def generate_pdf(inv):
-
-        safe_vno = str(inv['Voucher No']).replace("/", "_").replace("\\", "_")
-        file_name = f"/Users/ravivig/Downloads/Invoice_{safe_vno}.pdf"
-
-        doc = SimpleDocTemplate(file_name)
-        elements = []
-        styles = getSampleStyleSheet()
-
-        elements.append(Paragraph("TAX INVOICE", styles['Title']))
-        elements.append(Spacer(1, 10))
-
-        elements.append(Paragraph(f"Invoice No: {inv['Voucher No']}", styles['Normal']))
-        elements.append(Paragraph(f"Party: {inv['Party']}", styles['Normal']))
-        elements.append(Paragraph(f"Date: {inv['Date']}", styles['Normal']))
-        elements.append(Spacer(1, 10))
-
-        data = [["Item", "Description", "Qty", "Rate", "Amount"]]
-
-        for i in inv["Items"]:
-            data.append([
-                i.get("Item", ""),
-                i.get("Description", ""),
-                i.get("Qty", ""),
-                i.get("Rate", ""),
-                str(i.get("Amount", ""))
-            ])
-
-        table = Table(data)
-
-        table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey)
-        ]))
-
-        elements.append(table)
-        elements.append(Spacer(1, 10))
-
-        subtotal = inv["Total"]
-        cgst = subtotal * 0.09
-        sgst = subtotal * 0.09
-        grand_total = subtotal + cgst + sgst
-
-        elements.append(Paragraph(f"Subtotal: ₹{subtotal:.2f}", styles['Normal']))
-        elements.append(Paragraph(f"CGST: ₹{cgst:.2f}", styles['Normal']))
-        elements.append(Paragraph(f"SGST: ₹{sgst:.2f}", styles['Normal']))
-        elements.append(Paragraph(f"Grand Total: ₹{grand_total:.2f}", styles['Heading2']))
-
-        doc.build(elements)
-
-        return file_name
-
-
-    # ================= SYNC BUTTON =================
-    if st.button("🔄 Sync Tally Data"):
-        result = fetch_tally_data()
-
-        if result == True:
-            st.success("✅ Data synced successfully")
+    if tab_choice == "Invoices":
+    
+        import streamlit as st
+        import pandas as pd
+        import json
+        import os
+    
+        from tally_sync import fetch_tally_data
+    
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+    
+    
+        # ================= PDF FUNCTION =================
+        def generate_pdf(inv):
+    
+            safe_vno = str(inv['Voucher No']).replace("/", "_").replace("\\", "_")
+            file_name = f"/Users/ravivig/Downloads/Invoice_{safe_vno}.pdf"
+    
+            doc = SimpleDocTemplate(file_name)
+            elements = []
+            styles = getSampleStyleSheet()
+    
+            elements.append(Paragraph("TAX INVOICE", styles['Title']))
+            elements.append(Spacer(1, 10))
+    
+            elements.append(Paragraph(f"Invoice No: {inv['Voucher No']}", styles['Normal']))
+            elements.append(Paragraph(f"Party: {inv['Party']}", styles['Normal']))
+            elements.append(Paragraph(f"Date: {inv['Date']}", styles['Normal']))
+            elements.append(Spacer(1, 10))
+    
+            data = [["Item", "Description", "Qty", "Rate", "Amount"]]
+    
+            for i in inv["Items"]:
+                data.append([
+                    i.get("Item", ""),
+                    i.get("Description", ""),
+                    i.get("Qty", ""),
+                    i.get("Rate", ""),
+                    str(i.get("Amount", ""))
+                ])
+    
+            table = Table(data)
+    
+            table.setStyle(TableStyle([
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey)
+            ]))
+    
+            elements.append(table)
+            elements.append(Spacer(1, 10))
+    
+            subtotal = inv["Total"]
+            cgst = subtotal * 0.09
+            sgst = subtotal * 0.09
+            grand_total = subtotal + cgst + sgst
+    
+            elements.append(Paragraph(f"Subtotal: ₹{subtotal:.2f}", styles['Normal']))
+            elements.append(Paragraph(f"CGST: ₹{cgst:.2f}", styles['Normal']))
+            elements.append(Paragraph(f"SGST: ₹{sgst:.2f}", styles['Normal']))
+            elements.append(Paragraph(f"Grand Total: ₹{grand_total:.2f}", styles['Heading2']))
+    
+            doc.build(elements)
+    
+            return file_name
+    
+    
+        # ================= SYNC BUTTON =================
+        if st.button("🔄 Sync Tally Data"):
+            result = fetch_tally_data()
+    
+            if result == True:
+                st.success("✅ Data synced successfully")
+            else:
+                st.error(result)
+    
+    
+        st.title("🧾 GST Invoice (Tally Style)")
+    
+    
+        # ================= LOAD DATA =================
+        def load_data():
+            path = "/Users/ravivig/Downloads/tally_cache.json"
+    
+            if not os.path.exists(path):
+                return pd.DataFrame()
+    
+            with open(path) as f:
+                return pd.DataFrame(json.load(f))
+    
+    
+        df = load_data()
+    
+    
+        if df.empty:
+            st.warning("No invoices found. Click Sync first.")
+    
         else:
-            st.error(result)
-
-
-    st.title("🧾 GST Invoice (Tally Style)")
-
-
-    # ================= LOAD DATA =================
-    def load_data():
-        path = "/Users/ravivig/Downloads/tally_cache.json"
-
-        if not os.path.exists(path):
-            return pd.DataFrame()
-
-        with open(path) as f:
-            return pd.DataFrame(json.load(f))
-
-
-    df = load_data()
-
-
-    if df.empty:
-        st.warning("No invoices found. Click Sync first.")
-
-    else:
-        selected = st.selectbox("Select Invoice", df["Voucher No"])
-        inv = df[df["Voucher No"] == selected].iloc[0]
-
-        st.markdown("## 🧾 TAX INVOICE")
-
-        col1, col2 = st.columns(2)
-        col1.write(f"**Invoice No:** {inv['Voucher No']}")
-        col1.write(f"**Date:** {inv['Date']}")
-        col2.write(f"**Party Name:** {inv['Party']}")
-
-        st.markdown("---")
-
-        st.markdown("### 📦 Item Details")
-        items_df = pd.DataFrame(inv["Items"])
-        st.dataframe(items_df, use_container_width=True)
-
-        subtotal = inv["Total"]
-        cgst = subtotal * 0.09
-        sgst = subtotal * 0.09
-        grand_total = subtotal + cgst + sgst
-
-        st.markdown("---")
-
-        col1, col2 = st.columns(2)
-        col2.write(f"**Subtotal:** ₹{subtotal:.2f}")
-        col2.write(f"**CGST (9%):** ₹{cgst:.2f}")
-        col2.write(f"**SGST (9%):** ₹{sgst:.2f}")
-        col2.write(f"### **Grand Total: ₹{grand_total:.2f}**")
-
-        st.markdown("---")
-
-        # ================= PRINT VIEW =================
-        html = f"""
-        <h2 style="text-align:center;">TAX INVOICE</h2>
-
-        <p><b>Invoice No:</b> {inv['Voucher No']}</p>
-        <p><b>Party:</b> {inv['Party']}</p>
-        <p><b>Date:</b> {inv['Date']}</p>
-
-        <table border="1" width="100%" cellpadding="5" cellspacing="0">
-        <tr>
-            <th>Item</th>
-            <th>Description</th>
-            <th>Qty</th>
-            <th>Rate</th>
-            <th>Amount</th>
-        </tr>
-        """
-
-        for i in inv["Items"]:
-            html += f"""
+            selected = st.selectbox("Select Invoice", df["Voucher No"])
+            inv = df[df["Voucher No"] == selected].iloc[0]
+    
+            st.markdown("## 🧾 TAX INVOICE")
+    
+            col1, col2 = st.columns(2)
+            col1.write(f"**Invoice No:** {inv['Voucher No']}")
+            col1.write(f"**Date:** {inv['Date']}")
+            col2.write(f"**Party Name:** {inv['Party']}")
+    
+            st.markdown("---")
+    
+            st.markdown("### 📦 Item Details")
+            items_df = pd.DataFrame(inv["Items"])
+            st.dataframe(items_df, use_container_width=True)
+    
+            subtotal = inv["Total"]
+            cgst = subtotal * 0.09
+            sgst = subtotal * 0.09
+            grand_total = subtotal + cgst + sgst
+    
+            st.markdown("---")
+    
+            col1, col2 = st.columns(2)
+            col2.write(f"**Subtotal:** ₹{subtotal:.2f}")
+            col2.write(f"**CGST (9%):** ₹{cgst:.2f}")
+            col2.write(f"**SGST (9%):** ₹{sgst:.2f}")
+            col2.write(f"### **Grand Total: ₹{grand_total:.2f}**")
+    
+            st.markdown("---")
+    
+            # ================= PRINT VIEW =================
+            html = f"""
+            <h2 style="text-align:center;">TAX INVOICE</h2>
+    
+            <p><b>Invoice No:</b> {inv['Voucher No']}</p>
+            <p><b>Party:</b> {inv['Party']}</p>
+            <p><b>Date:</b> {inv['Date']}</p>
+    
+            <table border="1" width="100%" cellpadding="5" cellspacing="0">
             <tr>
-                <td>{i.get('Item','')}</td>
-                <td>{i.get('Description','')}</td>
-                <td>{i.get('Qty','')}</td>
-                <td>{i.get('Rate','')}</td>
-                <td>{i.get('Amount','')}</td>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Rate</th>
+                <th>Amount</th>
             </tr>
             """
-
-        html += f"""
-        </table>
-
-        <hr>
-        <p>Subtotal: ₹{subtotal:.2f}</p>
-        <p>CGST: ₹{cgst:.2f}</p>
-        <p>SGST: ₹{sgst:.2f}</p>
-        <h3>Grand Total: ₹{grand_total:.2f}</h3>
-        """
-
-        st.markdown("### 🖨️ Print Preview")
-        st.components.v1.html(html, height=700)
-
-        # ================= PDF BUTTON =================
-        if st.button("📄 Generate PDF"):
-
-            file_path = generate_pdf(inv)
-
-            with open(file_path, "rb") as f:
-                st.download_button(
-                    label="⬇️ Download Invoice PDF",
-                    data=f,
-                    file_name=os.path.basename(file_path),
-                    mime="application/pdf"
-                )
-
-            msg = f"Invoice {inv['Voucher No']} | {inv['Party']} | ₹{grand_total:.2f}"
-
-            st.link_button("📲 Share on WhatsApp", f"https://wa.me/?text={msg}")
-            st.link_button("📧 Send Email", f"mailto:?subject=Invoice&body={msg}")
+    
+            for i in inv["Items"]:
+                html += f"""
+                <tr>
+                    <td>{i.get('Item','')}</td>
+                    <td>{i.get('Description','')}</td>
+                    <td>{i.get('Qty','')}</td>
+                    <td>{i.get('Rate','')}</td>
+                    <td>{i.get('Amount','')}</td>
+                </tr>
+                """
+    
+            html += f"""
+            </table>
+    
+            <hr>
+            <p>Subtotal: ₹{subtotal:.2f}</p>
+            <p>CGST: ₹{cgst:.2f}</p>
+            <p>SGST: ₹{sgst:.2f}</p>
+            <h3>Grand Total: ₹{grand_total:.2f}</h3>
+            """
+    
+            st.markdown("### 🖨️ Print Preview")
+            st.components.v1.html(html, height=700)
+    
+            # ================= PDF BUTTON =================
+            if st.button("📄 Generate PDF"):
+    
+                file_path = generate_pdf(inv)
+    
+                with open(file_path, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download Invoice PDF",
+                        data=f,
+                        file_name=os.path.basename(file_path),
+                        mime="application/pdf"
+                    )
+    
+                msg = f"Invoice {inv['Voucher No']} | {inv['Party']} | ₹{grand_total:.2f}"
+    
+                st.link_button("📲 Share on WhatsApp", f"https://wa.me/?text={msg}")
+                st.link_button("📧 Send Email", f"mailto:?subject=Invoice&body={msg}")
 
       
    
