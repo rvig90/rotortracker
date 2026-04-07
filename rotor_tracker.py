@@ -4188,6 +4188,16 @@ if is_watch or watch_mode or is_mobile:
     st.stop()
 
 if tab_choice == "Invoices":
+
+    from tally_sync import fetch_tally_data
+
+    if st.button("🔄 Sync Tally Data"):
+        result = fetch_tally_data()
+    
+        if result == True:
+            st.success("✅ Data synced successfully")
+        else:
+            st.error(result)
     # ================== TALLY INVOICES TAB ==================
 
     import streamlit as st
