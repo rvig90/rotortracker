@@ -1,9 +1,8 @@
 import requests
-import xmltodict
 import json
 import re
 
-TALLY_URL = "http://<YOUR_VM_IP>:9000"
+TALLY_URL = "http://172.16.14.128:9000"  # your VM IP
 
 XML_REQUEST = """ 
 <ENVELOPE>
@@ -25,21 +24,32 @@ XML_REQUEST = """
 """
 
 response = requests.post(TALLY_URL, data=XML_REQUEST)
+xml = response.text
 
-raw_xml = response.text
+# 🔥 Extract only required fields using regex (safe)
+vouchers = re.findall(r"<VOUCHER.*?>.*?</VOUCHER>", xml, re.DOTALL)
 
-# 🔥 CLEAN INVALID CHARACTERS
-clean_xml = re.sub(r'&(?!amp;|lt;|gt;|apos;|quot;)', '&amp;', raw_xml)
+data = []
 
-# OPTIONAL: REMOVE NON-ASCII (extra safe)
-clean_xml = clean_xml.encode("utf-8", "ignore").decode("utf-8")
+for v in vouchers:
+    try:
+        date = re.search(r"<DATE>(.*?)</DATE>", v)
+        party = re.search(r"<PARTYLEDGERNAME>(.*?)</PARTYLEDGERNAME>", v)
+        vno = re.search(r"<VOUCHERNUMBER>(.*?)</VOUCHERNUMBER>", v)
+        amount = re.search(r"<AMOUNT>(.*?)</AMOUNT>", v)
 
-# DEBUG (optional)
-print(clean_xml[:1000])
+        data.append({
+            "Date": date.group(1) if date else "",
+            "Party": party.group(1) if party else "",
+            "Voucher No": vno.group(1) if vno else "",
+            "Amount": float(amount.group(1)) if amount else 0
+        })
 
-data = xmltodict.parse(clean_xml)
+    except:
+        continue  # skip bad entries
 
+# Save clean JSON
 with open("tally_cache.json", "w") as f:
     json.dump(data, f, indent=2)
 
-print("✅ Data saved successfully")
+print("✅ Clean data saved successfully")
