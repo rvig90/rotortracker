@@ -4193,7 +4193,7 @@ if tab_choice == "Invoices":
     import streamlit as st
     import json
     import pandas as pd
-    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    
     
     # ---------- LOAD DATA ----------
     @st.cache_data(ttl=60)
@@ -4284,7 +4284,7 @@ if tab_choice == "Invoices":
             # ---------- ACTIONS ----------
             msg = f"Invoice {invoice['Voucher No']} | {invoice['Party']} | ₹{invoice['Amount']}"
     
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
     
             with col1:
                 st.link_button("📲 WhatsApp", f"https://wa.me/?text={msg}")
@@ -4292,12 +4292,7 @@ if tab_choice == "Invoices":
             with col2:
                 st.link_button("📧 Email", f"mailto:?subject=Invoice&body={msg}")
     
-            with col3:
-                if st.button("📥 PDF"):
-                    pdf = create_pdf(invoice)
-                    with open(pdf, "rb") as f:
-                        st.download_button("Download PDF", f, file_name="invoice.pdf")
-    
+           
             # ---------- PRINT ----------
             st.markdown("### 🖨️ Print")
             st.markdown(
