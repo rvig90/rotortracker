@@ -1794,9 +1794,10 @@ if tab_choice == "🔁 Rotor Tracker":
               target_size = size_num
               break
       is_size_pending_query = target_size is not None and 'pending' in query
-      if is_size_pending_query:
+      if is_size_pending_query and st.session_state.get("last_auto_pending_query") != query:
           st.session_state.history_type = "Outgoing"
           st.session_state.history_pending = "Pending Only"
+          st.session_state.last_auto_pending_query = query
       
       # =========================
       # DETECT TIME PERIOD IN QUERY
