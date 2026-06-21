@@ -1793,6 +1793,10 @@ if tab_choice == "🔁 Rotor Tracker":
           if size_num in st.session_state.fixed_prices or size_num > 20:
               target_size = size_num
               break
+      is_size_pending_query = target_size is not None and 'pending' in query
+      if is_size_pending_query:
+          st.session_state.history_type = "Outgoing"
+          st.session_state.history_pending = "Pending Only"
       
       # =========================
       # DETECT TIME PERIOD IN QUERY
