@@ -2182,7 +2182,7 @@ if tab_choice == "🔁 Rotor Tracker":
           
           # Resample to monthly for cleaner chart
           timeline_df.set_index('Date', inplace=True)
-          monthly_stock = timeline_df.resample('M')['Cumulative Stock'].last().reset_index()
+          monthly_stock = timeline_df.resample('ME')['Cumulative Stock'].last().reset_index()
           
           if not monthly_stock.empty:
               chart = alt.Chart(monthly_stock).mark_line(point=True).encode(
