@@ -2052,7 +2052,7 @@ if tab_choice == "🔁 Rotor Tracker":
           
           # Map balance back onto history_df; pending/future rows get no balance value
           history_df['Balance'] = history_df.index.map(chrono_df.set_index(chrono_df.index)['Balance'])
-          history_df['Balance'] = history_df['Balance'].fillna(method='ffill').fillna(0).astype(int)
+          history_df['Balance'] = history_df['Balance'].ffill().fillna(0).astype(int)
           
           price_per = get_price_per_rotor(target_size)
           
