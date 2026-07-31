@@ -2100,16 +2100,17 @@ if tab_choice == "🔁 Rotor Tracker":
           )
           
           # Format for display
+          # Format for display
           display_history = filtered_history.copy()
           display_history['Date'] = display_history['Date'].dt.strftime('%Y-%m-%d')
           display_history['Value'] = display_history['Value'].apply(lambda x: f"₹{x:,.2f}")
           display_history['Pending'] = display_history['Pending'].apply(lambda x: 'Yes' if x else 'No')
-          
+        
           # Display transaction history
           st.subheader(f"📋 Transaction Details ({len(filtered_history)} records)")
-          
+        
           st.dataframe(
-              display_history[['Date', 'Type', 'Quantity', 'Remarks', 'Status', 'Pending', 'Value']]
+              display_history[['Date', 'Type', 'Quantity', 'Balance', 'Remarks', 'Status', 'Pending', 'Value']]
               .rename(columns={
                   'Type': 'Movement',
                   'Quantity': 'Qty',
@@ -2120,7 +2121,6 @@ if tab_choice == "🔁 Rotor Tracker":
               use_container_width=True,
               hide_index=True
           )
-          
           # Monthly summary
           st.subheader("📅 Monthly Summary")
           
