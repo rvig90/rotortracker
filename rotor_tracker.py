@@ -1739,7 +1739,7 @@ if tab_choice == "🔁 Rotor Tracker":
                   st.success("✅ Reset to default rates!")
                   st.rerun()
       
-      with st.expander("💰 Current Pricing", expanded=True):
+      with st.expander("💰 Current Pricing", expanded=False):
           st.write("**Fixed Prices:**")
           for size, price in sorted(st.session_state.fixed_prices.items()):
               st.write(f"- {size}mm: ₹{price} per rotor")
@@ -2040,6 +2040,14 @@ if tab_choice == "🔁 Rotor Tracker":
           # Sort by date (newest first)
           history_df = history_df.sort_values('Date', ascending=False)
           
+          # Calculate running balance chronologically (oldest to newest)
+          chrono_df = history_df.sort_values('Date', ascending=True).copy()
+          chrono_df['SignedQty'] = chrono_df.apply(
+              lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1
+          )
+          chrono_df['Balance'] = chrono_df['SignedQty'].cumsum().astype(int)
+          history_df['Balance'] = chrono_df['Balance']
+          
           price_per = get_price_per_rotor(target_size)
           
           # Calculate summary metrics
@@ -2100,15 +2108,14 @@ if tab_choice == "🔁 Rotor Tracker":
           )
           
           # Format for display
-          # Format for display
           display_history = filtered_history.copy()
           display_history['Date'] = display_history['Date'].dt.strftime('%Y-%m-%d')
           display_history['Value'] = display_history['Value'].apply(lambda x: f"₹{x:,.2f}")
           display_history['Pending'] = display_history['Pending'].apply(lambda x: 'Yes' if x else 'No')
-        
+          
           # Display transaction history
           st.subheader(f"📋 Transaction Details ({len(filtered_history)} records)")
-        
+          
           st.dataframe(
               display_history[['Date', 'Type', 'Quantity', 'Balance', 'Remarks', 'Status', 'Pending', 'Value']]
               .rename(columns={
