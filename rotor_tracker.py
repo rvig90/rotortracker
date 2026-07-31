@@ -2042,17 +2042,23 @@ if tab_choice == "🔁 Rotor Tracker":
           history_df = history_df.sort_values('Date', ascending=False)
           
           # Calculate running balance - only current, non-pending transactions count
-          chrono_df = history_df[
-              (history_df['Pending'] == False) & (history_df['Status'] == 'Current')
-          ].sort_values('Date', ascending=True).copy()
+          # Calculate running balance - only current, non-pending transactions count
+          chrono_df = history_df.sort_values('Date', ascending=True).copy()
+          
+          current_mask = (chrono_df['Pending'] == False) & (chrono_df['Status'] == 'Current')
           chrono_df['SignedQty'] = chrono_df.apply(
               lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1
           )
-          chrono_df['Balance'] = chrono_df['SignedQty'].cumsum().astype(int)
+          # Only current/non-pending rows contribute to the running sum
+          chrono_df['Balance'] = (chrono_df['SignedQty'] * current_mask).cumsum()
+          # For pending/future rows, blank out their own balance so it inherits the prior one
+          chrono_df.loc[~current_mask, 'Balance'] = None
+          # Forward-fill in chronological order (oldest -> newest) so pending rows
+          # show the balance as it stood BEFORE them, not after a later transaction
+          chrono_df['Balance'] = chrono_df['Balance'].ffill().fillna(0).astype(int)
           
-          # Map balance back onto history_df; pending/future rows get no balance value
+          # Map the correctly-ordered balance back onto history_df (sorted newest-first for display)
           history_df['Balance'] = history_df.index.map(chrono_df.set_index(chrono_df.index)['Balance'])
-          history_df['Balance'] = history_df['Balance'].ffill().fillna(0).astype(int)
           
           price_per = get_price_per_rotor(target_size)
           
