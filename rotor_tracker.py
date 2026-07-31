@@ -2038,15 +2038,21 @@ if tab_choice == "🔁 Rotor Tracker":
               time_desc = "All time"
           
           # Sort by date (newest first)
+          # Sort by date (newest first)
           history_df = history_df.sort_values('Date', ascending=False)
           
-          # Calculate running balance chronologically (oldest to newest)
-          chrono_df = history_df.sort_values('Date', ascending=True).copy()
+          # Calculate running balance - only current, non-pending transactions count
+          chrono_df = history_df[
+              (history_df['Pending'] == False) & (history_df['Status'] == 'Current')
+          ].sort_values('Date', ascending=True).copy()
           chrono_df['SignedQty'] = chrono_df.apply(
               lambda row: row['Quantity'] if row['Type'] == 'Inward' else -row['Quantity'], axis=1
           )
           chrono_df['Balance'] = chrono_df['SignedQty'].cumsum().astype(int)
-          history_df['Balance'] = chrono_df['Balance']
+          
+          # Map balance back onto history_df; pending/future rows get no balance value
+          history_df['Balance'] = history_df.index.map(chrono_df.set_index(chrono_df.index)['Balance'])
+          history_df['Balance'] = history_df['Balance'].fillna(method='ffill').fillna(0).astype(int)
           
           price_per = get_price_per_rotor(target_size)
           
