@@ -1452,6 +1452,131 @@ if tab_choice == "🔁 Rotor Tracker":
                 'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown'
             }
         }
+
+     # =========================
+    # AI RESPONSE WITH FULL MEMORY
+    # =========================
+    def get_ai_response(user_input):
+        """Get AI response with full conversation memory and inventory awareness"""
+        
+        # Get complete inventory context
+        inventory_context = get_complete_inventory_context()
+        
+        # If AI is connected, use it with full memory
+        if st.session_state.ai_config['initialized']:
+            try:
+                config = st.session_state.ai_config
+                provider = AI_PROVIDERS[config['provider']]
+                
+                # Build system prompt with complete inventory context
+                system_prompt = f"""You are an AI inventory assistant with complete knowledge of the inventory system. 
+    
+    CURRENT INVENTORY DATA (AS OF {datetime.now().strftime('%Y-%m-%d %H:%M')}):
+    
+    STOCK SUMMARY:
+    {json.dumps(inventory_context['stock_summary'], indent=2)}
+    
+    PENDING ORDERS BY BUYER:
+    {json.dumps(inventory_context['pending_orders'], indent=2)}
+    
+    FUTURE INCOMING ROTORS:
+    {json.dumps(inventory_context['future_incoming'], indent=2)}
+    
+    LATEST INCOMING (Last 50):
+    {json.dumps(inventory_context['latest_incoming'], indent=2)}
+    
+    LATEST OUTGOING (Last 50):
+    {json.dumps(inventory_context['latest_outgoing'], indent=2)}
+    
+    ALL BUYERS: {inventory_context['buyers']}
+    TOTAL TRANSACTIONS: {inventory_context['total_transactions']}
+    TOTAL QUANTITY: {inventory_context['total_quantity']} units
+    DATE RANGE: {inventory_context['date_range']['from']} to {inventory_context['date_range']['to']}
+    
+    INSTRUCTIONS:
+    1. You have COMPLETE knowledge of all inventory data above
+    2. Remember EVERYTHING discussed in this conversation
+    3. Answer naturally and conversationally like a human assistant
+    4. Be concise but informative
+    5. If asked about something not in the data, say so politely
+    6. Use the conversation history to maintain context
+    7. When showing data, format it nicely with bullet points or numbered lists
+    8. For pending orders, always mention buyer name, size, and quantity
+    9. For future incoming, include dates when available
+    10. For latest transactions, show date, buyer/supplier, size, and quantity
+    11. You can reference previous questions and answers in the conversation
+    12. If asked about any transaction history show at least 30 transactions
+    13. The reasonings should be hidden and give the final answer
+    
+    CONVERSATION HISTORY (last 10 exchanges):
+    {json.dumps(st.session_state.conversation_history[-20:], indent=2)}
+    
+    Current user question: {user_input}
+    
+    Provide a helpful, natural response based on ALL the above information."""
+                
+                if provider.get('api_key_in_url', False):
+                    url = f"{provider['base_url']}{config['model']}:generateContent?key={config['api_key']}"
+                    headers = provider['headers'](config['api_key'])
+                    
+                    # For Gemini
+                    data = {
+                        "contents": [{"parts": [{"text": system_prompt}]}],
+                        "generationConfig": {
+                            "temperature": 0.2,
+                            "maxOutputTokens": 800,
+                            "topP": 0.8,
+                            "topK": 40
+                        }
+                    }
+                else:
+                    # For OpenAI-compatible APIs
+                    url = provider['base_url']
+                    headers = provider['headers'](config['api_key'])
+                    
+                    # Build messages with history
+                    messages = [{"role": "system", "content": system_prompt}]
+                    
+                    # Add conversation history
+                    for msg in st.session_state.conversation_history[-10:]:
+                        messages.append({"role": msg["role"], "content": msg["content"]})
+                    
+                    messages.append({"role": "user", "content": user_input})
+                    
+                    data = {
+                        "model": config['model'],
+                        "messages": messages,
+                        "temperature": 0.2,
+                        "max_tokens": 800,
+                        "top_p": 0.8
+                    }
+                
+                # Make API request
+                response = requests.post(url, headers=headers, json=data, timeout=15)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Parse response based on provider
+                    if "gemini" in config['provider'].lower():
+                        ai_response = result['candidates'][0]['content']['parts'][0]['text']
+                    else:
+                        ai_response = result['choices'][0]['message']['content']
+                    
+                    # Update conversation history
+                    st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                    st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+                    
+                    # Keep history manageable (last 50 exchanges)
+                    if len(st.session_state.conversation_history) > 100:
+                        st.session_state.conversation_history = st.session_state.conversation_history[-100:]
+                    
+                    return ai_response
+                else:
+                    return f"⚠️ AI Error: {response.status_code}. Using fallback mode."
+                    
+            except Exception as e:
+                return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
      
     
     # === TAB 3: Rotor Trend ===
