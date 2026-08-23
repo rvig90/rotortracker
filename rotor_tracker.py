@@ -1788,7 +1788,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 "Provider",
                 options=list(GROUNDED_AI_PROVIDERS.keys()),
                 index=list(GROUNDED_AI_PROVIDERS.keys()).index(st.session_state.ai_config['provider'])
-                if st.session_state.ai_config['provider'] in AI_PROVIDERS else 0,
+                if st.session_state.ai_config['provider'] in GROUNDED_AI_PROVIDERS else 0,
                 key="popup_provider"
             )
         
@@ -1796,7 +1796,7 @@ if tab_choice == "🔁 Rotor Tracker":
                 "Model",
                 options=GROUNDED_AI_PROVIDERS[provider]['models'],
                 index=GROUNDED_AI_PROVIDERS[provider]['models'].index(st.session_state.ai_config['model'])
-                if st.session_state.ai_config['model'] in AI_PROVIDERS[provider]['models'] else 0,
+                if st.session_state.ai_config['model'] in GROUNDED_AI_PROVIDERS[provider]['models'] else 0,
                 key="popup_model"
             )
         
