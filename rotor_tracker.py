@@ -1246,27 +1246,212 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     
     
-    def render_floating_ai_button():
-        if "show_assistant" not in st.session_state:
-            st.session_state.show_assistant = False
-     
-        st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
-        if st.button("🤖 AI Assistant", key="open_grounded_assistant"):
-            st.session_state.show_assistant = not st.session_state.show_assistant
-        st.markdown('</div>', unsafe_allow_html=True)
-     
-        if st.session_state.show_assistant:
-            st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
-            col1, col2 = st.columns([6, 1])
-            with col1:
-                st.markdown("### 🤖 AI Assistant")
-            with col2:
-                if st.button("✖️", key="close_grounded_assistant"):
-                    st.session_state.show_assistant = False
-                    st.rerun()
-            render_grounded_ai_assistant_tab()
-            st.markdown('</div>', unsafe_allow_html=True)
-            render_floating_ai_button() 
+    def get_latest_incoming(limit=20, buyer=None, size=None):
+        """Get latest incoming transactions"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for incoming
+        incoming_df = df[df['Type'] == 'Inward'].copy()
+        
+        if incoming_df.empty:
+            return []
+        
+        # Apply filters
+        if buyer:
+            incoming_df = incoming_df[incoming_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
+        if size:
+            incoming_df = incoming_df[incoming_df['Size (mm)'] == size]
+        
+        # Sort by date (newest first)
+        incoming_df = incoming_df.sort_values('Date', ascending=False)
+        
+        # Format results
+        results = []
+        for _, row in incoming_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+                'supplier': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'status': str(row['Status'])
+            })
+        
+        return results
+    
+    def get_latest_outgoing(limit=20, buyer=None, size=None):
+        """Get latest outgoing transactions"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for outgoing
+        outgoing_df = df[df['Type'] == 'Outgoing'].copy()
+        
+        if outgoing_df.empty:
+            return []
+        
+        # Apply filters
+        if buyer:
+            outgoing_df = outgoing_df[outgoing_df['Remarks'].str.lower().str.contains(buyer.lower(), na=False)]
+        if size:
+            outgoing_df = outgoing_df[outgoing_df['Size (mm)'] == size]
+        
+        # Sort by date (newest first)
+        outgoing_df = outgoing_df.sort_values('Date', ascending=False)
+        
+        # Format results
+        results = []
+        for _, row in outgoing_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+                'buyer': str(row['Remarks']),
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'pending': bool(row['Pending'])
+            })
+        
+        return results
+    
+    def get_future_incoming(limit=20):
+        """Get future incoming rotors"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return []
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Filter for future incoming
+        future_df = df[(df['Type'] == 'Inward') & (df['Status'] == 'Future')].copy()
+        
+        if future_df.empty:
+            return []
+        
+        # Sort by date (soonest first)
+        future_df = future_df.sort_values('Date', ascending=True)
+        
+        # Format results
+        results = []
+        for _, row in future_df.head(limit).iterrows():
+            results.append({
+                'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'TBD',
+                'size': int(row['Size (mm)']),
+                'quantity': int(row['Quantity']),
+                'supplier': str(row['Remarks'])
+            })
+        
+        return results
+    
+    def format_latest_transactions(transactions, title, transaction_type="incoming"):
+        """Format transactions for display"""
+        if not transactions:
+            return f"No {transaction_type} transactions found."
+        
+        response = f"**{title}:**\n\n"
+        
+        if transaction_type == "incoming":
+            for t in transactions:
+                response += f"• {t['date']}: **{t['supplier']}** - {t['size']}mm, {t['quantity']} units\n"
+        elif transaction_type == "outgoing":
+            for t in transactions:
+                pending = " ⏳" if t['pending'] else ""
+                response += f"• {t['date']}: **{t['buyer']}** - {t['size']}mm, {t['quantity']} units{pending}\n"
+        elif transaction_type == "future":
+            for t in transactions:
+                response += f"• {t['date']}: **{t['size']}mm**, {t['quantity']} units from {t['supplier']}\n"
+        
+        return response
+    
+    # =========================
+    # INVENTORY DATA FUNCTIONS
+    # =========================
+    
+    def get_complete_inventory_context():
+        """Get complete inventory context for AI"""
+        if 'data' not in st.session_state or st.session_state.data.empty:
+            return {
+                'error': 'No inventory data loaded',
+                'stock_summary': [],
+                'pending_orders': {},
+                'future_incoming': [],
+                'buyers': [],
+                'total_transactions': 0,
+                'date_range': 'No data'
+            }
+        
+        df = st.session_state.data.copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Size (mm)'] = pd.to_numeric(df['Size (mm)'], errors='coerce')
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+        
+        # Stock summary
+        stock_summary = []
+        for size in sorted(df['Size (mm)'].unique()):
+            if pd.isna(size):
+                continue
+            size_df = df[df['Size (mm)'] == size]
+            total_in = size_df[size_df['Type'] == 'Inward']['Quantity'].sum()
+            total_out = size_df[(size_df['Type'] == 'Outgoing') & (~size_df['Pending'])]['Quantity'].sum()
+            current = total_in - total_out
+            pending = size_df[(size_df['Type'] == 'Outgoing') & (size_df['Pending'] == True)]['Quantity'].sum()
+            future = size_df[(size_df['Type'] == 'Inward') & (size_df['Status'] == 'Future')]['Quantity'].sum()
+            
+            if current > 0 or pending > 0 or future > 0:
+                stock_summary.append({
+                    'size': int(size),
+                    'current_stock': int(current),
+                    'pending_orders': int(pending),
+                    'future_incoming': int(future)
+                })
+        
+        # Pending orders by buyer
+        pending_df = df[(df['Type'] == 'Outgoing') & (df['Pending'] == True)]
+        pending_orders = {}
+        for buyer in pending_df['Remarks'].unique():
+            if pd.isna(buyer):
+                continue
+            buyer_df = pending_df[pending_df['Remarks'] == buyer]
+            orders = []
+            for _, row in buyer_df.iterrows():
+                orders.append({
+                    'size': int(row['Size (mm)']),
+                    'quantity': int(row['Quantity']),
+                    'date': row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown'
+                })
+            pending_orders[str(buyer)] = {
+                'total': int(buyer_df['Quantity'].sum()),
+                'orders': orders
+            }
+        
+        # Future incoming
+        future_incoming = get_future_incoming(50)  # Use the new function
+        
+        # Buyers list
+        buyers = df[df['Type'] == 'Outgoing']['Remarks'].dropna().unique().tolist()
+        
+        # Latest transactions for context
+        latest_incoming = get_latest_incoming(5)
+        latest_outgoing = get_latest_outgoing(5)
+        
+        return {
+            'stock_summary': stock_summary,
+            'pending_orders': pending_orders,
+            'future_incoming': future_incoming,
+            'buyers': [str(b) for b in buyers],
+            'total_transactions': len(df),
+            'total_quantity': int(df['Quantity'].sum()),
+            'latest_incoming': latest_incoming,
+            'latest_outgoing': latest_outgoing,
+            'date_range': {
+                'from': df['Date'].min().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown',
+                'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown'
+            }
+        }
      
     
     # === TAB 3: Rotor Trend ===
