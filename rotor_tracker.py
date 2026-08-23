@@ -1266,6 +1266,7 @@ if tab_choice == "🔁 Rotor Tracker":
                     st.rerun()
             render_grounded_ai_assistant_tab()
             st.markdown('</div>', unsafe_allow_html=True)
+            render_floating_ai_button() 
      
     
     # === TAB 3: Rotor Trend ===
