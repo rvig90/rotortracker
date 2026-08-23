@@ -729,6 +729,8 @@ if tab_choice == "🔁 Rotor Tracker":
     import json
     import re
     import time
+    import shutil
+    import subprocess
     
    
     
@@ -770,7 +772,207 @@ if tab_choice == "🔁 Rotor Tracker":
             "api_key_in_url": False
         }
     }
-    
+
+    "Nemotron Ultra (OpenRouter)": {
+        "base_url": "https://openrouter.ai/api/v1/chat/completions",
+        # NVIDIA's Nemotron Ultra 253B, served via OpenRouter.
+        # Get an OpenRouter API key at https://openrouter.ai/keys
+        "models": ["nvidia/llama-3.1-nemotron-ultra-253b-v1"],
+        "default_model": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "headers": lambda api_key: {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        "api_key_in_url": False,
+    },
+    # ---- SLOT FOR YOUR SECOND MODEL ----
+    # "ox alpha" isn't a model I recognize (it may be a nickname, a typo,
+    # or a newer release after my knowledge cutoff). Tell me the real
+    # provider + model name and I'll fill in the entry below the same way,
+    # e.g. for an OpenRouter-hosted model:
+    #
+    # "Model Name Here": {
+    #     "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    #     "models": ["provider/model-id"],
+    #     "default_model": "provider/model-id",
+    #     "headers": lambda api_key: {
+    #         "Authorization": f"Bearer {api_key}",
+    #         "Content-Type": "application/json",
+    #     },
+    #     "api_key_in_url": False,
+    # },
+}
+ 
+# =========================
+# 2. FILE PATHS
+# =========================
+APP_FILE = "rotor_tracker.py"
+PATCH_FILE = "pending_patch.diff"
+BACKUP_DIR = "backups"
+ 
+ 
+def _call_ai_for_patch(provider_cfg, model, api_key, feature_request, current_code_snippet):
+    """Ask the AI model to draft a unified diff for the requested feature."""
+    system_prompt = (
+        "You are a careful senior Python/Streamlit engineer. The user will "
+        "describe a feature or change they want in their Streamlit inventory "
+        "app. You are given a snippet of the current code for context.\n\n"
+        "Respond with ONLY a unified diff (the kind `git apply` or `patch` "
+        "can consume) that implements the change. Do not rewrite the whole "
+        "file. Do not include explanations, markdown fences, or commentary "
+        "— output the raw diff text only, starting with '--- a/' and "
+        "'+++ b/' headers.\n\n"
+        "Be conservative: only touch the lines necessary for the requested "
+        "feature. If the request is ambiguous or risky (e.g. it could "
+        "affect stock calculations, Google Sheets sync, or delete data), "
+        "add a comment in the diff flagging that risk instead of guessing."
+    )
+ 
+    user_content = (
+        f"FEATURE REQUEST:\n{feature_request}\n\n"
+        f"CURRENT CODE (for context — file is {APP_FILE}):\n"
+        f"```python\n{current_code_snippet}\n```"
+    )
+ 
+    if provider_cfg.get("api_key_in_url", False):
+        url = f"{provider_cfg['base_url']}{model}:generateContent?key={api_key}"
+        headers = provider_cfg["headers"](api_key)
+        data = {
+            "contents": [
+                {"parts": [{"text": system_prompt + "\n\n" + user_content}]}
+            ],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000},
+        }
+    else:
+        url = provider_cfg["base_url"]
+        headers = provider_cfg["headers"](api_key)
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2000,
+        }
+ 
+    resp = requests.post(url, headers=headers, json=data, timeout=30)
+    resp.raise_for_status()
+    result = resp.json()
+ 
+    if "gemini" in model.lower():
+        return result["candidates"][0]["content"]["parts"][0]["text"]
+    return result["choices"][0]["message"]["content"]
+ 
+ 
+def _make_backup():
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(BACKUP_DIR, f"rotor_tracker.py.bak.{ts}")
+    shutil.copy2(APP_FILE, backup_path)
+    return backup_path
+ 
+ 
+def _list_backups():
+    if not os.path.isdir(BACKUP_DIR):
+        return []
+    return sorted(
+        [f for f in os.listdir(BACKUP_DIR) if f.startswith("rotor_tracker.py.bak.")],
+        reverse=True,
+    )
+ 
+ 
+def render_feature_assistant_tab():
+    st.subheader("🛠️ AI Feature Assistant (review-before-apply)")
+    st.caption(
+        "Describe a change. The AI drafts a patch. Nothing touches your live "
+        "app file until you review it and click Apply — which also backs up "
+        "the current file first."
+    )
+ 
+    if "feature_ai_config" not in st.session_state:
+        st.session_state.feature_ai_config = {
+            "provider": list(NEW_AI_PROVIDERS.keys())[0] if NEW_AI_PROVIDERS else None,
+            "api_key": "",
+        }
+ 
+    with st.expander("🔌 AI Connection", expanded=True):
+        provider_name = st.selectbox(
+            "Provider",
+            options=list(NEW_AI_PROVIDERS.keys()),
+            key="feat_provider",
+        )
+        provider_cfg = NEW_AI_PROVIDERS[provider_name]
+        model = st.selectbox("Model", options=provider_cfg["models"], key="feat_model")
+        api_key = st.text_input(
+            "API Key", type="password", key="feat_api_key",
+            value=st.session_state.feature_ai_config.get("api_key", ""),
+        )
+ 
+    feature_request = st.text_area(
+        "Describe the feature or change you want:",
+        placeholder="e.g. Add a button that exports the pending orders table to CSV",
+        height=100,
+    )
+ 
+    st.markdown("**Paste the relevant section of `rotor_tracker.py`** "
+                "(the function/tab you want changed — not the whole file):")
+    code_snippet = st.text_area("Code context", height=200)
+ 
+    if st.button("✨ Draft Patch", type="primary"):
+        if not (feature_request and code_snippet and api_key):
+            st.warning("Fill in the feature request, code context, and API key first.")
+        else:
+            with st.spinner("Drafting patch..."):
+                try:
+                    patch_text = _call_ai_for_patch(
+                        provider_cfg, model, api_key, feature_request, code_snippet
+                    )
+                    with open(PATCH_FILE, "w") as f:
+                        f.write(patch_text)
+                    st.session_state["last_patch"] = patch_text
+                    st.success(f"Patch drafted and saved to `{PATCH_FILE}`. Review it below before applying anything.")
+                except Exception as e:
+                    st.error(f"Failed to get a patch: {e}")
+ 
+    if st.session_state.get("last_patch"):
+        st.markdown("### 📄 Proposed Patch (nothing applied yet)")
+        st.code(st.session_state["last_patch"], language="diff")
+ 
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Apply Patch (backs up first)"):
+                try:
+                    backup_path = _make_backup()
+                    result = subprocess.run(
+                        ["patch", "-p1", "--input", PATCH_FILE],
+                        capture_output=True, text=True,
+                    )
+                    if result.returncode == 0:
+                        st.success(f"Patch applied. Backup saved at `{backup_path}`.")
+                    else:
+                        st.error(
+                            f"Patch failed to apply cleanly (file unchanged):\n\n{result.stderr}"
+                        )
+                except Exception as e:
+                    st.error(f"Error applying patch: {e}")
+        with col2:
+            if st.button("🗑️ Discard Patch"):
+                st.session_state["last_patch"] = None
+                if os.path.exists(PATCH_FILE):
+                    os.remove(PATCH_FILE)
+                st.rerun()
+ 
+    st.divider()
+    st.markdown("### ⏮️ Backups")
+    backups = _list_backups()
+    if not backups:
+        st.caption("No backups yet — none needed until you apply a patch.")
+    else:
+        chosen = st.selectbox("Restore a previous version:", backups)
+        if st.button("♻️ Restore Selected Backup"):
+            shutil.copy2(os.path.join(BACKUP_DIR, chosen), APP_FILE)
+            st.success(f"Restored `{chosen}` over `{APP_FILE}`. Restart the app to load it.")
         
     
     
