@@ -1577,6 +1577,163 @@ if tab_choice == "🔁 Rotor Tracker":
                     
             except Exception as e:
                 return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
+
+    # =========================
+    # HANDLE ACTIONS
+    # =========================
+    def handle_action(query):
+        """Handle button clicks"""
+        response = get_ai_response(query)
+        # Update chat display
+        st.session_state.chat_messages.append({"role": "user", "content": query})
+        st.session_state.chat_messages.append({"role": "assistant", "content": response})
+        st.rerun()
+    
+    # =========================
+    # FLOATING BUTTON
+    # =========================
+    st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
+    if st.button("🤖 AI Assistant", key="open_assistant"):
+        st.session_state.show_assistant = not st.session_state.show_assistant
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # =========================
+    # ASSISTANT POPUP
+    # =========================
+    if st.session_state.show_assistant:
+        st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
+        
+        # Header
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            st.markdown("### 🤖 AI Assistant")
+        with col2:
+            if st.button("✖️", key="close_assistant"):
+                st.session_state.show_assistant = False
+                st.rerun()
+        
+        # Status indicator
+        # =========================
+        # AI CONNECTION PANEL
+        # =========================
+        
+        connected = st.session_state.ai_config['initialized']
+        
+        if connected:
+            st.markdown(
+                f'<div class="status-indicator">✅ Connected to {st.session_state.ai_config["provider"]} ({st.session_state.ai_config["model"]})</div>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                '<div class="status-indicator">⚠️ Not connected - Using basic mode</div>',
+                unsafe_allow_html=True
+            )
+        
+        with st.expander("🔌 AI Connection Settings", expanded=not connected):
+        
+            provider = st.selectbox(
+                "Provider",
+                options=list(AI_PROVIDERS.keys()),
+                index=list(AI_PROVIDERS.keys()).index(st.session_state.ai_config['provider'])
+                if st.session_state.ai_config['provider'] in AI_PROVIDERS else 0,
+                key="popup_provider"
+            )
+        
+            model = st.selectbox(
+                "Model",
+                options=AI_PROVIDERS[provider]['models'],
+                index=AI_PROVIDERS[provider]['models'].index(st.session_state.ai_config['model'])
+                if st.session_state.ai_config['model'] in AI_PROVIDERS[provider]['models'] else 0,
+                key="popup_model"
+            )
+        
+            api_key = st.text_input(
+                "API Key",
+                type="password",
+                value=st.session_state.ai_config.get("api_key", ""),
+                key="popup_key"
+            )
+        
+            colA, colB = st.columns(2)
+        
+            with colA:
+                if st.button("🔄 Reconnect / Update", use_container_width=True):
+                    if api_key:
+                        st.session_state.ai_config.update({
+                            'provider': provider,
+                            'model': model,
+                            'api_key': api_key,
+                            'initialized': True
+                        })
+                        st.success("✅ AI Connected")
+                        st.rerun()
+        
+            with colB:
+                if st.button("❌ Disconnect", use_container_width=True):
+                    st.session_state.ai_config['initialized'] = False
+                    st.success("Disconnected")
+                    st.rerun()
+        
+        # Chat area
+        st.markdown('<div class="chat-area">', unsafe_allow_html=True)
+        for msg in st.session_state.chat_messages[-8:]:
+            if msg["role"] == "user":
+                st.markdown(f'<div class="user-message">{msg["content"]}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="ai-message">{msg["content"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="clearfix"></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Quick buttons - UPDATED with more options
+        st.markdown('<div class="quick-buttons">', unsafe_allow_html=True)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        with col1:
+            if st.button("📦 Stock", key="btn_stock"):
+                handle_action("Show me current stock levels")
+        with col2:
+            if st.button("⏳ Pending", key="btn_pending"):
+                handle_action("Show all pending orders")
+        with col3:
+            if st.button("📥 Incoming", key="btn_incoming"):
+                handle_action("Show latest incoming transactions")
+        with col4:
+            if st.button("📤 Outgoing", key="btn_outgoing"):
+                handle_action("Show latest outgoing transactions")
+        with col5:
+            if st.button("📅 Coming", key="btn_coming"):
+                handle_action("What rotors are coming in the future?")
+        with col6:
+            if st.button("❓ Help", key="btn_help"):
+                handle_action("What can you help me with?")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Input form
+        with st.form(key="assistant_chat_form", clear_on_submit=True):
+            user_input = st.text_input("Ask me anything about your inventory...",
+                                       placeholder="e.g., Show latest incoming, pending for Ajji, stock")
+            col1, col2 = st.columns(2)
+            with col1:
+                send = st.form_submit_button("📤 Send", use_container_width=True)
+            with col2:
+                clear = st.form_submit_button("🗑️ Clear Chat", use_container_width=True)
+        
+        # Handle form submissions
+        if send and user_input:
+            response = get_ai_response(user_input)
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
+            st.rerun()
+        
+        if clear:
+            st.session_state.chat_messages = [
+                {"role": "assistant", "content": "👋 Chat cleared. I still remember everything about your inventory. Ask me anything!"}
+            ]
+            # Keep conversation history but reset display
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
      
     
     # === TAB 3: Rotor Trend ===
