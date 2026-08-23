@@ -773,7 +773,7 @@ if tab_choice == "🔁 Rotor Tracker":
         },
     
 
-        "Nemotron Ultra (OpenRouter)": {
+         "Nemotron Ultra (OpenRouter)": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
             # NVIDIA's Nemotron Ultra 253B, served via OpenRouter.
             # Get an OpenRouter API key at https://openrouter.ai/keys
@@ -785,22 +785,19 @@ if tab_choice == "🔁 Rotor Tracker":
             },
             "api_key_in_url": False,
         },
-        # ---- SLOT FOR YOUR SECOND MODEL ----
-        # "ox alpha" isn't a model I recognize (it may be a nickname, a typo,
-        # or a newer release after my knowledge cutoff). Tell me the real
-        # provider + model name and I'll fill in the entry below the same way,
-        # e.g. for an OpenRouter-hosted model:
-        #
-        # "Model Name Here": {
-        #     "base_url": "https://openrouter.ai/api/v1/chat/completions",
-        #     "models": ["provider/model-id"],
-        #     "default_model": "provider/model-id",
-        #     "headers": lambda api_key: {
-        #         "Authorization": f"Bearer {api_key}",
-        #         "Content-Type": "application/json",
-        #     },
-        #     "api_key_in_url": False,
-        # },
+        "Ox Alpha (OpenRouter, stealth/free)": {
+            "base_url": "https://openrouter.ai/api/v1/chat/completions",
+            # Stealth reasoning model on OpenRouter, geared toward coding and
+            # sustained agentic work — a good fit for drafting patches.
+            # Currently listed free ($0/M input, $0/M output) as of Aug 2026.
+            "models": ["stealth/ox-alpha"],
+            "default_model": "stealth/ox-alpha",
+            "headers": lambda api_key: {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            "api_key_in_url": False,
+        },
     }
      
     # =========================
