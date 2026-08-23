@@ -1786,16 +1786,16 @@ if tab_choice == "🔁 Rotor Tracker":
         
             provider = st.selectbox(
                 "Provider",
-                options=list(AI_PROVIDERS.keys()),
-                index=list(AI_PROVIDERS.keys()).index(st.session_state.ai_config['provider'])
+                options=list(GROUNDED_AI_PROVIDERS.keys()),
+                index=list(GROUNDED_AI_PROVIDERS.keys()).index(st.session_state.ai_config['provider'])
                 if st.session_state.ai_config['provider'] in AI_PROVIDERS else 0,
                 key="popup_provider"
             )
         
             model = st.selectbox(
                 "Model",
-                options=AI_PROVIDERS[provider]['models'],
-                index=AI_PROVIDERS[provider]['models'].index(st.session_state.ai_config['model'])
+                options=GROUNDED_AI_PROVIDERS[provider]['models'],
+                index=GROUNDED_AI_PROVIDERS[provider]['models'].index(st.session_state.ai_config['model'])
                 if st.session_state.ai_config['model'] in AI_PROVIDERS[provider]['models'] else 0,
                 key="popup_model"
             )
