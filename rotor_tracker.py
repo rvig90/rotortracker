@@ -1246,6 +1246,27 @@ if tab_choice == "🔁 Rotor Tracker":
     # =========================
     
     
+    def render_floating_ai_button():
+        if "show_assistant" not in st.session_state:
+            st.session_state.show_assistant = False
+     
+        st.markdown('<div class="floating-btn-container">', unsafe_allow_html=True)
+        if st.button("🤖 AI Assistant", key="open_grounded_assistant"):
+            st.session_state.show_assistant = not st.session_state.show_assistant
+        st.markdown('</div>', unsafe_allow_html=True)
+     
+        if st.session_state.show_assistant:
+            st.markdown('<div class="assistant-popup">', unsafe_allow_html=True)
+            col1, col2 = st.columns([6, 1])
+            with col1:
+                st.markdown("### 🤖 AI Assistant")
+            with col2:
+                if st.button("✖️", key="close_grounded_assistant"):
+                    st.session_state.show_assistant = False
+                    st.rerun()
+            render_grounded_ai_assistant_tab()
+            st.markdown('</div>', unsafe_allow_html=True)
+     
     
     # === TAB 3: Rotor Trend ===
 
