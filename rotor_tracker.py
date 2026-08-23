@@ -734,49 +734,9 @@ if tab_choice == "🔁 Rotor Tracker":
     
    
     
-    AI_PROVIDERS = {
-        
-        "Sarvam AI": {
-            "base_url": "https://api.sarvam.ai/v1/chat/completions",
-            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
-            "default_model": "sarvam-m",
-            "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
-            "api_key_in_url": False
-        },
-
-        
-       
-
-        "Gemini": {
-            "base_url": "https://generativelanguage.googleapis.com/v1/models/",
-            "models": [
-                "gemini-2.5-flash-lite",
-                "gemini-2.5-flash",
-                "gemini-3.1-flash-lite"
-            ],
-            "default_model": "gemini-2.5-flash-lite",
-            "headers": lambda api_key: {
-                "Content-Type": "application/json"
-            },
-            "api_key_in_url": True
-        },
-    
-        "OpenRouter": {
+    GROUNDED_AI_PROVIDERS = {
+        "Nemotron Ultra (OpenRouter)": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": "openrouter/free",
-            "default_model": "deepseek/deepseek-chat",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            "api_key_in_url": False
-        },
-    
-
-         "Nemotron Ultra (OpenRouter)": {
-            "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            # NVIDIA's Nemotron Ultra 253B, served via OpenRouter.
-            # Get an OpenRouter API key at https://openrouter.ai/keys
             "models": ["nvidia/llama-3.1-nemotron-ultra-253b-v1"],
             "default_model": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
             "headers": lambda api_key: {
@@ -785,11 +745,8 @@ if tab_choice == "🔁 Rotor Tracker":
             },
             "api_key_in_url": False,
         },
-        "Ox Alpha (OpenRouter, stealth/free)": {
+        "Ox Alpha (OpenRouter, free)": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            # Stealth reasoning model on OpenRouter, geared toward coding and
-            # sustained agentic work — a good fit for drafting patches.
-            # Currently listed free ($0/M input, $0/M output) as of Aug 2026.
             "models": ["stealth/ox-alpha"],
             "default_model": "stealth/ox-alpha",
             "headers": lambda api_key: {
@@ -798,59 +755,226 @@ if tab_choice == "🔁 Rotor Tracker":
             },
             "api_key_in_url": False,
         },
+        "Gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1/models/",
+            "models": ["gemini-2.5-flash-lite", "gemini-2.5-flash"],
+            "default_model": "gemini-2.5-flash-lite",
+            "headers": lambda api_key: {"Content-Type": "application/json"},
+            "api_key_in_url": True,
+        },
+        "OpenRouter (custom model)": {
+            "base_url": "https://openrouter.ai/api/v1/chat/completions",
+            # NOTE: your original code had "models": "openrouter/free" as a
+            # plain string, not a list — that would break st.selectbox (it
+            # needs an iterable of options). Fixed here as a proper list,
+            # with "openrouter/free" kept as a selectable entry alongside
+            # a couple of other common OpenRouter model IDs.
+            "models": ["openrouter/free", "deepseek/deepseek-chat", "openai/gpt-4o-mini"],
+            "default_model": "deepseek/deepseek-chat",
+            "headers": lambda api_key: {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            "api_key_in_url": False,
+        },
     }
      
-    # =========================
-    # 2. FILE PATHS
-    # =========================
-    APP_FILE = "rotor_tracker.py"
-    PATCH_FILE = "pending_patch.diff"
-    BACKUP_DIR = "backups"
+    MONTH_MAP = {
+        'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
+        'april': 4, 'apr': 4, 'may': 5, 'june': 6, 'jun': 6, 'july': 7, 'jul': 7,
+        'august': 8, 'aug': 8, 'september': 9, 'sep': 9, 'october': 10, 'oct': 10,
+        'november': 11, 'nov': 11, 'december': 12, 'dec': 12,
+    }
+    MAX_UNSCOPED_ROWS = 100
      
      
-    def _call_ai_for_patch(provider_cfg, model, api_key, feature_request, current_code_snippet):
-        """Ask the AI model to draft a unified diff for the requested feature."""
-        system_prompt = (
-            "You are a careful senior Python/Streamlit engineer. The user will "
-            "describe a feature or change they want in their Streamlit inventory "
-            "app. You are given a snippet of the current code for context.\n\n"
-            "Respond with ONLY a unified diff (the kind `git apply` or `patch` "
-            "can consume) that implements the change. Do not rewrite the whole "
-            "file. Do not include explanations, markdown fences, or commentary "
-            "— output the raw diff text only, starting with '--- a/' and "
-            "'+++ b/' headers.\n\n"
-            "Be conservative: only touch the lines necessary for the requested "
-            "feature. If the request is ambiguous or risky (e.g. it could "
-            "affect stock calculations, Google Sheets sync, or delete data), "
-            "add a comment in the diff flagging that risk instead of guessing."
+    # -------------------------------------------------------------------
+    # 2. GROUNDING — parse the question, pull the exact matching rows
+    # -------------------------------------------------------------------
+    def _extract_query_filters(query, df):
+        q = query.lower().strip()
+        filters = {"size": None, "buyer": None, "month": None, "year": None}
+     
+        for size_str in re.findall(r'\b(\d+)\b', q):
+            n = int(size_str)
+            if n > 20:
+                filters["size"] = n
+                break
+     
+        for name, num in MONTH_MAP.items():
+            if name in q:
+                filters["month"] = num
+                break
+        year_match = re.search(r'\b(20\d{2})\b', q)
+        if year_match:
+            filters["year"] = int(year_match.group(1))
+        elif filters["month"]:
+            filters["year"] = datetime.now().year
+     
+        if 'Remarks' in df.columns:
+            buyers = sorted({
+                str(b).strip() for b in df['Remarks'].dropna().unique()
+                if str(b).strip() and str(b).lower() not in ('', 'nan', 'none')
+            })
+            for b in buyers:
+                for word in b.lower().split():
+                    if len(word) > 1 and word in q:
+                        filters["buyer"] = b
+                        break
+                if filters["buyer"]:
+                    break
+     
+        return filters
+     
+     
+    def _get_matching_transactions(df, size=None, buyer=None, month=None, year=None):
+        d = df.copy()
+        d['Date'] = pd.to_datetime(d['Date'], errors='coerce')
+     
+        if size is not None and 'Size (mm)' in d.columns:
+            d = d[d['Size (mm)'] == size]
+        if buyer is not None and 'Remarks' in d.columns:
+            d = d[d['Remarks'].astype(str).str.lower().str.contains(buyer.lower(), na=False)]
+        if month is not None and year is not None:
+            d = d[(d['Date'].dt.month == month) & (d['Date'].dt.year == year)]
+        elif year is not None:
+            d = d[d['Date'].dt.year == year]
+     
+        return d.sort_values('Date', ascending=False)
+     
+     
+    def _build_grounded_context(user_query, df):
+        filters = _extract_query_filters(user_query, df)
+        is_scoped = any([filters["size"], filters["buyer"], filters["month"]])
+     
+        matches = _get_matching_transactions(
+            df, size=filters["size"], buyer=filters["buyer"],
+            month=filters["month"], year=filters["year"],
         )
      
+        truncated = False
+        if not is_scoped and len(matches) > MAX_UNSCOPED_ROWS:
+            matches = matches.head(MAX_UNSCOPED_ROWS)
+            truncated = True
+     
+        records = []
+        for _, row in matches.iterrows():
+            records.append({
+                "date": row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
+                "size_mm": None if pd.isna(row.get('Size (mm)')) else int(row['Size (mm)']),
+                "type": str(row.get('Type', '')),
+                "quantity": None if pd.isna(row.get('Quantity')) else int(row['Quantity']),
+                "buyer_or_supplier": str(row.get('Remarks', '')),
+                "status": str(row.get('Status', '')),
+                "pending": bool(row.get('Pending', False)),
+            })
+     
+        return {
+            "detected_filters": filters,
+            "match_count": len(records),
+            "truncated_for_token_limit": truncated,
+            "note": (
+                "This is the COMPLETE set of matching transactions from the live "
+                "data. Answer using only these records — do not estimate or "
+                "invent transactions not listed here. If match_count is 0, say "
+                "plainly that no matching transactions were found."
+                if not truncated else
+                f"Query was broad, so this is capped at the {MAX_UNSCOPED_ROWS} "
+                f"most recent matches, not the full set. Tell the user to add a "
+                f"size, buyer, or month to get a complete answer."
+            ),
+            "transactions": records,
+        }
+     
+     
+    # -------------------------------------------------------------------
+    # 2b. FALLBACK — no API key needed, formats the same grounded data
+    #     with plain Python instead of an LLM call.
+    # -------------------------------------------------------------------
+    def _format_fallback_response(context_block):
+        filters = context_block["detected_filters"]
+        records = context_block["transactions"]
+     
+        if context_block["match_count"] == 0:
+            return "No matching transactions found for that query. Try adding a size (e.g. '130mm'), a buyer name, or a month."
+     
+        label_parts = []
+        if filters.get("size"):
+            label_parts.append(f"{filters['size']}mm")
+        if filters.get("buyer"):
+            label_parts.append(filters["buyer"])
+        if filters.get("month"):
+            month_name = [k for k, v in MONTH_MAP.items() if v == filters["month"] and len(k) > 3][0].capitalize()
+            label_parts.append(f"{month_name} {filters.get('year', '')}")
+        label = " · ".join(label_parts) if label_parts else "All matching"
+     
+        lines = [f"**{label}** — {context_block['match_count']} transaction(s):\n"]
+        total_in, total_out = 0, 0
+        for r in records:
+            pending_tag = " ⏳pending" if r["pending"] else ""
+            lines.append(
+                f"- {r['date']}: **{r['type']}** {r['quantity']} units, "
+                f"{r['size_mm']}mm — {r['buyer_or_supplier']} ({r['status']}){pending_tag}"
+            )
+            if r["type"] == "Inward":
+                total_in += r["quantity"] or 0
+            elif r["type"] == "Outgoing":
+                total_out += r["quantity"] or 0
+     
+        lines.append(f"\n**Totals:** Inward {total_in} · Outgoing {total_out} · Net {total_in - total_out}")
+     
+        if context_block["truncated_for_token_limit"]:
+            lines.append(f"\n_Showing first {MAX_UNSCOPED_ROWS} results — narrow your query (size/buyer/month) to see everything._")
+     
+        return "\n".join(lines)
+     
+     
+    # -------------------------------------------------------------------
+    # 3. AI CALL
+    # -------------------------------------------------------------------
+    def _call_grounded_ai(provider_cfg, model, api_key, user_query, context_block, recent_history=None):
+        system_prompt = (
+            "You are an inventory assistant for a rotor/stator manufacturing "
+            "business. You will be given a JSON block of EXACT transaction "
+            "records already filtered to match the user's question. Answer "
+            "using only that data — list transactions clearly (date, type, "
+            "quantity, buyer/supplier, pending status) and give a total where "
+            "relevant. Do not invent or estimate data not present in the "
+            "block. If match_count is 0, say so plainly and suggest the user "
+            "rephrase with a size, buyer name, or month. Use the recent "
+            "conversation history for context (e.g. follow-up questions like "
+            "'what about last month' referring to a size mentioned earlier)."
+        )
         user_content = (
-            f"FEATURE REQUEST:\n{feature_request}\n\n"
-            f"CURRENT CODE (for context — file is {APP_FILE}):\n"
-            f"```python\n{current_code_snippet}\n```"
+            f"USER QUESTION: {user_query}\n\n"
+            f"GROUNDED TRANSACTION DATA:\n{json.dumps(context_block, indent=2, default=str)}"
         )
      
         if provider_cfg.get("api_key_in_url", False):
+            # Gemini: fold recent history + system prompt into one text block
+            history_text = ""
+            if recent_history:
+                history_text = "RECENT CONVERSATION:\n" + "\n".join(
+                    f"{m['role']}: {m['content']}" for m in recent_history
+                ) + "\n\n"
             url = f"{provider_cfg['base_url']}{model}:generateContent?key={api_key}"
             headers = provider_cfg["headers"](api_key)
             data = {
-                "contents": [
-                    {"parts": [{"text": system_prompt + "\n\n" + user_content}]}
-                ],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000},
+                "contents": [{"parts": [{"text": system_prompt + "\n\n" + history_text + user_content}]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1200},
             }
         else:
             url = provider_cfg["base_url"]
             headers = provider_cfg["headers"](api_key)
+            messages = [{"role": "system", "content": system_prompt}]
+            if recent_history:
+                messages.extend(recent_history)
+            messages.append({"role": "user", "content": user_content})
             data = {
                 "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
+                "messages": messages,
                 "temperature": 0.1,
-                "max_tokens": 2000,
+                "max_tokens": 1200,
             }
      
         resp = requests.post(url, headers=headers, json=data, timeout=30)
@@ -862,141 +986,94 @@ if tab_choice == "🔁 Rotor Tracker":
         return result["choices"][0]["message"]["content"]
      
      
-    def _make_backup():
-        os.makedirs(BACKUP_DIR, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(BACKUP_DIR, f"rotor_tracker.py.bak.{ts}")
-        shutil.copy2(APP_FILE, backup_path)
-        return backup_path
-     
-     
-    def _list_backups():
-        if not os.path.isdir(BACKUP_DIR):
-            return []
-        return sorted(
-            [f for f in os.listdir(BACKUP_DIR) if f.startswith("rotor_tracker.py.bak.")],
-            reverse=True,
-        )
-     
-     
-    def render_feature_assistant_tab():
-        st.subheader("🛠️ AI Feature Assistant (review-before-apply)")
+    # -------------------------------------------------------------------
+    # 4. THE TAB
+    # -------------------------------------------------------------------
+    def render_grounded_ai_assistant_tab():
+        st.subheader("🤖 AI Assistant (grounded on your real data)")
         st.caption(
-            "Describe a change. The AI drafts a patch. Nothing touches your live "
-            "app file until you review it and click Apply — which also backs up "
-            "the current file first."
+            "Ask about stock, buyers, sizes, or time periods — e.g. "
+            "'all 130mm transactions for Ajji in June'. The exact matching "
+            "records are pulled from your live data before the AI answers, "
+            "so it isn't guessing or summarizing from a partial sample."
         )
      
-        if "feature_ai_config" not in st.session_state:
-            st.session_state.feature_ai_config = {
-                "provider": list(NEW_AI_PROVIDERS.keys())[0] if NEW_AI_PROVIDERS else None,
-                "api_key": "",
-            }
+        if "grounded_ai_config" not in st.session_state:
+            st.session_state.grounded_ai_config = {"provider": None, "api_key": ""}
+        if "grounded_chat_history" not in st.session_state:
+            st.session_state.grounded_chat_history = [
+                {"role": "assistant", "content": "👋 Ask me anything about your inventory — stock, buyers, pending orders, or specific size/month/buyer combinations."}
+            ]
      
-        with st.expander("🔌 AI Connection", expanded=True):
+        with st.expander("🔌 AI Connection", expanded=False):
             provider_name = st.selectbox(
-                "Provider",
-                options=list(NEW_AI_PROVIDERS.keys()),
-                key="feat_provider",
+                "Provider", options=list(GROUNDED_AI_PROVIDERS.keys()), key="grounded_provider"
             )
-            provider_cfg = NEW_AI_PROVIDERS[provider_name]
-            model = st.selectbox("Model", options=provider_cfg["models"], key="feat_model")
+            provider_cfg = GROUNDED_AI_PROVIDERS[provider_name]
+            model = st.selectbox("Model", options=provider_cfg["models"], key="grounded_model")
             api_key = st.text_input(
-                "API Key", type="password", key="feat_api_key",
-                value=st.session_state.feature_ai_config.get("api_key", ""),
+                "API Key", type="password", key="grounded_api_key",
+                value=st.session_state.grounded_ai_config.get("api_key", ""),
+            )
+            st.session_state.grounded_ai_config.update({
+                "provider": provider_name, "api_key": api_key,
+            })
+            use_fallback_only = st.checkbox(
+                "Use rule-based fallback only (skip AI call)", value=not bool(api_key),
+                help="Formats the exact matching data directly with no LLM call — works with zero API key."
             )
      
-        feature_request = st.text_area(
-            "Describe the feature or change you want:",
-            placeholder="e.g. Add a button that exports the pending orders table to CSV",
-            height=100,
-        )
+        for msg in st.session_state.grounded_chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
      
-        st.markdown("**Paste the relevant section of `rotor_tracker.py`** "
-                    "(the function/tab you want changed — not the whole file):")
-        code_snippet = st.text_area("Code context", height=200)
+        user_input = st.chat_input("Ask about inventory...")
      
-        if st.button("✨ Draft Patch", type="primary"):
-            if not (feature_request and code_snippet and api_key):
-                st.warning("Fill in the feature request, code context, and API key first.")
-            else:
-                with st.spinner("Drafting patch..."):
-                    try:
-                        patch_text = _call_ai_for_patch(
-                            provider_cfg, model, api_key, feature_request, code_snippet
-                        )
-                        with open(PATCH_FILE, "w") as f:
-                            f.write(patch_text)
-                        st.session_state["last_patch"] = patch_text
-                        st.success(f"Patch drafted and saved to `{PATCH_FILE}`. Review it below before applying anything.")
-                    except Exception as e:
-                        st.error(f"Failed to get a patch: {e}")
+        if user_input:
+            st.session_state.grounded_chat_history.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.markdown(user_input)
      
-        if st.session_state.get("last_patch"):
-            st.markdown("### 📄 Proposed Patch (nothing applied yet)")
-            st.code(st.session_state["last_patch"], language="diff")
+            with st.chat_message("assistant"):
+                if 'data' not in st.session_state or st.session_state.data.empty:
+                    reply = "No inventory data loaded yet."
+                    st.info(reply)
+                else:
+                    with st.spinner("Checking records..."):
+                        context_block = _build_grounded_context(user_input, st.session_state.data)
      
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Apply Patch (backs up first)"):
-                    try:
-                        backup_path = _make_backup()
-                        result = subprocess.run(
-                            ["patch", "-p1", "--input", PATCH_FILE],
-                            capture_output=True, text=True,
-                        )
-                        if result.returncode == 0:
-                            st.success(f"Patch applied. Backup saved at `{backup_path}`.")
+                        # last 5 exchanges (10 messages) before this turn, for
+                        # follow-up questions like "what about last month"
+                        recent_history = st.session_state.grounded_chat_history[-10:-1]
+     
+                        if use_fallback_only or not api_key:
+                            reply = _format_fallback_response(context_block)
+                            st.markdown(reply)
                         else:
-                            st.error(
-                                f"Patch failed to apply cleanly (file unchanged):\n\n{result.stderr}"
-                            )
-                    except Exception as e:
-                        st.error(f"Error applying patch: {e}")
-            with col2:
-                if st.button("🗑️ Discard Patch"):
-                    st.session_state["last_patch"] = None
-                    if os.path.exists(PATCH_FILE):
-                        os.remove(PATCH_FILE)
-                    st.rerun()
+                            try:
+                                reply = _call_grounded_ai(
+                                    provider_cfg, model, api_key, user_input,
+                                    context_block, recent_history=recent_history,
+                                )
+                                st.markdown(reply)
+                            except Exception as e:
+                                # AI call failed (bad key, rate limit, network) —
+                                # fall back to the rule-based formatter instead
+                                # of just showing an error with no answer.
+                                reply = _format_fallback_response(context_block)
+                                st.warning(f"AI call failed ({e}) — showing rule-based answer instead:")
+                                st.markdown(reply)
      
-        st.divider()
-        st.markdown("### ⏮️ Backups")
-        backups = _list_backups()
-        if not backups:
-            st.caption("No backups yet — none needed until you apply a patch.")
-        else:
-            chosen = st.selectbox("Restore a previous version:", backups)
-            if st.button("♻️ Restore Selected Backup"):
-                shutil.copy2(os.path.join(BACKUP_DIR, chosen), APP_FILE)
-                st.success(f"Restored `{chosen}` over `{APP_FILE}`. Restart the app to load it.")
-        
-    
-    
-    # =========================
-    # SESSION STATE INITIALIZATION
-    # =========================
-    if 'show_assistant' not in st.session_state:
-        st.session_state.show_assistant = False
-    
-    if 'chat_messages' not in st.session_state:
-        st.session_state.chat_messages = [
-            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I know everything about your inventory. Ask me anything!"}
-        ]
-    
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    
-   
-    
-    if 'ai_config' not in st.session_state:
-        
-        st.session_state.ai_config = {
-            'provider': 'Sarvam AI',
-            'model': 'sarvam-m',
-            'api_key': st.secrets.get("SARVAM_API_KEY"),
-            'initialized': False
-        }
+                        with st.expander(f"📋 Data used ({context_block['match_count']} records)"):
+                            st.json(context_block, expanded=False)
+     
+            st.session_state.grounded_chat_history.append({"role": "assistant", "content": reply})
+     
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.grounded_chat_history = [
+                {"role": "assistant", "content": "Chat cleared. Ask me anything about your inventory."}
+            ]
+            st.rerun()
 
     
     
