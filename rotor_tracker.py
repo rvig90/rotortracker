@@ -729,351 +729,75 @@ if tab_choice == "🔁 Rotor Tracker":
     import json
     import re
     import time
-    import shutil
-    import subprocess
     
    
     
-    GROUNDED_AI_PROVIDERS = {
-        "Nemotron Ultra (OpenRouter)": {
-            "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": ["nvidia/llama-3.1-nemotron-ultra-253b-v1"],
-            "default_model": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            "api_key_in_url": False,
+    AI_PROVIDERS = {
+        
+        "Sarvam AI": {
+            "base_url": "https://api.sarvam.ai/v1/chat/completions",
+            "models": ["sarvam-m", "sarvam-2b", "sarvam-7b"],
+            "default_model": "sarvam-m",
+            "headers": lambda api_key: {"api-subscription-key": api_key, "Content-Type": "application/json"},
+            "api_key_in_url": False
         },
-        "Ox Alpha (OpenRouter, free)": {
-            "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            "models": ["stealth/ox-alpha"],
-            "default_model": "stealth/ox-alpha",
-            "headers": lambda api_key: {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            "api_key_in_url": False,
-        },
+
+        
+       
+
         "Gemini": {
             "base_url": "https://generativelanguage.googleapis.com/v1/models/",
-            "models": ["gemini-2.5-flash-lite", "gemini-2.5-flash"],
+            "models": [
+                "gemini-2.5-flash-lite",
+                "gemini-2.5-flash",
+                "gemini-3.1-flash-lite"
+            ],
             "default_model": "gemini-2.5-flash-lite",
-            "headers": lambda api_key: {"Content-Type": "application/json"},
-            "api_key_in_url": True,
+            "headers": lambda api_key: {
+                "Content-Type": "application/json"
+            },
+            "api_key_in_url": True
         },
-        "OpenRouter (custom model)": {
+    
+        "OpenRouter": {
             "base_url": "https://openrouter.ai/api/v1/chat/completions",
-            # NOTE: your original code had "models": "openrouter/free" as a
-            # plain string, not a list — that would break st.selectbox (it
-            # needs an iterable of options). Fixed here as a proper list,
-            # with "openrouter/free" kept as a selectable entry alongside
-            # a couple of other common OpenRouter model IDs.
-            "models": ["openrouter/free", "deepseek/deepseek-chat", "openai/gpt-4o-mini"],
+            "models": "openrouter/free",
             "default_model": "deepseek/deepseek-chat",
             "headers": lambda api_key: {
                 "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
+                "Content-Type": "application/json"
             },
-            "api_key_in_url": False,
-        },
-    }
-     
-    MONTH_MAP = {
-        'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
-        'april': 4, 'apr': 4, 'may': 5, 'june': 6, 'jun': 6, 'july': 7, 'jul': 7,
-        'august': 8, 'aug': 8, 'september': 9, 'sep': 9, 'october': 10, 'oct': 10,
-        'november': 11, 'nov': 11, 'december': 12, 'dec': 12,
-    }
-    MAX_UNSCOPED_ROWS = 100
-     
-     
-    # -------------------------------------------------------------------
-    # 2. GROUNDING — parse the question, pull the exact matching rows
-    # -------------------------------------------------------------------
-    def _extract_query_filters(query, df):
-        q = query.lower().strip()
-        filters = {"size": None, "buyer": None, "month": None, "year": None}
-     
-        for size_str in re.findall(r'\b(\d+)\b', q):
-            n = int(size_str)
-            if n > 20:
-                filters["size"] = n
-                break
-     
-        for name, num in MONTH_MAP.items():
-            if name in q:
-                filters["month"] = num
-                break
-        year_match = re.search(r'\b(20\d{2})\b', q)
-        if year_match:
-            filters["year"] = int(year_match.group(1))
-        elif filters["month"]:
-            filters["year"] = datetime.now().year
-     
-        if 'Remarks' in df.columns:
-            buyers = sorted({
-                str(b).strip() for b in df['Remarks'].dropna().unique()
-                if str(b).strip() and str(b).lower() not in ('', 'nan', 'none')
-            })
-            for b in buyers:
-                for word in b.lower().split():
-                    if len(word) > 1 and word in q:
-                        filters["buyer"] = b
-                        break
-                if filters["buyer"]:
-                    break
-     
-        return filters
-     
-     
-    def _get_matching_transactions(df, size=None, buyer=None, month=None, year=None):
-        d = df.copy()
-        d['Date'] = pd.to_datetime(d['Date'], errors='coerce')
-     
-        if size is not None and 'Size (mm)' in d.columns:
-            d = d[d['Size (mm)'] == size]
-        if buyer is not None and 'Remarks' in d.columns:
-            d = d[d['Remarks'].astype(str).str.lower().str.contains(buyer.lower(), na=False)]
-        if month is not None and year is not None:
-            d = d[(d['Date'].dt.month == month) & (d['Date'].dt.year == year)]
-        elif year is not None:
-            d = d[d['Date'].dt.year == year]
-     
-        return d.sort_values('Date', ascending=False)
-     
-     
-    def _build_grounded_context(user_query, df):
-        filters = _extract_query_filters(user_query, df)
-        is_scoped = any([filters["size"], filters["buyer"], filters["month"]])
-     
-        matches = _get_matching_transactions(
-            df, size=filters["size"], buyer=filters["buyer"],
-            month=filters["month"], year=filters["year"],
-        )
-     
-        truncated = False
-        if not is_scoped and len(matches) > MAX_UNSCOPED_ROWS:
-            matches = matches.head(MAX_UNSCOPED_ROWS)
-            truncated = True
-     
-        records = []
-        for _, row in matches.iterrows():
-            records.append({
-                "date": row['Date'].strftime('%Y-%m-%d') if pd.notna(row['Date']) else 'Unknown',
-                "size_mm": None if pd.isna(row.get('Size (mm)')) else int(row['Size (mm)']),
-                "type": str(row.get('Type', '')),
-                "quantity": None if pd.isna(row.get('Quantity')) else int(row['Quantity']),
-                "buyer_or_supplier": str(row.get('Remarks', '')),
-                "status": str(row.get('Status', '')),
-                "pending": bool(row.get('Pending', False)),
-            })
-     
-        return {
-            "detected_filters": filters,
-            "match_count": len(records),
-            "truncated_for_token_limit": truncated,
-            "note": (
-                "This is the COMPLETE set of matching transactions from the live "
-                "data. Answer using only these records — do not estimate or "
-                "invent transactions not listed here. If match_count is 0, say "
-                "plainly that no matching transactions were found."
-                if not truncated else
-                f"Query was broad, so this is capped at the {MAX_UNSCOPED_ROWS} "
-                f"most recent matches, not the full set. Tell the user to add a "
-                f"size, buyer, or month to get a complete answer."
-            ),
-            "transactions": records,
+            "api_key_in_url": False
         }
-     
-     
-    # -------------------------------------------------------------------
-    # 2b. FALLBACK — no API key needed, formats the same grounded data
-    #     with plain Python instead of an LLM call.
-    # -------------------------------------------------------------------
-    def _format_fallback_response(context_block):
-        filters = context_block["detected_filters"]
-        records = context_block["transactions"]
-     
-        if context_block["match_count"] == 0:
-            return "No matching transactions found for that query. Try adding a size (e.g. '130mm'), a buyer name, or a month."
-     
-        label_parts = []
-        if filters.get("size"):
-            label_parts.append(f"{filters['size']}mm")
-        if filters.get("buyer"):
-            label_parts.append(filters["buyer"])
-        if filters.get("month"):
-            month_name = [k for k, v in MONTH_MAP.items() if v == filters["month"] and len(k) > 3][0].capitalize()
-            label_parts.append(f"{month_name} {filters.get('year', '')}")
-        label = " · ".join(label_parts) if label_parts else "All matching"
-     
-        lines = [f"**{label}** — {context_block['match_count']} transaction(s):\n"]
-        total_in, total_out = 0, 0
-        for r in records:
-            pending_tag = " ⏳pending" if r["pending"] else ""
-            lines.append(
-                f"- {r['date']}: **{r['type']}** {r['quantity']} units, "
-                f"{r['size_mm']}mm — {r['buyer_or_supplier']} ({r['status']}){pending_tag}"
-            )
-            if r["type"] == "Inward":
-                total_in += r["quantity"] or 0
-            elif r["type"] == "Outgoing":
-                total_out += r["quantity"] or 0
-     
-        lines.append(f"\n**Totals:** Inward {total_in} · Outgoing {total_out} · Net {total_in - total_out}")
-     
-        if context_block["truncated_for_token_limit"]:
-            lines.append(f"\n_Showing first {MAX_UNSCOPED_ROWS} results — narrow your query (size/buyer/month) to see everything._")
-     
-        return "\n".join(lines)
-     
-     
-    # -------------------------------------------------------------------
-    # 3. AI CALL
-    # -------------------------------------------------------------------
-    def _call_grounded_ai(provider_cfg, model, api_key, user_query, context_block, recent_history=None):
-        system_prompt = (
-            "You are an inventory assistant for a rotor/stator manufacturing "
-            "business. You will be given a JSON block of EXACT transaction "
-            "records already filtered to match the user's question. Answer "
-            "using only that data — list transactions clearly (date, type, "
-            "quantity, buyer/supplier, pending status) and give a total where "
-            "relevant. Do not invent or estimate data not present in the "
-            "block. If match_count is 0, say so plainly and suggest the user "
-            "rephrase with a size, buyer name, or month. Use the recent "
-            "conversation history for context (e.g. follow-up questions like "
-            "'what about last month' referring to a size mentioned earlier)."
-        )
-        user_content = (
-            f"USER QUESTION: {user_query}\n\n"
-            f"GROUNDED TRANSACTION DATA:\n{json.dumps(context_block, indent=2, default=str)}"
-        )
-     
-        if provider_cfg.get("api_key_in_url", False):
-            # Gemini: fold recent history + system prompt into one text block
-            history_text = ""
-            if recent_history:
-                history_text = "RECENT CONVERSATION:\n" + "\n".join(
-                    f"{m['role']}: {m['content']}" for m in recent_history
-                ) + "\n\n"
-            url = f"{provider_cfg['base_url']}{model}:generateContent?key={api_key}"
-            headers = provider_cfg["headers"](api_key)
-            data = {
-                "contents": [{"parts": [{"text": system_prompt + "\n\n" + history_text + user_content}]}],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1200},
-            }
-        else:
-            url = provider_cfg["base_url"]
-            headers = provider_cfg["headers"](api_key)
-            messages = [{"role": "system", "content": system_prompt}]
-            if recent_history:
-                messages.extend(recent_history)
-            messages.append({"role": "user", "content": user_content})
-            data = {
-                "model": model,
-                "messages": messages,
-                "temperature": 0.1,
-                "max_tokens": 1200,
-            }
-     
-        resp = requests.post(url, headers=headers, json=data, timeout=30)
-        resp.raise_for_status()
-        result = resp.json()
-     
-        if "gemini" in model.lower():
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-        return result["choices"][0]["message"]["content"]
-     
-     
-    # -------------------------------------------------------------------
-    # 4. THE TAB
-    # -------------------------------------------------------------------
-    def render_grounded_ai_assistant_tab():
-        st.subheader("🤖 AI Assistant (grounded on your real data)")
-        st.caption(
-            "Ask about stock, buyers, sizes, or time periods — e.g. "
-            "'all 130mm transactions for Ajji in June'. The exact matching "
-            "records are pulled from your live data before the AI answers, "
-            "so it isn't guessing or summarizing from a partial sample."
-        )
-     
-        if "grounded_ai_config" not in st.session_state:
-            st.session_state.grounded_ai_config = {"provider": None, "api_key": ""}
-        if "grounded_chat_history" not in st.session_state:
-            st.session_state.grounded_chat_history = [
-                {"role": "assistant", "content": "👋 Ask me anything about your inventory — stock, buyers, pending orders, or specific size/month/buyer combinations."}
-            ]
-     
-        with st.expander("🔌 AI Connection", expanded=False):
-            provider_name = st.selectbox(
-                "Provider", options=list(GROUNDED_AI_PROVIDERS.keys()), key="grounded_provider"
-            )
-            provider_cfg = GROUNDED_AI_PROVIDERS[provider_name]
-            model = st.selectbox("Model", options=provider_cfg["models"], key="grounded_model")
-            api_key = st.text_input(
-                "API Key", type="password", key="grounded_api_key",
-                value=st.session_state.grounded_ai_config.get("api_key", ""),
-            )
-            st.session_state.grounded_ai_config.update({
-                "provider": provider_name, "api_key": api_key,
-            })
-            use_fallback_only = st.checkbox(
-                "Use rule-based fallback only (skip AI call)", value=not bool(api_key),
-                help="Formats the exact matching data directly with no LLM call — works with zero API key."
-            )
-     
-        for msg in st.session_state.grounded_chat_history:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-     
-        user_input = st.chat_input("Ask about inventory...")
-     
-        if user_input:
-            st.session_state.grounded_chat_history.append({"role": "user", "content": user_input})
-            with st.chat_message("user"):
-                st.markdown(user_input)
-     
-            with st.chat_message("assistant"):
-                if 'data' not in st.session_state or st.session_state.data.empty:
-                    reply = "No inventory data loaded yet."
-                    st.info(reply)
-                else:
-                    with st.spinner("Checking records..."):
-                        context_block = _build_grounded_context(user_input, st.session_state.data)
-     
-                        # last 5 exchanges (10 messages) before this turn, for
-                        # follow-up questions like "what about last month"
-                        recent_history = st.session_state.grounded_chat_history[-10:-1]
-     
-                        if use_fallback_only or not api_key:
-                            reply = _format_fallback_response(context_block)
-                            st.markdown(reply)
-                        else:
-                            try:
-                                reply = _call_grounded_ai(
-                                    provider_cfg, model, api_key, user_input,
-                                    context_block, recent_history=recent_history,
-                                )
-                                st.markdown(reply)
-                            except Exception as e:
-                                # AI call failed (bad key, rate limit, network) —
-                                # fall back to the rule-based formatter instead
-                                # of just showing an error with no answer.
-                                reply = _format_fallback_response(context_block)
-                                st.warning(f"AI call failed ({e}) — showing rule-based answer instead:")
-                                st.markdown(reply)
-     
-                        with st.expander(f"📋 Data used ({context_block['match_count']} records)"):
-                            st.json(context_block, expanded=False)
-     
-            st.session_state.grounded_chat_history.append({"role": "assistant", "content": reply})
-     
-        if st.button("🗑️ Clear Chat"):
-            st.session_state.grounded_chat_history = [
-                {"role": "assistant", "content": "Chat cleared. Ask me anything about your inventory."}
-            ]
-            st.rerun()
+    }
+    
+        
+    
+    
+    # =========================
+    # SESSION STATE INITIALIZATION
+    # =========================
+    if 'show_assistant' not in st.session_state:
+        st.session_state.show_assistant = False
+    
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = [
+            {"role": "assistant", "content": "👋 Hi! I'm your AI inventory assistant. I know everything about your inventory. Ask me anything!"}
+        ]
+    
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    
+   
+    
+    if 'ai_config' not in st.session_state:
+        
+        st.session_state.ai_config = {
+            'provider': 'Sarvam AI',
+            'model': 'sarvam-m',
+            'api_key': st.secrets.get("SARVAM_API_KEY"),
+            'initialized': False
+        }
 
     
     
@@ -1452,8 +1176,8 @@ if tab_choice == "🔁 Rotor Tracker":
                 'to': df['Date'].max().strftime('%Y-%m-%d') if not df['Date'].isna().all() else 'Unknown'
             }
         }
-
-     # =========================
+    
+    # =========================
     # AI RESPONSE WITH FULL MEMORY
     # =========================
     def get_ai_response(user_input):
@@ -1577,7 +1301,146 @@ if tab_choice == "🔁 Rotor Tracker":
                     
             except Exception as e:
                 return f"⚠️ Connection Error: {str(e)[:50]}. Using fallback mode."
-
+        
+        # Fallback response if AI not connected
+        return get_fallback_response(user_input, inventory_context)
+    
+    # =========================
+    # FALLBACK RESPONSE (WHEN AI NOT CONNECTED)
+    # =========================
+    def get_fallback_response(user_input, context):
+        """Rule-based fallback when AI is not connected"""
+        text = user_input.lower().strip()
+        
+        # ===== LATEST TRANSACTIONS QUERIES =====
+        
+        # Latest incoming
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['incoming', 'inward', 'received']):
+            # Check for specific buyer/supplier
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    transactions = get_latest_incoming(limit=10, buyer=buyer)
+                    return format_latest_transactions(transactions, f"Latest Incoming from {buyer}", "incoming")
+            
+            # Check for specific size
+            size_match = re.search(r'(\d+)', text)
+            if size_match:
+                size = int(size_match.group(1))
+                transactions = get_latest_incoming(limit=10, size=size)
+                return format_latest_transactions(transactions, f"Latest Incoming for Size {size}mm", "incoming")
+            
+            # Default latest incoming
+            transactions = get_latest_incoming(limit=10)
+            return format_latest_transactions(transactions, "Latest Incoming Transactions", "incoming")
+        
+        # Latest outgoing
+        if any(word in text for word in ['latest', 'recent', 'last']) and any(word in text for word in ['outgoing', 'outward', 'sold']):
+            # Check for specific buyer
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    transactions = get_latest_outgoing(limit=10, buyer=buyer)
+                    return format_latest_transactions(transactions, f"Latest Outgoing for {buyer}", "outgoing")
+            
+            # Check for specific size
+            size_match = re.search(r'(\d+)', text)
+            if size_match:
+                size = int(size_match.group(1))
+                transactions = get_latest_outgoing(limit=10, size=size)
+                return format_latest_transactions(transactions, f"Latest Outgoing for Size {size}mm", "outgoing")
+            
+            # Default latest outgoing
+            transactions = get_latest_outgoing(limit=10)
+            return format_latest_transactions(transactions, "Latest Outgoing Transactions", "outgoing")
+        
+        # Future incoming
+        if any(word in text for word in ['coming', 'future', 'incoming', 'expected']):
+            if 'future' in text or 'coming' in text:
+                transactions = get_future_incoming(limit=20)
+                return format_latest_transactions(transactions, "Future Incoming Rotors", "future")
+        
+        # Combined latest (both types)
+        if any(word in text for word in ['latest', 'recent', 'last']) and not any(word in text for word in ['incoming', 'outgoing']):
+            incoming = get_latest_incoming(limit=5)
+            outgoing = get_latest_outgoing(limit=5)
+            
+            response = "**📊 Recent Transactions:**\n\n"
+            
+            if incoming:
+                response += "**📥 Incoming:**\n"
+                for t in incoming:
+                    response += f"• {t['date']}: {t['supplier']} - {t['size']}mm, {t['quantity']} units\n"
+                response += "\n"
+            
+            if outgoing:
+                response += "**📤 Outgoing:**\n"
+                for t in outgoing:
+                    pending = " ⏳" if t['pending'] else ""
+                    response += f"• {t['date']}: {t['buyer']} - {t['size']}mm, {t['quantity']} units{pending}\n"
+            
+            if not incoming and not outgoing:
+                return "No recent transactions found."
+            
+            return response
+        
+        # ===== ORIGINAL FALLBACK QUERIES =====
+        
+        # Stock query
+        if 'stock' in text:
+            if context['stock_summary']:
+                response = "📦 **Current Stock Levels:**\n\n"
+                total = 0
+                for item in context['stock_summary']:
+                    response += f"• {item['size']}mm: {item['current_stock']} units"
+                    if item['pending_orders'] > 0:
+                        response += f" (⏳ {item['pending_orders']} pending)"
+                    response += "\n"
+                    total += item['current_stock']
+                response += f"\n**Total Stock:** {total} units"
+                return response
+        
+        # Pending orders
+        elif 'pending' in text:
+            # Check for specific buyer
+            for buyer in context['buyers']:
+                if buyer.lower() in text:
+                    if buyer in context['pending_orders']:
+                        data = context['pending_orders'][buyer]
+                        response = f"⏳ **Pending for {buyer}:**\n"
+                        for order in data['orders']:
+                            response += f"• {order['size']}mm: {order['quantity']} units\n"
+                        response += f"\n**Total:** {data['total']} units"
+                        return response
+            
+            # All pending
+            if context['pending_orders']:
+                response = "⏳ **All Pending Orders:**\n\n"
+                total_all = 0
+                for buyer, data in context['pending_orders'].items():
+                    response += f"**{buyer}**\n"
+                    for order in data['orders']:
+                        response += f"  • {order['size']}mm: {order['quantity']} units\n"
+                    response += f"  Total: {data['total']} units\n\n"
+                    total_all += data['total']
+                response += f"**Overall Total:** {total_all} units"
+                return response
+        
+        # Help
+        elif 'help' in text:
+            return """🤖 **Available Commands:**
+    • `stock` - Show current stock levels
+    • `pending` - Show all pending orders
+    • `[buyer] pending` - Show pending for specific buyer
+    • `coming` - Show future incoming rotors
+    • `latest incoming` - Show recent incoming transactions
+    • `latest outgoing` - Show recent outgoing transactions
+    • `latest for [buyer]` - Show recent transactions for specific buyer
+    • `latest [size]mm` - Show recent transactions for specific size
+    
+    Ask me anything about your inventory!"""
+        
+        # Default response
+        return "I can help you with stock levels, pending orders, future incoming, and latest transactions. Try asking: 'stock', 'pending', 'coming', 'latest incoming', or 'latest outgoing'"
+    
     # =========================
     # HANDLE ACTIONS
     # =========================
